@@ -4,7 +4,7 @@
   flex: 1;
   min-height: 200px;
   overflow: auto;
-  padding: 0 32px 40px;
+  padding: 0 clamp(25px, 3.5vw, 58px) 40px;
   outline: 0;
 }
 .text-content {
@@ -17,9 +17,9 @@
   white-space: pre-wrap;
   tab-size: 2;
   overflow-wrap: anywhere;
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1.9;
-  padding: 12px 0 40px;
+  padding: 0 0 40px;
   cursor: text;
 }
 .text-paragraph {
@@ -37,8 +37,8 @@
 .text-image-layer,
 .text-image-controls {
   position: absolute;
-  left: 32px;
-  right: 32px;
+  left: clamp(25px, 3.5vw, 58px);
+  right: clamp(25px, 3.5vw, 58px);
   pointer-events: none;
 }
 .text-image-layer {
@@ -138,6 +138,8 @@
 .text-image-tools button {
   font-size: 11px;
   padding: 4px 8px;
+  background: transparent;
+  border-color: transparent;
   color: var(--muted);
   pointer-events: auto;
 }
@@ -173,4 +175,15 @@
 }
 .text-content:has(~ .text-image-controls .image-selection) {
   touch-action: none;
+}
+
+.text-image-tools button::before {
+  content: '+';
+  margin-right: 9px;
+  font-size: 15px;
+}
+
+.text-image-tools button {
+  padding: 0 4px;
+  min-height: 24px;
 }

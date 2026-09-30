@@ -2,7 +2,7 @@
 
 ## Automated coverage
 
-Verified locally on 2026-09-30:
+Verified locally on 2026-10-01:
 
 | Check               | Result                | Coverage                                                                                                                                                                                |
 | ------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -36,3 +36,5 @@ The complete browser suite passed with one worker; an earlier parallel run had o
 ## Scope
 
 Rich formatting beyond automatic lists, Tasks, Finance, Goals, Web Push, prototype-data migration, and deployment remain outside the implemented Notes/account flow. Account backup import can complete partially if a request fails; it is not an atomic server transaction. Large collections and real-device performance need separate verification.
+
+Workspace styling was compared with the prototype at 1864×1000 and 390×844 viewports. Tabs start at the workspace top; account status stays in the sidebar. Finance remains a labeled preview.

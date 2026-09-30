@@ -726,14 +726,26 @@
   </nav>
   <div class="sidebar-footer">
     <div class="account-control">
+      {#if account}<div class="account-status">
+          {account.username} · {writable
+            ? t(
+                'Account workspace · synced to server',
+                'Workspace akun · tersimpan di server',
+              )
+            : t(
+                'Account cache · read only until connected',
+                'Cache akun · hanya baca sampai terhubung',
+              )}
+        </div>{/if}
+
       <button
         class="account-button"
         aria-label={t('Account', 'Akun')}
         aria-expanded={accountMenu}
         onclick={() => (accountMenu = !accountMenu)}
-        ><Icon name="account" /><span
-          >{account ? account.username : t('Guest', 'Tamu')}</span
-        ></button
+        ><span class="avatar" aria-hidden="true"
+          >{account ? account.username[0].toUpperCase() : 'Z'}</span
+        ><span>{account ? account.username : t('Guest', 'Tamu')}</span></button
       >{#if accountMenu}<div class="account-menu">
           <p>
             {account
@@ -797,17 +809,6 @@
     </div>
   {:else if view === 'main' || view === 'notes'}
     <section class="notes-pane">
-      {#if account}<div class="account-status">
-          {account.username} · {writable
-            ? t(
-                'Account workspace · synced to server',
-                'Workspace akun · tersimpan di server',
-              )
-            : t(
-                'Account cache · read only until connected',
-                'Cache akun · hanya baca sampai terhubung',
-              )}
-        </div>{/if}
       <div class="tabs">
         {#each openNotes as note (note.id)}<div
             class="tab"
@@ -952,20 +953,46 @@
             <h2>Finance<span>.</span></h2>
             <small>{t('Preview', 'Pratinjau')}</small>
           </div>
-          <p class="muted">
-            {t(
-              'A clearer picture of your money.',
-              'Gambaran keuangan yang lebih jelas.',
-            )}
+          <div class="finance-meta">
+            <span>{t('By category', 'Per kategori')}</span><span
+              >{new Intl.DateTimeFormat(prefs.language === 'en' ? 'en' : 'id', {
+                month: 'long',
+                year: 'numeric',
+              }).format(new Date())}</span
+            >
+          </div>
+          <div class="finance-summary">
+            <div class="money">
+              <small>{t('Income', 'Pemasukan')}</small><strong
+                >Rp8.000.000</strong
+              >
+            </div>
+            <div class="money expense">
+              <small>{t('Expenses', 'Pengeluaran')}</small><strong
+                >Rp2.500.000</strong
+              >
+            </div>
+            <div class="money">
+              <small>{t('Balance', 'Saldo')}</small><strong>Rp5,5 jt</strong>
+            </div>
+          </div>
+          <p class="finance-date">
+            {t('Recent transactions', 'Transaksi terbaru')}
           </p>
-          <div class="money">
-            <small>{t('Balance', 'Saldo')}</small><strong>Rp5.500.000</strong>
+          <div class="transaction">
+            <span class="category">{t('Food', 'Makanan')}</span><span
+              class="description">{t('Lunch', 'Makan siang')}</span
+            ><b>−Rp35.000</b>
           </div>
           <div class="transaction">
-            <span>{t('Groceries', 'Belanja')}</span><b>−Rp150.000</b>
+            <span class="category">{t('Transport', 'Transportasi')}</span><span
+              class="description">{t('Ride home', 'Perjalanan pulang')}</span
+            ><b>−Rp20.000</b>
           </div>
           <div class="transaction">
-            <span>{t('Internet', 'Internet')}</span><b>−Rp350.000</b>
+            <span class="category">{t('Bills', 'Tagihan')}</span><span
+              class="description">{t('Internet', 'Internet')}</span
+            ><b>−Rp350.000</b>
           </div>
         </section>
       </div>{/if}

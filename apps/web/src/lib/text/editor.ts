@@ -73,6 +73,7 @@ export function mountText(host: HTMLElement, options: Options) {
   const add = document.createElement('button');
   add.type = 'button';
   add.textContent = t('Add image', 'Tambah gambar');
+  add.setAttribute('aria-label', t('Add image', 'Tambah gambar'));
   add.onpointerdown = (e) => e.preventDefault();
   add.onclick = () => {
     savedRange = range();

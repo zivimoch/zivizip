@@ -1,16 +1,13 @@
 :root {
-  font-family:
-    Inter,
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    sans-serif;
-  color: #e2eaed;
-  background: #101719;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  color: #edf1f3;
+  background: #080f12;
+  --bg: #080f12;
   font-synthesis: none;
   --accent: #00d8ec;
-  --line: #26353c;
-  --muted: #8198a4;
+  --line: #203037;
+  --muted: #89979f;
   color-scheme: dark;
 }
 * {
@@ -58,8 +55,8 @@ small {
   position: fixed;
   inset: 0 auto 0 0;
   width: 72px;
-  padding: 20px 10px;
-  background: #101b20;
+  padding: 24px 10px;
+  background: #091216;
   border-right: 1px solid var(--line);
   z-index: 20;
   overflow: hidden;
@@ -73,11 +70,11 @@ small {
   box-shadow: 20px 0 40px #0003;
 }
 .brand {
-  height: 70px;
+  height: 40px;
   display: flex;
   align-items: center;
   gap: 24px;
-  padding-left: 14px;
+  padding-left: 8px;
   white-space: nowrap;
 }
 .brand-mark {
@@ -91,7 +88,7 @@ small {
   font-size: 25px;
 }
 .sidebar nav {
-  margin-top: 20px;
+  margin-top: 10px;
 }
 .sidebar button {
   display: flex;
@@ -107,7 +104,7 @@ small {
 }
 .sidebar button.active {
   color: var(--accent);
-  background: #00333b;
+  background: linear-gradient(90deg, #003a44a0, #00323a55);
 }
 .sidebar button:hover {
   background: #193139;
@@ -159,7 +156,7 @@ small {
 }
 .tab.active {
   box-shadow: inset 0 -3px var(--accent);
-  background: #14252b;
+  background: linear-gradient(0deg, #00d8ec0d, transparent);
 }
 .tab button,
 .add-tab {
@@ -188,7 +185,7 @@ small {
   padding: 10px 16px;
 }
 .breadcrumb {
-  padding: 22px 32px 12px;
+  padding: 12px clamp(25px, 3.5vw, 58px) 12px;
   display: flex;
   gap: 12px;
   color: #99b1bc;
@@ -216,7 +213,7 @@ small {
   overflow: hidden;
 }
 .preview {
-  padding: 24px 22px;
+  padding: 25px;
   overflow: auto;
   flex: 1;
   min-height: 0;
@@ -528,7 +525,7 @@ dialog p {
     right: 0;
     height: 60px;
     border-top: 1px solid var(--line);
-    background: #101b20;
+    background: #091216;
     justify-content: space-around;
   }
   .bottom-nav button {
@@ -553,7 +550,7 @@ dialog p {
     padding: 12px 20px;
   }
   .brand {
-    padding-left: 14px;
+    padding-left: 8px;
   }
 }
 
@@ -652,4 +649,177 @@ button:disabled {
 }
 .breadcrumb-tools {
   flex-shrink: 0;
+}
+
+/* Shared workspace appearance follows the interaction prototype. */
+body,
+.notes-pane,
+.right-pane {
+  background: var(--bg);
+}
+.sidebar button {
+  margin-bottom: 5px;
+}
+.sidebar-footer {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.sidebar .account-button {
+  padding: 6px 7px;
+}
+.sidebar .account-button .avatar {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #202e35;
+  font-size: 16px;
+}
+.sidebar:not(:hover):not(:has(button:focus-visible)):not(.expanded)
+  .account-button
+  .avatar {
+  visibility: visible;
+}
+.account-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  padding: 0;
+  border: 0;
+}
+.sidebar:hover .account-status,
+.sidebar.expanded .account-status {
+  position: static;
+  width: auto;
+  height: auto;
+  clip-path: none;
+  padding: 8px;
+  font-size: 11px;
+}
+.tabs {
+  padding-left: 7px;
+}
+.tab {
+  font-size: 12px;
+  color: #9aa7ae;
+}
+.tab.active {
+  color: #edf1f3;
+}
+.tab-select {
+  padding-inline: 16px 10px;
+}
+.breadcrumb {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.breadcrumb-path > span {
+  color: #526a77;
+}
+.section-heading {
+  margin-bottom: 16px;
+}
+.section-heading h2 {
+  margin: 0;
+  font-weight: 750;
+  letter-spacing: -1px;
+}
+.preview.tasks > .muted {
+  font-size: 11px;
+  margin: 1px 0 9px;
+}
+.progress {
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.task {
+  padding: 12px 0;
+  min-height: 49px;
+}
+.divider {
+  position: relative;
+  background: transparent;
+}
+.divider::after {
+  content: '';
+  position: absolute;
+  background: var(--line);
+}
+.divider.vertical::after {
+  width: 1px;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+}
+.divider.horizontal::after {
+  height: 1px;
+  left: 0;
+  right: 0;
+  top: 50%;
+}
+.divider:hover {
+  background: transparent;
+}
+.divider:hover::after {
+  background: var(--accent);
+}
+.finance-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 18px 0;
+}
+.finance-summary .money {
+  background: #0d191f;
+  margin: 0;
+  padding: 12px 10px;
+  border-radius: 6px;
+}
+.finance-summary .money small {
+  font-size: 9px;
+}
+.finance-summary .money strong {
+  font-size: clamp(13px, 1vw, 18px);
+  white-space: nowrap;
+}
+.finance-summary .expense strong {
+  color: #ff583e;
+}
+.finance-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #aebcc2;
+  font-size: 11px;
+}
+.finance-date {
+  font-size: 11px;
+  color: #aebcc2;
+  margin: 20px 0 8px;
+}
+.transaction {
+  align-items: center;
+  padding: 9px 0;
+}
+.transaction .category {
+  padding: 3px 9px;
+  border: 1px solid #2b3e48;
+  background: #1c2931;
+  border-radius: 20px;
+  font-size: 10px;
+}
+.transaction .description {
+  flex: 1;
+}
+@media (max-width: 800px) {
+  .breadcrumb {
+    padding: 12px 20px 10px;
+  }
+  .sidebar.expanded .brand {
+    height: 40px;
+  }
 }

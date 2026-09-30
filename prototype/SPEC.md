@@ -23,6 +23,8 @@ This document describes the target interaction model. The [verification scope](.
 - The editor fills available height and accepts native caret placement throughout. Focus adds no colored side line or canvas border.
 - Note tab labels use compact horizontal padding and a maximum selection width of 180px on desktop / 160px on mobile; longer names retain ellipsis.
 
+- Workspace styling follows the prototype palette, 14px sans-serif UI, 15px editor text, compact tabs, thin splitters and responsive note margins. Account status belongs to the sidebar rather than above note tabs. Finance preview uses three summary cards and category pills.
+
 ## Text and images
 
 - Preserve normal caret placement, selection, typing, Enter and paste behavior. Image controls must not block text editing.
