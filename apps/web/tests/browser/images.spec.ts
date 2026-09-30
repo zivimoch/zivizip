@@ -70,6 +70,107 @@ test('images follow the caret and preceding paragraphs without drifting during l
   await page.screenshot({ path: '/tmp/zivizip-text-images.png' });
 });
 
+test('backspace and mobile input delete adjacent images with undo', async ({
+  page,
+}) => {
+  await guest(page);
+  await create(page);
+  const editor = page.getByRole('textbox', { name: 'Note content' });
+  await editor.click();
+  await page.keyboard.type('Above');
+  await page.keyboard.press('Enter');
+  await paste(page);
+  await page.keyboard.type('Below');
+  for (let i = 0; i < 5; i++) await page.keyboard.press('Backspace');
+  await expect(page.locator('.text-image')).toHaveCount(1);
+  await page.keyboard.press('Backspace');
+  await expect(page.locator('.text-image')).toHaveCount(0);
+  await page.keyboard.press('Control+z');
+  await expect(page.locator('.text-image img')).toBeVisible();
+  await editor.evaluate((el) =>
+    el.dispatchEvent(
+      new InputEvent('beforeinput', {
+        inputType: 'deleteContentBackward',
+        bubbles: true,
+        cancelable: true,
+      }),
+    ),
+  );
+  await expect(page.locator('.text-image')).toHaveCount(0);
+  await page.keyboard.press('Control+z');
+  await expect(page.locator('.text-image img')).toBeVisible();
+  await page.locator('.text-paragraph').first().click();
+  await page.keyboard.press('End');
+  await page.keyboard.press('Delete');
+  await expect(page.locator('.text-image')).toHaveCount(0);
+  await expect(editor).toContainText('Above');
+});
+
+test('moving an image releases its former space for typing and deletion', async ({
+  page,
+}) => {
+  await guest(page);
+  await create(page);
+  await page.getByRole('textbox', { name: 'Note content' }).click();
+  for (let i = 0; i < 8; i++) {
+    await page.keyboard.type('Line ' + i);
+    await page.keyboard.press('Enter');
+  }
+  await paste(page);
+  await page.keyboard.type('Below');
+  const original = await position(page);
+  await page.mouse.move(
+    original.x + original.width / 2,
+    original.y + original.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(original.x + original.width / 2, original.y - 120, {
+    steps: 6,
+  });
+  await page.mouse.up();
+  await expect(page.locator('.text-image-anchor')).toHaveCSS('height', '0px');
+  const last = page.locator('.text-paragraph').last();
+  expect((await last.boundingBox())!.y).toBeLessThan(original.y + 35);
+  await last.click();
+  await page.keyboard.press('End');
+  await page.keyboard.type(' editable');
+  await page.keyboard.press('Backspace');
+  await expect(last).toHaveText('Below editabl');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          new Promise<string[]>((resolve, reject) => {
+            const open = indexedDB.open('zivizip-guest-v1');
+            open.onerror = () => reject(open.error);
+            open.onsuccess = () => {
+              const db = open.result;
+              const request = db
+                .transaction('notes')
+                .objectStore('notes')
+                .getAll();
+              request.onsuccess = () => {
+                resolve(request.result.map((n) => n.body));
+                db.close();
+              };
+              request.onerror = () => {
+                reject(request.error);
+                db.close();
+              };
+            };
+          }),
+      ),
+    )
+    .toContain(
+      'Line 0\nLine 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6\nLine 7\nBelow editabl',
+    );
+  await page.reload();
+  await expect(page.locator('.text-image-anchor')).toHaveCSS('height', '0px');
+  await expect(page.locator('.text-paragraph').last()).toHaveText(
+    'Below editabl',
+  );
+});
+
 test('image selection supports all resize corners, rotation, deletion and undo', async ({
   page,
 }) => {

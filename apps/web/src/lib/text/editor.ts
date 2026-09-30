@@ -31,7 +31,6 @@ export function mountText(host: HTMLElement, options: Options) {
   let history: string[] = [],
     redo: string[] = [],
     before = accepted,
-    protectedAnchors: { node: HTMLElement; index: number }[] = [],
     stationary: { id: string; y: number }[] = [];
   let gesture: {
     id: string;
@@ -250,7 +249,8 @@ export function mountText(host: HTMLElement, options: Options) {
     for (const im of doc.images) {
       const a = anchor(im.id);
       if (a) {
-        a.style.height = `${im.h + 20}px`;
+        // Offset images float behind text without leaving an uneditable flow gap.
+        a.style.height = `${im.dx || im.dy ? 0 : im.h + 20}px`;
         a.style.width = '100%';
         const r = a.getBoundingClientRect();
         positions.set(im.id, {
@@ -361,6 +361,28 @@ export function mountText(host: HTMLElement, options: Options) {
     persist(before);
     paint();
     editor.focus();
+  }
+  function deleteAdjacentImage(backward: boolean) {
+    const r = range();
+    if (!r?.collapsed) return false;
+    const p = targetParagraph(r),
+      prefix = r.cloneRange();
+    prefix.selectNodeContents(p);
+    prefix.setEnd(r.startContainer, r.startOffset);
+    const boundary = backward
+      ? !prefix.toString()
+      : prefix.toString() === p.textContent;
+    const neighbor = backward ? p.previousSibling : p.nextSibling;
+    if (
+      !boundary ||
+      !(neighbor instanceof HTMLElement) ||
+      !neighbor.dataset.imageAnchor
+    )
+      return false;
+    remove(neighbor.dataset.imageAnchor);
+    getSelection()?.removeAllRanges();
+    getSelection()?.addRange(r);
+    return true;
   }
   async function insert(file: Blob) {
     if (!opts.writable || uploading) return;
@@ -473,22 +495,24 @@ export function mountText(host: HTMLElement, options: Options) {
         .filter((im) => y > (positions.get(im.id)?.y || 0) + 2)
         .map((im) => ({ id: im.id, y: positions.get(im.id)!.y }));
     }
-    protectedAnchors =
-      (e as InputEvent).inputType.startsWith('delete') && !all
-        ? [...editor.querySelectorAll<HTMLElement>('[data-image-anchor]')].map(
-            (node) => ({ node, index: [...editor.childNodes].indexOf(node) }),
-          )
-        : [];
+    const inputType = (e as InputEvent).inputType;
+    if (
+      inputType === 'deleteContentBackward' ||
+      inputType === 'deleteContentForward'
+    ) {
+      if (deleteAdjacentImage(inputType === 'deleteContentBackward')) {
+        e.preventDefault();
+        return;
+      }
+    }
     if (all && (e as InputEvent).inputType.startsWith('insert')) {
       doc.images = [];
       all = false;
     }
   });
   editor.addEventListener('input', (e) => {
-    for (const a of protectedAnchors)
-      if (!editor.contains(a.node))
-        editor.insertBefore(a.node, editor.childNodes[a.index] || null);
-    protectedAnchors = [];
+    // Native range deletion can remove image anchors along with selected text.
+    doc.images = doc.images.filter((im) => anchor(im.id));
     paint();
     for (const p of stationary) {
       const im = doc.images.find((im) => im.id === p.id),
@@ -586,24 +610,11 @@ export function mountText(host: HTMLElement, options: Options) {
       paint();
       return;
     }
-    if (e.key === 'Backspace' || e.key === 'Delete') {
-      const r = range();
-      if (!r?.collapsed) return;
-      const p = targetParagraph(r),
-        prefix = r.cloneRange();
-      prefix.selectNodeContents(p);
-      prefix.setEnd(r.startContainer, r.startOffset);
-      const atStart = !prefix.toString(),
-        atEnd = prefix.toString() === p.textContent;
-      const neighbor =
-        e.key === 'Backspace' ? p.previousSibling : p.nextSibling;
-      if (
-        (e.key === 'Backspace' ? atStart : atEnd) &&
-        neighbor instanceof HTMLElement &&
-        neighbor.dataset.imageAnchor
-      )
-        e.preventDefault();
-    }
+    if (
+      (e.key === 'Backspace' || e.key === 'Delete') &&
+      deleteAdjacentImage(e.key === 'Backspace')
+    )
+      e.preventDefault();
   });
   host.addEventListener('pointerdown', (e) => {
     const el = e.target as Element;

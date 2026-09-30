@@ -26,8 +26,8 @@ This document describes the target interaction model. The [verification scope](.
 
 - Preserve normal caret placement, selection, typing, Enter and paste behavior. Image controls must not block text editing.
 - Pasted images anchor at the caret in their own flow block and place the next typing position below the image. Inserting or wrapping lines above moves the image vertically without horizontal drift.
-- Images render behind text and can be dragged independently. Drag offsets preserve anchoring; resizing updates reserved space. After dragging an image upward, editing below its displayed position must not move it through its former anchor.
-- Paragraph spacing remains consistent before and after images. Ordinary text deletion preserves image anchors.
+- Images render behind text and can be dragged independently. Drag offsets preserve anchoring; moved images release their original reserved space so it remains editable. Resizing an image in flow updates reserved space. After dragging an image upward, editing below its displayed position must not move it through its former anchor.
+- Paragraph spacing remains consistent before and after images. Backspace/Delete at an adjacent image boundary removes the image and supports undo. Range deletion includes image anchors within the selection.
 - Selected images expose four circular resize handles, rotation above, and deletion below. All controls remain reachable above the editor hit area. Right-side resizing must work without requiring diagonal movement.
 - Delete/Backspace removes selected images. Ctrl/Cmd+A in the editor includes text and images, and deletion removes the complete selection.
 - Images, transforms and content persist. Image bytes are stored separately from text updates, and an Add image file picker supplements clipboard paste. New Draw exports have transparent backgrounds; existing opaque screenshots retain their original pixels.

@@ -52,6 +52,6 @@ Pan and zoom are stored separately per browser workspace. Selection and undo his
 
 ## Text image editing
 
-The Text editor stores typed paragraph/image blocks rather than arbitrary HTML. Normal-flow anchors reserve space at paste time; an independent image layer places pixels behind text and stores movement/rotation separately. Editing below a moved image compensates for anchor movement so the image does not drift. Explicit image deletion and select-all deletion are distinct from ordinary text deletion.
+The Text editor stores typed paragraph/image blocks rather than arbitrary HTML. Normal-flow anchors reserve space at paste time; an independent image layer places pixels behind text and stores movement/rotation separately. Editing below a moved image compensates for anchor movement so the image does not drift. Offset images release reserved flow space. Backspace/Delete at image boundaries and range deletion remove the affected images; the editor history restores them with undo.
 
 Attachment bytes live outside note revisions. Guest bytes are IndexedDB blobs; the single-owner service stores content-addressed bytes in SQLite. Typing, resize and rotation only write document metadata. This keeps HTTP/SSE note synchronization independent of image byte size. A separate media store can replace the SQLite attachment table when deployment/storage requirements justify it.
