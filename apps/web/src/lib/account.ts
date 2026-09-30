@@ -1,4 +1,10 @@
-import { type Note, type NotesRepository, WorkspaceDB } from './storage';
+import { emptyScene } from './draw/scene';
+import {
+  type Note,
+  type NoteKind,
+  type NotesRepository,
+  WorkspaceDB,
+} from './storage';
 export interface Account {
   id: string;
   username: string;
@@ -60,14 +66,20 @@ export class AccountNotes implements NotesRepository {
     });
     return notes;
   }
-  async create(name: string, category: string, icon: string) {
+  async create(
+    name: string,
+    category: string,
+    icon: string,
+    kind: NoteKind = 'text',
+  ) {
     const time = Date.now();
     return this.copy({
       id: crypto.randomUUID(),
       name,
       category,
       icon,
-      body: '',
+      kind,
+      body: kind === 'draw' ? JSON.stringify(emptyScene()) : '',
       revision: 1,
       createdAt: time,
       updatedAt: time,

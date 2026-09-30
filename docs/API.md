@@ -37,3 +37,11 @@ The registration modal collects an email and a message. Submitting sends those f
 SQLite lives in the `notes-data` Docker volume. Normal container recreation preserves notes and sessions. Removing the volume destroys server data.
 
 Stale updates produce conflict copies. Stale deletes return `409`. Authentication failures return `401`, invalid mutation origins return `403`, and rate limits return `429`. Account writes are not queued offline. Failed pending edits remain available for retry or download.
+
+## Note documents
+
+`kind` is `text` or `draw` and cannot be changed after creation. Missing `kind` on existing records is interpreted as `text`; the SQLite JSON records need no destructive migration. `body` remains a string: plain text for Text notes, or serialized `{ "version": 1, "shapes": [...] }` for Draw.
+
+Draw objects contain an ID, type, points, color, stroke width, rotation angle, label, font size and local eraser masks. Client and server validate geometry, identifiers and colors. Limits are 2 MB UTF-8 per body, 2,000 objects, 100,000 combined geometry/eraser points, and 10,000 UTF-16 code units per label. World coordinates are bounded to ±1,000,000. Invalid documents return `400`.
+
+Workspace backup version 2 includes Text and Draw notes. Import also accepts version 1 Text backups and creates new note IDs. Viewport, selection and undo history are not part of the portable document. PNG export is transparent and limited to 2,400 pixels on the longest side.

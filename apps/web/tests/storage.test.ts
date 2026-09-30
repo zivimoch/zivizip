@@ -63,3 +63,49 @@ it('keeps guest notes separate from the account cache', async () => {
     'Guest private',
   ]);
 });
+it('round-trips Draw backups and accepts legacy Text backups', async () => {
+  const { repo, db } = setup();
+  const n = await repo.create('Canvas', 'General', 'note', 'draw');
+  const body = JSON.stringify({
+    version: 1,
+    shapes: [
+      {
+        id: 'shape-1',
+        type: 'rect',
+        points: [
+          [0, 0],
+          [100, 80],
+        ],
+        color: '#17c5d5',
+        width: 4,
+        angle: 45,
+        text: 'Plan',
+        fontSize: 24,
+        erased: [],
+      },
+    ],
+  });
+  await repo.write({ ...n, body });
+  const backup = await exportWorkspace(db);
+  expect(backup.version).toBe(2);
+  await importWorkspace(db, backup);
+  expect(
+    (await repo.list()).every((n) => n.kind === 'draw' && n.body === body),
+  ).toBe(true);
+  const legacy = {
+    ...backup,
+    version: 1,
+    notes: backup.notes.map((n) => ({
+      ...n,
+      kind: undefined,
+      body: 'Legacy text',
+    })),
+  };
+  expect(validateBackup(legacy).notes[0].body).toBe('Legacy text');
+  const bad = {
+    ...backup,
+    notes: backup.notes.map((n) => ({ ...n, body: '{}' })),
+  };
+  await expect(importWorkspace(db, bad)).rejects.toThrow();
+  expect(await repo.list()).toHaveLength(2);
+});

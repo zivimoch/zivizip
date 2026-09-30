@@ -4,6 +4,7 @@
     account: 'M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0 M4 22v-3a8 8 0 0 1 16 0v3',
     home: 'M3 10 12 3l9 7v11h-6v-7H9v7H3z',
     layers: 'm12 3 10 5-10 5L2 8z M2 12l10 5 10-5 M2 16l10 5 10-5',
+    draw: 'M4 20l2-6L17 3l4 4L10 18z',
     note: 'M14 2H5v20h14V7z M14 2v6h5 M8 12h8 M8 16h8',
     tasks: 'M4 3h16v18H4z m3 9 3 3 7-7',
     finance: 'M3 14h4v8H3z M10 8h4v14h-4z M17 2h4v20h-4z',

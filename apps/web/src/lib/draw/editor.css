@@ -1,0 +1,230 @@
+.draw-editor {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  padding: 0 20px 10px;
+  overflow: hidden;
+}
+.draw-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-bottom: 8px;
+}
+.draw-tools,
+.draw-options {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  min-width: 0;
+  padding-bottom: 3px;
+}
+.draw-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  background: #152128;
+}
+.draw-toolbar button[aria-pressed='true'] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.draw-editor button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.draw-editor button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+}
+.draw-tools kbd {
+  font: 10px inherit;
+  color: var(--muted);
+  margin-left: 3px;
+}
+.draw-divider {
+  height: 25px;
+  border-left: 1px solid var(--line);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+.draw-options label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--muted);
+  margin: 0;
+}
+.draw-options input[type='color'] {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  flex-shrink: 0;
+}
+.draw-options input[type='range'] {
+  width: 60px;
+  min-width: 60px;
+  padding: 0;
+}
+.draw-options select {
+  width: 50px;
+  margin: 0;
+  padding: 5px;
+}
+.draw-stage {
+  position: relative;
+  flex: 1;
+  min-height: 180px;
+  overflow: hidden;
+  background: transparent;
+  isolation: isolate;
+}
+.draw-stage .drawing {
+  display: block;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+  user-select: none;
+  outline: none !important;
+  border: 0 !important;
+}
+.draw-stage .drawing:focus,
+.draw-stage .drawing:focus-visible {
+  outline: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+.draw-stage [data-handle],
+.draw-stage [data-endpoint] {
+  cursor: move;
+}
+.selection-rotate,
+.selection-delete {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  padding: 8px;
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+  background: #152128;
+  touch-action: none;
+  z-index: 3;
+  color: var(--accent);
+}
+.draw-editor [hidden] {
+  display: none !important;
+}
+.eraser-cursor {
+  pointer-events: none;
+  position: absolute;
+  border: 1px solid #ccdce3;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 4;
+}
+.canvas-text-editor {
+  position: absolute !important;
+  width: min(360px, 90%) !important;
+  min-height: 90px !important;
+  height: 120px;
+  padding: 4px !important;
+  line-height: 1.2;
+  background: #101719 !important;
+  z-index: 5;
+  border: 1px dashed var(--accent) !important;
+  resize: both;
+  margin: 0 !important;
+}
+.canvas-text-done {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 6;
+  background: var(--accent);
+  color: #071014;
+  border-radius: 5px;
+  padding: 10px 15px;
+}
+.draw-caption {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 5px 0 0;
+  flex-shrink: 0;
+}
+.draw-message {
+  font-size: 12px;
+  color: var(--muted);
+}
+.draw-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+.note-type-picker {
+  border: 0;
+  padding: 0;
+  display: flex;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.note-type-picker legend {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.note-type-picker label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+.note-type-picker input {
+  width: auto;
+  margin: 0;
+}
+@media (max-width: 700px) {
+  .draw-editor {
+    padding: 0 8px 8px;
+  }
+  .draw-toolbar button {
+    min-height: 40px;
+  }
+  .draw-caption {
+    display: none;
+  }
+  .draw-tools kbd {
+    display: none;
+  }
+  .draw-options input[type='color'] {
+    height: 34px;
+  }
+  .canvas-text-editor {
+    font-size: 20px !important;
+  }
+  .draw-stage {
+    min-height: 150px;
+  }
+}

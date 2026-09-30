@@ -1,5 +1,8 @@
+import { emptyScene, parseScene } from './draw/scene';
 import Dexie, { type Table } from 'dexie';
+export type NoteKind = 'text' | 'draw';
 export interface Note {
+  kind?: NoteKind;
   id: string;
   name: string;
   category: string;
@@ -20,7 +23,7 @@ export interface Preferences {
 }
 export interface Backup {
   format: 'zivizip';
-  version: 1;
+  version: 1 | 2;
   exportedAt: string;
   notes: Note[];
   preferences: Preferences;
@@ -53,7 +56,12 @@ export class WorkspaceDB extends Dexie {
 }
 export interface NotesRepository {
   list(): Promise<Note[]>;
-  create(name: string, category: string, icon: string): Promise<Note>;
+  create(
+    name: string,
+    category: string,
+    icon: string,
+    kind?: NoteKind,
+  ): Promise<Note>;
   write(note: Note): Promise<Note>;
   remove(id: string): Promise<void>;
 }
@@ -65,14 +73,20 @@ export class LocalNotes implements NotesRepository {
       .toArray()
       .catch(() => this.db.notes.toArray());
   }
-  async create(name: string, category: string, icon: string) {
+  async create(
+    name: string,
+    category: string,
+    icon: string,
+    kind: NoteKind = 'text',
+  ) {
     const now = Date.now();
     const n: Note = {
       id: crypto.randomUUID(),
       name,
       category,
       icon,
-      body: '',
+      kind,
+      body: kind === 'draw' ? JSON.stringify(emptyScene()) : '',
       revision: 1,
       createdAt: now,
       updatedAt: now,
@@ -112,7 +126,7 @@ export function validateBackup(value: unknown): Backup {
   const b = value as Backup;
   if (
     b.format !== 'zivizip' ||
-    b.version !== 1 ||
+    ![1, 2].includes(b.version) ||
     !Array.isArray(b.notes) ||
     b.notes.length > 10000
   )
@@ -130,12 +144,14 @@ export function validateBackup(value: unknown): Backup {
       typeof n.category !== 'string' ||
       n.category.length > 60 ||
       typeof n.icon !== 'string' ||
+      (n.kind !== undefined && !['text', 'draw'].includes(n.kind)) ||
       typeof n.body !== 'string' ||
       n.body.length > 2_000_000 ||
       ![n.revision, n.createdAt, n.updatedAt].every(Number.isFinite) ||
       n.revision < 1
     )
       throw new Error('Invalid note in backup');
+    if (n.kind === 'draw') parseScene(n.body);
     ids.add(n.id);
   }
   const p = b.preferences;
@@ -161,7 +177,7 @@ export function validateBackup(value: unknown): Backup {
 export async function exportWorkspace(db: WorkspaceDB): Promise<Backup> {
   return db.transaction('r', db.notes, db.preferences, async () => ({
     format: 'zivizip',
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     notes: await db.notes.toArray(),
     preferences: (await db.preferences.get('workspace')) || { ...defaults },

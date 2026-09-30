@@ -1,3 +1,4 @@
+mod draw;
 use argon2::{password_hash::SaltString, Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use axum::{
     extract::{DefaultBodyLimit, Path, Request, State},
@@ -40,9 +41,18 @@ struct Credentials {
     username: String,
     password: String,
 }
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "lowercase")]
+enum NoteKind {
+    #[default]
+    Text,
+    Draw,
+}
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 struct Note {
+    #[serde(default)]
+    kind: NoteKind,
     id: String,
     name: String,
     category: String,
@@ -262,6 +272,7 @@ fn validate(n: &Note) -> Result<()> {
         || n.category.chars().count() > 60
         || n.icon.len() > 30
         || n.body.len() > 2_000_000
+        || (n.kind == NoteKind::Draw && !draw::valid(&n.body))
         || n.revision < 1
         || n.created_at < 0
     {
@@ -313,6 +324,12 @@ fn write_note(db: &mut Connection, mut n: Note) -> Result<Note> {
     let tx = db.transaction()?;
     let existing = tx.query_row("SELECT data FROM notes WHERE id=?", [&n.id], row_note);
     match existing {
+        Ok(current) if current.kind != n.kind => {
+            return Err(Error(
+                StatusCode::BAD_REQUEST,
+                "Note type cannot be changed",
+            ));
+        }
         Ok(current) if current.revision == n.revision => {
             n.revision += 1;
             n.created_at = current.created_at;
@@ -517,6 +534,7 @@ mod tests {
     use super::*;
     fn note() -> Note {
         Note {
+            kind: NoteKind::Text,
             id: Uuid::new_v4().to_string(),
             name: "Plan".into(),
             category: "General".into(),

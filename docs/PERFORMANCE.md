@@ -31,3 +31,9 @@ Docker production preview: 233,108 bytes JS/CSS, 86,316 bytes summed gzip (84.3 
 A local `docker stats --no-stream` snapshot near the end of the small acceptance run showed Notes at 97.31 MiB / 0.01% CPU, Nginx preview at 10.85 MiB / 0% CPU, and Vite development at 199.4 MiB / 0.10% CPU. This includes password authentication activity and runtime allocator retention; it is not an idle floor, a peak measurement, or a production capacity claim. The development container is not part of the deployed runtime design. Password hashing intentionally incurs memory/CPU cost.
 
 The database remains a single-owner SQLite instance. No load test, large-note collection benchmark, real-device test, or multi-replica performance claim is made. Track authentication memory peaks, synchronous database contention, SSE refresh payloads and browser memory as the next measurement targets.
+
+## Draw baseline — 2026-09-30
+
+The Draw editor adds no third-party drawing dependency. The production build contains approximately 256 KiB of JS/CSS and 95 KiB summed gzip, including the Draw chunk (approximately 7.6 KiB gzip). The editor module executes when a Draw note is opened; the service worker still downloads it during shell precaching so guest drawings work offline.
+
+Each completed gesture saves a document revision. Rendering is scheduled once per animation frame; pointer movement does not issue writes. Undo is bounded to 40 snapshots and approximately 8 million serialized characters. A drawing is limited to 2 MB, 2,000 objects and 100,000 combined points/masks. These are guardrails, not a guarantee of fluid performance at maximum size. Large-scene interaction latency and physical-device memory remain unmeasured.

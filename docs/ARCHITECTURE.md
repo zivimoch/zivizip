@@ -20,16 +20,16 @@ The service owns Notes, the single-owner session, and registration-interest reco
 - Account data is stored on the server. A separate browser cache supports offline reading and is cleared on logout.
 - Login offers an explicit guest-note copy; original guest notes remain local.
 - Revision checks preserve conflicting edits as separate copies. Delete requires the current revision.
-- JSON backups include implemented note/workspace data. Media and full-feature archives remain planned.
+- JSON backups include implemented note/workspace data. Draw geometry is included; attachments and full-feature archives remain planned.
 
 ## Service boundaries
 
-| Domain  | Ownership                                                 | Status               |
-| ------- | --------------------------------------------------------- | -------------------- |
-| Notes   | Text notes, revisions, future drawings and attachments    | Implemented for text |
-| Tasks   | Task state and ordering                                   | Prototype            |
-| Finance | Transactions, categories, monthly budgets and realization | Prototype            |
-| Goals   | Goals and links to source records                         | Prototype            |
+| Domain  | Ownership                                                 | Status                    |
+| ------- | --------------------------------------------------------- | ------------------------- |
+| Notes   | Text/Draw notes, revisions, future attachments            | Text and Draw implemented |
+| Tasks   | Task state and ordering                                   | Prototype                 |
+| Finance | Transactions, categories, monthly budgets and realization | Prototype                 |
+| Goals   | Goals and links to source records                         | Prototype                 |
 
 Future services must communicate through APIs or events, rather than writing each other's tables. Goals should consume Tasks/Finance changes and retain only their own relationships and aggregates.
 
@@ -43,3 +43,9 @@ Planned deployment uses Kubernetes, separate environments, project-specific conf
 
 - [ADR 0001: Browser-local notes](decisions/0001-local-notes.md)
 - [ADR 0002: Owner account and Notes service](decisions/0002-local-owner-account.md)
+
+## Draw documents
+
+The SVG editor loads dynamically when a Draw note opens. Shape geometry and labels use a validated, versioned JSON document in the note body. Each completed gesture creates one revision; pointer movements do not send network requests. SSE refreshes wait while a local drawing gesture or text edit is active, preserving the revision used for conflict detection.
+
+Pan and zoom are stored separately per browser workspace. Selection and undo history are transient. Account drawings follow the same login, copy, conflict, cache and offline rules as Text notes. The service worker precaches the editor for guest offline use.

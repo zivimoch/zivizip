@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
+  import DrawEditor from '$lib/DrawEditor.svelte';
+  import type { Viewport } from '$lib/draw/scene';
   import Icon from '$lib/Icon.svelte';
   import AccountDialog from '$lib/AccountDialog.svelte';
   import { AccountNotes, ApiError, api, type Account } from '$lib/account';
@@ -33,6 +35,21 @@
   let formName = '';
   let formCategory = '';
   let formIcon = 'note';
+  let formKind: 'text' | 'draw' = 'text';
+  let drawBusy = false;
+  let drawViews: Record<string, Viewport> = {};
+  function rememberDrawView(id: string, value: Viewport) {
+    drawViews[id] = value;
+    if (db) void db.meta.put({ key: 'draw-view-' + id, value }).catch(problem);
+  }
+  async function loadDrawViews(target: WorkspaceDB) {
+    const rows = await target.meta.toArray();
+    return Object.fromEntries(
+      rows
+        .filter((r) => r.key.startsWith('draw-view-'))
+        .map((r) => [r.key.slice(10), r.value as Viewport]),
+    );
+  }
   let backup: Backup | null = null;
   let online = true;
   let queue = Promise.resolve();
@@ -117,6 +134,7 @@
       );
       if (!nextPrefs.open.includes(nextPrefs.active || ''))
         nextPrefs.active = nextPrefs.open[0] || null;
+      const nextViews = await loadDrawViews(nextDb);
       if (user) await guestDb.meta.put({ key: 'active-account', value: user });
       else await guestDb.meta.delete('active-account');
       eventSource?.close();
@@ -128,6 +146,7 @@
       verified = !!user && fetchServer;
       db = nextDb;
       repo = nextRepo;
+      drawViews = nextViews;
       notes = nextNotes;
       prefs = nextPrefs;
       if (user && fetchServer) listen();
@@ -139,7 +158,15 @@
     }
   }
   async function refreshAccount() {
-    if (!account || pending || dirty.size || switching || refreshing || !online)
+    if (
+      !account ||
+      pending ||
+      drawBusy ||
+      dirty.size ||
+      switching ||
+      refreshing ||
+      !online
+    )
       return;
     refreshing = true;
     const epoch = workspaceEpoch;
@@ -148,7 +175,13 @@
       await api<Account>('/session');
       if (epoch !== workspaceEpoch) return;
       const fresh = await target.list();
-      if (epoch !== workspaceEpoch || pending || dirty.size || switching)
+      if (
+        epoch !== workspaceEpoch ||
+        pending ||
+        drawBusy ||
+        dirty.size ||
+        switching
+      )
         return;
       notes = fresh;
       verified = true;
@@ -260,6 +293,7 @@
     db = guestDb;
     repo = new LocalNotes(db);
     await load();
+    drawViews = await loadDrawViews(db);
     const marker = (await guestDb.meta.get('active-account'))?.value as
       | Account
       | undefined;
@@ -302,7 +336,7 @@
     window.addEventListener('online', connectivity);
     window.addEventListener('offline', connectivity);
     const leave = (e: BeforeUnloadEvent) => {
-      if (error || pending || dirty.size) {
+      if (drawBusy || error || pending || dirty.size) {
         e.preventDefault();
         e.returnValue = '';
       }
@@ -377,9 +411,8 @@
       prefs.active = prefs.open[Math.min(index, prefs.open.length - 1)] || null;
     remember();
   }
-  function editBody(body: string) {
-    if (!current || !writable) return;
-    const original = current.id;
+  function editBody(body: string, original = current?.id) {
+    if (!original || !writable) return;
     dirty.add(original);
     notes = notes.map((n) => (n.id === original ? { ...n, body } : n));
     pending++;
@@ -430,6 +463,7 @@
     formName = n?.name || `Note${number}`;
     formCategory = n?.category || t('General', 'Umum');
     formIcon = n?.icon || 'note';
+    formKind = n?.kind || 'text';
     dialog.showModal();
     await tick();
     nameInput.focus();
@@ -456,7 +490,8 @@
         const n = await repo.create(
           formName.trim(),
           formCategory.trim(),
-          formIcon,
+          formKind === 'draw' && formIcon === 'note' ? 'draw' : formIcon,
+          formKind,
         );
         notes = [...notes, n];
         prefs.counter++;
@@ -543,6 +578,7 @@
       } else {
         count = await importWorkspace(db, backup);
         await load();
+        drawViews = await loadDrawViews(db);
       }
       backup = null;
       notice = t(
@@ -793,14 +829,30 @@
       {#if current}<div class="breadcrumb">
           {current.category}<span>/</span>{current.name}
         </div>
-        <textarea
-          class="note-editor"
-          readonly={!writable}
-          aria-label={t('Note content', 'Isi catatan')}
-          value={current.body}
-          oninput={(e) => editBody(e.currentTarget.value)}
-          spellcheck="true"
-        ></textarea>{:else}<div class="empty">
+        {#if current.kind === 'draw'}
+          {#key `${workspaceEpoch}:${current.id}:${prefs.language}`}
+            {@const drawId = current.id}
+            <DrawEditor
+              body={current.body}
+              name={current.name}
+              {writable}
+              language={prefs.language}
+              view={drawViews[drawId]}
+              onchange={(body) => editBody(body, drawId)}
+              onviewport={(value) => rememberDrawView(drawId, value)}
+              onbusy={(value) => (drawBusy = value)}
+              onerror={problem}
+            />
+          {/key}
+        {:else}
+          <textarea
+            class="note-editor"
+            readonly={!writable}
+            aria-label={t('Note content', 'Isi catatan')}
+            value={current.body}
+            oninput={(e) => editBody(e.currentTarget.value)}
+            spellcheck="true"
+          ></textarea>{/if}{:else}<div class="empty">
           <Icon name="note" />
           <p>
             {t('A little space for your thoughts.', 'Ruang untuk pikiranmu.')}
@@ -921,8 +973,17 @@
         onclick={() => dialog.close()}>×</button
       >
     </div>
+    {#if !editing}<fieldset class="note-type-picker">
+        <legend>{t('Note type', 'Jenis catatan')}</legend>
+        <label
+          ><input type="radio" bind:group={formKind} value="text" />Text</label
+        >
+        <label
+          ><input type="radio" bind:group={formKind} value="draw" />Draw</label
+        >
+      </fieldset>{/if}
     <div class="icon-picker">
-      {#each ['note', 'bulb', 'folder', 'tasks', 'home', 'finance'] as icon}<button
+      {#each ['note', 'draw', 'bulb', 'folder', 'tasks', 'home', 'finance'] as icon}<button
           type="button"
           class:active={formIcon === icon}
           aria-label={icon}
