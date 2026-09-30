@@ -1,0 +1,12 @@
+node_modules/
+.svelte-kit/
+build/
+.env
+.env.*
+!.env.example
+playwright-report/
+test-results/
+.local/
+**/target/
+*.sqlite*
+.pnpm-store/

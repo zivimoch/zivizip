@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#080f12" />
+    <title>Zivizip — ruang pribadi</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-heading">
+        <a class="brand" href="#main" aria-label="Zivizip Main"
+          ><span class="brand-mark">z</span
+          ><span class="sidebar-label">zivizip</span></a
+        ><button
+          id="hide-sidebar"
+          class="icon-button"
+          aria-label="Sembunyikan sidebar"
+        >
+          ←
+        </button>
+      </div>
+      <div class="workspace-label sidebar-label">PERSONAL WORKSPACE</div>
+      <nav>
+        <button data-view="main" class="nav-item active" aria-label="Main">
+          <span data-icon="home"></span
+          ><span class="sidebar-label">Main</span></button
+        ><button data-view="goals" class="nav-item" aria-label="Goals">
+          <span data-icon="target"></span
+          ><span class="sidebar-label">Goals</span></button
+        ><button
+          id="detail-toggle"
+          class="nav-item"
+          aria-label="Detail"
+          aria-expanded="false"
+          aria-controls="detail-links"
+        >
+          <span data-icon="layers"></span
+          ><span class="sidebar-label">Detail</span
+          ><span class="chevron sidebar-label">⌄</span>
+        </button>
+        <div id="detail-links" class="detail-links" hidden>
+          <button data-view="notes" class="nav-item" aria-label="Notes">
+            <span data-icon="note"></span
+            ><span class="sidebar-label">Notes</span></button
+          ><button data-view="tasks" class="nav-item" aria-label="To do">
+            <span data-icon="check"></span
+            ><span class="sidebar-label">To do</span></button
+          ><button data-view="finance" class="nav-item" aria-label="Finance">
+            <span data-icon="chart"></span
+            ><span class="sidebar-label">Finance</span>
+          </button>
+        </div>
+      </nav>
+      <div class="sidebar-bottom">
+        <button id="settings" class="profile" aria-label="Pengaturan">
+          <span class="avatar">Z</span
+          ><span class="sidebar-label">zivi<small>Ruang milikmu.</small></span
+          ><span class="sidebar-label" data-icon="settings"></span>
+        </button>
+      </div>
+    </aside>
+    <div class="scrim" id="scrim"></div>
+    <header class="mobile-header">
+      <button id="menu" aria-label="Buka menu">
+        <span data-icon="menu"></span></button
+      ><span class="mobile-brand">zivizip<span class="cyan">.</span></span>
+    </header>
+    <main id="workspace" class="workspace" data-view="main">
+      <section class="notes-pane" id="notes-pane">
+        <div class="tabs" id="tabs"></div>
+        <div class="note-scroll">
+          <div class="note-meta" id="note-breadcrumb"></div>
+          <article id="note-article"></article>
+        </div>
+      </section>
+      <div
+        id="notes-divider"
+        class="panel-divider vertical"
+        role="separator"
+        tabindex="0"
+        aria-label="Ukuran panel Notes"
+        aria-orientation="vertical"
+        title="Geser untuk mengubah ukuran · Klik dua kali untuk reset"
+      ></div>
+      <div class="right-pane">
+        <section class="tasks-pane">
+          <div class="section-top">
+            <h2>To do<span class="section-dot">.</span></h2>
+            <div class="actions">
+              <button class="subtle" id="archive">
+                <span data-icon="archive"></span
+                ><span>Arsipkan selesai</span></button
+              ><button
+                class="icon-button"
+                id="add-task"
+                aria-label="Tambah tugas"
+              >
+                <span data-icon="plus"></span>
+              </button>
+            </div>
+          </div>
+          <div class="progress-meta">
+            <span id="progress-text"></span><span id="progress-percent"></span>
+          </div>
+          <div class="progress-track"><div id="progress-bar"></div></div>
+          <div class="task-list" id="task-list"></div>
+          <button class="text-button archive-toggle" id="show-archive">
+            Lihat arsip
+          </button>
+        </section>
+        <div
+          id="finance-divider"
+          class="panel-divider horizontal"
+          role="separator"
+          tabindex="0"
+          aria-label="Ukuran panel To do dan Finance"
+          aria-orientation="horizontal"
+          title="Geser untuk mengubah ukuran · Klik dua kali untuk reset"
+        ></div>
+        <section class="finance-pane">
+          <div class="section-top">
+            <h2>Finance<span class="section-dot">.</span></h2>
+            <button
+              class="icon-button"
+              id="add-transaction"
+              aria-label="Tambah transaksi"
+            >
+              <span data-icon="plus"></span>
+            </button>
+          </div>
+          <div class="finance-toolbar">
+            <button class="subtle" id="group">
+              <span data-icon="list"></span><span>Per kategori</span></button
+            ><input
+              type="month"
+              id="month"
+              aria-label="Bulan transaksi"
+              value="2026-09"
+            />
+          </div>
+          <div class="balance-grid" id="balances"></div>
+          <div class="transactions" id="transactions"></div>
+        </section>
+      </div>
+    </main>
+    <nav class="bottom-nav">
+      <button data-view="notes"><span data-icon="note"></span>Note</button
+      ><button data-view="tasks"><span data-icon="check"></span>To Do</button
+      ><button data-view="finance">
+        <span data-icon="chart"></span>Finance
+      </button>
+    </nav>
+    <dialog id="dialog">
+      <form id="dialog-form">
+        <div class="dialog-heading">
+          <h2 id="dialog-title"></h2>
+          <button
+            type="button"
+            id="close-dialog"
+            class="icon-button"
+            aria-label="Tutup"
+          >
+            ×
+          </button>
+        </div>
+        <div id="dialog-fields"></div>
+        <div class="dialog-footer">
+          <button type="button" class="subtle" id="cancel">Batal</button
+          ><button type="submit" class="primary">Simpan</button>
+        </div>
+      </form>
+    </dialog>
+    <div id="toast" role="status"></div>
+    <script src="i18n.js"></script>
+    <script src="lists.js"></script>
+    <script src="images.js"></script>
+    <script src="draw.js"></script>
+    <script src="planner.js"></script>
+    <script src="goals.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

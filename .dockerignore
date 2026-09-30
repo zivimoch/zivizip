@@ -1,0 +1,16 @@
+*
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!apps/
+!apps/**
+!services/
+!services/**
+**/node_modules
+**/.svelte-kit
+**/build
+**/test-results
+**/playwright-report
+**/target
+**/.env*
+**/*.sqlite*

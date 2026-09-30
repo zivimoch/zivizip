@@ -1,0 +1,18 @@
+{
+  "name": "zivizip",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --dir apps/web dev",
+    "check": "pnpm --dir apps/web check",
+    "test": "pnpm --dir apps/web test",
+    "build": "pnpm --dir apps/web build",
+    "test:e2e": "pnpm --dir apps/web test:e2e",
+    "format": "prettier --write apps/web prototype docs scripts package.json pnpm-workspace.yaml compose.yaml README.md CONTRIBUTING.md",
+    "format:check": "prettier --check apps/web prototype docs scripts package.json pnpm-workspace.yaml compose.yaml README.md CONTRIBUTING.md"
+  },
+  "packageManager": "pnpm@10.28.2",
+  "devDependencies": {
+    "prettier": "3.6.2",
+    "prettier-plugin-svelte": "3.4.0"
+  }
+}

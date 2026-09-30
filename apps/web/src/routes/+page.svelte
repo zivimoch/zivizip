@@ -1,0 +1,1111 @@
+<script lang="ts">
+  import { onMount, tick } from 'svelte';
+  import Icon from '$lib/Icon.svelte';
+  import AccountDialog from '$lib/AccountDialog.svelte';
+  import { AccountNotes, ApiError, api, type Account } from '$lib/account';
+  import {
+    WorkspaceDB,
+    LocalNotes,
+    defaults,
+    exportWorkspace,
+    importWorkspace,
+    validateBackup,
+    type Note,
+    type Preferences,
+    type Backup,
+    type NotesRepository,
+  } from '$lib/storage';
+  import '../app.css';
+  let db: WorkspaceDB;
+  let repo: NotesRepository;
+  let notes: Note[] = [];
+  let prefs: Preferences = { ...defaults, open: [] };
+  let ready = false;
+  let error = '';
+  let notice = '';
+  let view = 'main';
+  let details = false;
+  let mobileMenu = false;
+  let dialog: HTMLDialogElement;
+  let settings: HTMLDialogElement;
+  let nameInput: HTMLInputElement;
+  let editing: string | null = null;
+  let formName = '';
+  let formCategory = '';
+  let formIcon = 'note';
+  let backup: Backup | null = null;
+  let online = true;
+  let queue = Promise.resolve();
+  let pending = 0;
+  let dragId: string | null = null;
+  let workspace: HTMLDivElement;
+  let right: HTMLDivElement;
+  let measure = '';
+  let accountDialog: AccountDialog;
+  let accountMenu = false;
+  let guestDb: WorkspaceDB;
+  let account: Account | null = null;
+  let verified = false;
+  let switching = false;
+  let refreshing = false;
+  let eventSource: EventSource | null = null;
+  let channel: BroadcastChannel | null = null;
+  let welcome: HTMLDialogElement;
+  let migration: HTMLDialogElement;
+  let guestCount = 0;
+  let dirty = new Set<string>();
+  let alive = true;
+  let workspaceEpoch = 0;
+  const redirectedNotes = new Map<string, string>();
+  $: writable = !switching && (!account || (online && verified));
+  $: current = notes.find((n) => n.id === prefs.active);
+  $: openNotes = prefs.open
+    .map((id) => notes.find((n) => n.id === id))
+    .filter((n): n is Note => !!n);
+  $: categories = [...new Set(notes.map((n) => n.category))];
+  $: t =
+    prefs.language === 'en'
+      ? (en: string, _id: string) => en
+      : (_en: string, id: string) => id;
+  function setLanguage(language: string) {
+    prefs = { ...prefs, language: language === 'id' ? 'id' : 'en' };
+    document.documentElement.lang = prefs.language;
+    remember();
+  }
+  const titleCase = (s: string) =>
+    s.replace(/(^|[\s-])\p{L}/gu, (c) => c.toLocaleUpperCase());
+  function problem(e: unknown) {
+    error =
+      t(
+        'Could not save. Keep this page open and retry. ',
+        'Tidak dapat menyimpan. Biarkan halaman terbuka dan coba lagi. ',
+      ) + (e instanceof Error ? e.message : '');
+  }
+  function remember() {
+    if (db)
+      void db.preferences.put(JSON.parse(JSON.stringify(prefs))).catch(problem);
+  }
+  async function load() {
+    notes = await repo.list();
+    prefs = (await db.preferences.get('workspace')) || {
+      ...defaults,
+      open: [],
+    };
+    prefs.open = prefs.open.filter((id) => notes.some((n) => n.id === id));
+    if (!prefs.open.includes(prefs.active || ''))
+      prefs.active = prefs.open[0] || null;
+  }
+  async function activate(user: Account | null, fetchServer = true) {
+    switching = true;
+    workspaceEpoch++;
+    const nextDb = user
+      ? new WorkspaceDB(`zivizip-account-${user.id}-v1`)
+      : guestDb;
+    const nextRepo = user ? new AccountNotes(nextDb) : new LocalNotes(nextDb);
+    try {
+      const nextNotes =
+        user && !fetchServer
+          ? await nextDb.notes.toArray()
+          : await nextRepo.list();
+      const nextPrefs = (await nextDb.preferences.get('workspace')) || {
+        ...defaults,
+        language: prefs.language,
+        open: [],
+      };
+      nextPrefs.open = nextPrefs.open.filter((id) =>
+        nextNotes.some((n) => n.id === id),
+      );
+      if (!nextPrefs.open.includes(nextPrefs.active || ''))
+        nextPrefs.active = nextPrefs.open[0] || null;
+      if (user) await guestDb.meta.put({ key: 'active-account', value: user });
+      else await guestDb.meta.delete('active-account');
+      eventSource?.close();
+      eventSource = null;
+      if (repo instanceof AccountNotes) repo.deactivate();
+      if (db !== guestDb && db !== nextDb) db.close();
+      redirectedNotes.clear();
+      account = user;
+      verified = !!user && fetchServer;
+      db = nextDb;
+      repo = nextRepo;
+      notes = nextNotes;
+      prefs = nextPrefs;
+      if (user && fetchServer) listen();
+    } catch (e) {
+      if (nextDb !== guestDb) nextDb.close();
+      throw e;
+    } finally {
+      switching = false;
+    }
+  }
+  async function refreshAccount() {
+    if (!account || pending || dirty.size || switching || refreshing || !online)
+      return;
+    refreshing = true;
+    const epoch = workspaceEpoch;
+    const target = repo;
+    try {
+      await api<Account>('/session');
+      if (epoch !== workspaceEpoch) return;
+      const fresh = await target.list();
+      if (epoch !== workspaceEpoch || pending || dirty.size || switching)
+        return;
+      notes = fresh;
+      verified = true;
+      prefs.open = prefs.open.filter((id) => fresh.some((n) => n.id === id));
+      if (!prefs.open.includes(prefs.active || ''))
+        prefs.active = prefs.open[0] || null;
+      remember();
+    } catch (e) {
+      if (epoch !== workspaceEpoch) return;
+      verified = false;
+      if (
+        e instanceof ApiError &&
+        e.status === 401 &&
+        !pending &&
+        !dirty.size
+      ) {
+        if (repo instanceof AccountNotes) repo.deactivate();
+        eventSource?.close();
+        await db.delete();
+        await activate(null);
+        notice = t(
+          'Your session ended. Guest workspace restored.',
+          'Sesi berakhir. Workspace tamu dipulihkan.',
+        );
+      }
+    } finally {
+      refreshing = false;
+    }
+  }
+
+  function listen() {
+    eventSource?.close();
+    eventSource = new EventSource('/api/events');
+    eventSource.addEventListener('notes', () => void refreshAccount());
+    eventSource.addEventListener('session-ended', () => void refreshAccount());
+    eventSource.onerror = () => {
+      verified = false;
+    };
+  }
+  async function signedIn(user: Account) {
+    await queue;
+    if (dirty.size) throw new Error('Save or download pending changes first');
+    await activate(user);
+    channel?.postMessage('session');
+    guestCount = await guestDb.notes.count();
+    if (guestCount) {
+      await tick();
+      migration.showModal();
+    }
+  }
+  async function signedOut() {
+    await queue;
+    if (dirty.size) {
+      notice = t(
+        'Retry saving or download your pending changes before logging out.',
+        'Coba simpan lagi atau unduh perubahan tertunda sebelum keluar.',
+      );
+      return;
+    }
+    switching = true;
+    workspaceEpoch++;
+    try {
+      await api('/session', 'DELETE');
+      eventSource?.close();
+      if (repo instanceof AccountNotes) repo.deactivate();
+      await db.delete();
+      await activate(null);
+      channel?.postMessage('session');
+      notice = t(
+        'Logged out. Your guest notes are unchanged.',
+        'Berhasil keluar. Catatan tamu tetap tersimpan.',
+      );
+    } catch (e) {
+      problem(e);
+    } finally {
+      switching = false;
+    }
+  }
+  async function copyGuest() {
+    if (!(repo instanceof AccountNotes) || !writable) return;
+    switching = true;
+    try {
+      const guest = await guestDb.notes.toArray();
+      for (const n of guest) {
+        const key = `guest-import:${n.id}:${n.revision}`;
+        if (await db.meta.get(key)) continue;
+        const copy = await repo.copy({
+          ...n,
+          id: crypto.randomUUID(),
+          revision: 1,
+        });
+        await db.meta.put({ key, value: copy.id });
+      }
+      notes = await repo.list();
+      migration.close();
+      notice = t(
+        'Guest notes copied to your account. Local originals remain available.',
+        'Catatan tamu disalin ke akun. Catatan asli tetap tersedia secara lokal.',
+      );
+    } catch (e) {
+      problem(e);
+    } finally {
+      switching = false;
+    }
+  }
+  async function start() {
+    const start = performance.now();
+    guestDb = new WorkspaceDB();
+    db = guestDb;
+    repo = new LocalNotes(db);
+    await load();
+    const marker = (await guestDb.meta.get('active-account'))?.value as
+      | Account
+      | undefined;
+    try {
+      const user = await api<Account>('/session');
+      await activate(user);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        if (marker) {
+          await new WorkspaceDB(`zivizip-account-${marker.id}-v1`).delete();
+          await guestDb.meta.delete('active-account');
+        }
+        await activate(null);
+      } else if (marker) {
+        await activate(marker, false);
+      } else await activate(null);
+    }
+    if (!alive) return;
+    ready = true;
+    document.documentElement.lang = prefs.language;
+    measure = `${Math.round(performance.now() - start)} ms`;
+    performance.mark('zivizip-workspace-ready');
+    if (!account && !(await guestDb.meta.get('guest-notice'))) {
+      await tick();
+      welcome.showModal();
+    }
+  }
+  onMount(() => {
+    online = navigator.onLine;
+    alive = true;
+    void start().catch(problem);
+    const connectivity = () => {
+      online = navigator.onLine;
+      if (!online) verified = false;
+      else if (account) {
+        listen();
+        void refreshAccount();
+      }
+    };
+    window.addEventListener('online', connectivity);
+    window.addEventListener('offline', connectivity);
+    const leave = (e: BeforeUnloadEvent) => {
+      if (error || pending || dirty.size) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', leave);
+    channel = new BroadcastChannel('zivizip-session');
+    channel.onmessage = async () => {
+      if (pending || dirty.size) {
+        verified = false;
+        notice = t(
+          'Account changed in another tab. Download pending edits before reloading.',
+          'Akun berubah di tab lain. Unduh perubahan tertunda sebelum memuat ulang.',
+        );
+        return;
+      }
+      try {
+        await activate(await api<Account>('/session'));
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 401) {
+          if (account) {
+            if (repo instanceof AccountNotes) repo.deactivate();
+            eventSource?.close();
+            await db.delete();
+          }
+          await activate(null);
+        }
+      }
+    };
+    return () => {
+      alive = false;
+      eventSource?.close();
+      channel?.close();
+      window.removeEventListener('online', connectivity);
+      window.removeEventListener('offline', connectivity);
+      window.removeEventListener('beforeunload', leave);
+    };
+  });
+  async function retrySave() {
+    if (!online && account) return;
+    try {
+      if (account) {
+        await api('/session');
+        verified = true;
+      }
+      for (const id of [...dirty]) {
+        const n = notes.find((n) => n.id === id);
+        if (!n) continue;
+        const saved = await repo.write(n);
+        notes = notes.map((n) => (n.id === id ? saved : n));
+        if (saved.id !== id) {
+          closeNote(id);
+          openNote(saved.id);
+        }
+        dirty.delete(id);
+      }
+      dirty = new Set(dirty);
+      error = '';
+    } catch (e) {
+      problem(e);
+    }
+  }
+
+  function openNote(id: string) {
+    if (!prefs.open.includes(id)) prefs.open = [...prefs.open, id];
+    prefs.active = id;
+    remember();
+  }
+  function closeNote(id: string) {
+    const index = prefs.open.indexOf(id);
+    prefs.open = prefs.open.filter((n) => n !== id);
+    if (prefs.active === id)
+      prefs.active = prefs.open[Math.min(index, prefs.open.length - 1)] || null;
+    remember();
+  }
+  function editBody(body: string) {
+    if (!current || !writable) return;
+    const original = current.id;
+    dirty.add(original);
+    notes = notes.map((n) => (n.id === original ? { ...n, body } : n));
+    pending++;
+    queue = queue.then(async () => {
+      const id = redirectedNotes.get(original) || original;
+      const latest = notes.find((n) => n.id === id);
+      if (!latest) {
+        pending--;
+        return;
+      }
+      try {
+        const saved = await repo.write({ ...latest, body });
+        const live = notes.find((n) => n.id === id);
+        if (saved.id !== id) {
+          redirectedNotes.set(original, saved.id);
+          notes = [...notes, { ...saved, body: live?.body ?? body }];
+          openNote(saved.id);
+          notice = t(
+            'A separate copy preserves conflicting changes.',
+            'Salinan terpisah menyimpan perubahan yang bertentangan.',
+          );
+        } else
+          notes = notes.map((n) =>
+            n.id === id ? { ...saved, body: live?.body ?? body } : n,
+          );
+        if (live?.body === body) {
+          dirty.delete(original);
+          dirty.delete(id);
+          dirty = new Set(dirty);
+        }
+        if (!dirty.size) error = '';
+      } catch (e) {
+        problem(e);
+        if (e instanceof ApiError && e.status === 401) verified = false;
+      } finally {
+        pending--;
+        if (pending === 0 && account && !dirty.size) void refreshAccount();
+      }
+    });
+  }
+
+  async function showNote(n?: Note) {
+    if (!writable) return;
+    await queue;
+    editing = n?.id || null;
+    let number = prefs.counter + 1;
+    while (notes.some((n) => n.name === `Note${number}`)) number++;
+    formName = n?.name || `Note${number}`;
+    formCategory = n?.category || t('General', 'Umum');
+    formIcon = n?.icon || 'note';
+    dialog.showModal();
+    await tick();
+    nameInput.focus();
+    if (!n) nameInput.select();
+  }
+  async function submitNote(e: SubmitEvent) {
+    e.preventDefault();
+    if (!writable) return;
+    await queue;
+    if (!formName.trim() || !formCategory.trim()) return;
+    try {
+      if (editing) {
+        const n = notes.find((n) => n.id === editing)!;
+        const saved = await repo.write({
+          ...n,
+          name: formName.trim(),
+          category: formCategory.trim(),
+          icon: formIcon,
+        });
+        notes = notes.filter((n) => n.id !== saved.id);
+        notes = [...notes, saved];
+        openNote(saved.id);
+      } else {
+        const n = await repo.create(
+          formName.trim(),
+          formCategory.trim(),
+          formIcon,
+        );
+        notes = [...notes, n];
+        prefs.counter++;
+        openNote(n.id);
+      }
+      dialog.close();
+    } catch (e) {
+      problem(e);
+    }
+  }
+  async function removeNote() {
+    if (
+      !writable ||
+      !editing ||
+      !confirm(
+        t('Delete this note permanently?', 'Hapus catatan ini permanen?'),
+      )
+    )
+      return;
+    await queue;
+    try {
+      await repo.remove(editing);
+      notes = notes.filter((n) => n.id !== editing);
+      closeNote(editing);
+      dialog.close();
+    } catch (e) {
+      problem(e);
+    }
+  }
+  function capitalise(event: Event, kind: 'name' | 'category') {
+    const input = event.target as HTMLInputElement;
+    if ((event as InputEvent).isComposing) return;
+    const start = input.selectionStart,
+      end = input.selectionEnd;
+    input.value = titleCase(input.value);
+    if (kind === 'name') formName = input.value;
+    else formCategory = input.value;
+    if (start !== null) input.setSelectionRange(start, end);
+  }
+  async function download() {
+    await queue;
+    try {
+      const data = await exportWorkspace(db);
+      data.notes = notes.map((n) => ({ ...n }));
+      data.preferences = JSON.parse(JSON.stringify(prefs));
+      const url = URL.createObjectURL(
+        new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }),
+      );
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `zivizip-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) {
+      problem(e);
+    }
+  }
+  async function inspectFile(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    try {
+      if (file.size > 20_000_000) throw new Error('Maximum backup size: 20 MB');
+      backup = validateBackup(JSON.parse(await file.text()));
+      error = '';
+    } catch (e) {
+      backup = null;
+      error =
+        t('Invalid backup: ', 'Backup tidak valid: ') + (e as Error).message;
+    }
+    input.value = '';
+  }
+  async function restore() {
+    if (!backup || !writable) return;
+    await queue;
+    try {
+      let count = 0;
+      if (repo instanceof AccountNotes) {
+        for (const n of backup.notes) {
+          await repo.copy({ ...n, id: crypto.randomUUID(), revision: 1 });
+          count++;
+        }
+        notes = await repo.list();
+      } else {
+        count = await importWorkspace(db, backup);
+        await load();
+      }
+      backup = null;
+      notice = t(
+        `${count} notes imported as new copies.`,
+        `${count} catatan diimpor sebagai salinan baru.`,
+      );
+    } catch (e) {
+      problem(e);
+    }
+  }
+  function navigate(next: string) {
+    view = next;
+    mobileMenu = false;
+  }
+  function startResize(e: PointerEvent, axis: 'width' | 'height') {
+    e.preventDefault();
+    const target = e.currentTarget as HTMLElement;
+    target.setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent) => {
+      const box = (
+        axis === 'width' ? workspace : right
+      ).getBoundingClientRect();
+      prefs[axis] = Math.max(
+        20,
+        Math.min(
+          axis === 'width' ? 85 : 80,
+          (axis === 'width'
+            ? (ev.clientX - box.left) / box.width
+            : (ev.clientY - box.top) / box.height) * 100,
+        ),
+      );
+    };
+    const stop = () => {
+      target.removeEventListener('pointermove', move);
+      target.removeEventListener('pointerup', stop);
+      target.removeEventListener('pointercancel', stop);
+      remember();
+    };
+    target.addEventListener('pointermove', move);
+    target.addEventListener('pointerup', stop);
+    target.addEventListener('pointercancel', stop);
+  }
+  function moveTab(e: PointerEvent, id: string) {
+    if (e.button !== 0) return;
+    const target = e.currentTarget as HTMLElement;
+    const x = e.clientX;
+    let moved = false;
+    target.setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent) => {
+      if (Math.abs(ev.clientX - x) < 8 && !moved) return;
+      moved = true;
+      dragId = id;
+      const tab = document
+        .elementFromPoint(ev.clientX, ev.clientY)
+        ?.closest<HTMLElement>('[data-note-id]');
+      if (tab && tab.dataset.noteId !== id) {
+        const next = prefs.open.filter((n) => n !== id);
+        next.splice(prefs.open.indexOf(tab.dataset.noteId!), 0, id);
+        prefs.open = next;
+      }
+    };
+    const stop = () => {
+      target.removeEventListener('pointermove', move);
+      target.removeEventListener('pointerup', stop);
+      target.removeEventListener('pointercancel', stop);
+      if (moved) remember();
+      setTimeout(() => (dragId = null), 0);
+    };
+    target.addEventListener('pointermove', move);
+    target.addEventListener('pointerup', stop);
+    target.addEventListener('pointercancel', stop);
+  }
+</script>
+
+<svelte:head
+  ><title>Zivizip — Personal workspace</title><meta
+    name="description"
+    content="Capture thoughts and organize your day in a private workspace."
+  /><meta name="robots" content="noindex,nofollow" /></svelte:head
+>
+<header class="mobile-header">
+  <button aria-label="Open menu" onclick={() => (mobileMenu = true)}
+    ><Icon name="menu" /></button
+  ><b>zivizip<span>.</span></b>
+</header>
+<aside class:expanded={mobileMenu} class="sidebar">
+  <div class="brand">
+    <span class="brand-mark">z</span><b>zivizip</b><button
+      class="hide-menu"
+      aria-label="Close menu"
+      onclick={() => (mobileMenu = false)}>←</button
+    >
+  </div>
+  <nav>
+    <button
+      class:active={view === 'main'}
+      title="Main"
+      onclick={() => navigate('main')}
+      ><Icon name="home" /><span>Main</span></button
+    ><button
+      class:active={view === 'goals'}
+      title="Goals"
+      onclick={() => navigate('goals')}
+      ><Icon name="goals" /><span>{t('Goals', 'Target')}</span></button
+    ><button
+      title="Detail"
+      aria-label="Detail"
+      aria-expanded={details}
+      onclick={() => (details = !details)}
+      ><Icon name="layers" /><span>Detail</span><span class="chevron"
+        >{details ? '⌃' : '⌄'}</span
+      ></button
+    >{#if details}<div class="detail">
+        {#each ['notes', 'tasks', 'finance'] as item}<button
+            class:active={view === item}
+            title={item}
+            onclick={() => navigate(item)}
+            ><Icon name={item === 'notes' ? 'note' : item} /><span
+              >{item === 'notes'
+                ? 'Notes'
+                : item === 'tasks'
+                  ? 'To do'
+                  : 'Finance'}</span
+            ></button
+          >{/each}
+      </div>{/if}
+  </nav>
+  <div class="sidebar-footer">
+    <div class="account-control">
+      <button
+        class="account-button"
+        aria-label={t('Account', 'Akun')}
+        aria-expanded={accountMenu}
+        onclick={() => (accountMenu = !accountMenu)}
+        ><Icon name="account" /><span
+          >{account ? account.username : t('Guest', 'Tamu')}</span
+        ></button
+      >{#if accountMenu}<div class="account-menu">
+          <p>
+            {account
+              ? account.username
+              : t('Guest workspace', 'Workspace tamu')}
+          </p>
+          {#if account}<button
+              disabled={switching || pending > 0 || dirty.size > 0 || !online}
+              onclick={async () => {
+                accountMenu = false;
+                await signedOut();
+              }}>{t('Log out', 'Keluar')}</button
+            >{#if !online}<small
+                >{t(
+                  'Reconnect to log out securely.',
+                  'Hubungkan internet untuk keluar dengan aman.',
+                )}</small
+              >{/if}{:else}<button
+              disabled={switching || pending > 0 || dirty.size > 0}
+              onclick={() => {
+                accountMenu = false;
+                mobileMenu = false;
+                accountDialog.open();
+              }}>{t('Log in', 'Masuk')}</button
+            >{/if}<button onclick={() => (accountMenu = false)}
+            >{t('Close', 'Tutup')}</button
+          >
+        </div>{/if}
+    </div>
+    <button
+      class="settings-button"
+      title={t('Settings', 'Pengaturan')}
+      onclick={() => settings.showModal()}
+      ><Icon name="settings" /><span>{t('Settings', 'Pengaturan')}</span
+      ></button
+    >
+  </div>
+</aside>
+<div
+  class="workspace"
+  class:main={view === 'main'}
+  bind:this={workspace}
+  style={`--notes:${prefs.width}%;--tasks:${prefs.height}%`}
+>
+  {#if error}<div class="error" role="alert">
+      {error}<button onclick={retrySave}
+        >{t('Retry save', 'Coba simpan')}</button
+      ><button onclick={download}
+        >{t('Download backup', 'Unduh cadangan')}</button
+      ><button
+        onclick={() => (error = '')}
+        aria-label={t('Dismiss message', 'Tutup pesan')}>×</button
+      >
+    </div>{/if}{#if notice}<button class="notice" onclick={() => (notice = '')}
+      >{notice} ×</button
+    >{/if}
+  {#if !ready}<div class="empty">
+      {error
+        ? t('Storage unavailable.', 'Penyimpanan tidak tersedia.')
+        : t('Opening workspace…', 'Membuka workspace…')}
+    </div>
+  {:else if view === 'main' || view === 'notes'}
+    <section class="notes-pane">
+      {#if account}<div class="account-status">
+          {account.username} · {writable
+            ? t(
+                'Account workspace · synced to server',
+                'Workspace akun · tersimpan di server',
+              )
+            : t(
+                'Account cache · read only until connected',
+                'Cache akun · hanya baca sampai terhubung',
+              )}
+        </div>{/if}
+      <div class="tabs">
+        {#each openNotes as note (note.id)}<div
+            class="tab"
+            class:active={prefs.active === note.id}
+            data-note-id={note.id}
+          >
+            <button
+              class="tab-select"
+              onpointerdown={(e) => moveTab(e, note.id)}
+              onclick={() => {
+                if (!dragId) openNote(note.id);
+              }}
+              ondblclick={() => showNote(note)}
+              onkeydown={(e) => {
+                if (e.key === 'F2') showNote(note);
+              }}
+              title={t('Double-click to edit', 'Klik dua kali untuk edit')}
+              ><Icon name={note.icon} /><span>{note.name}</span></button
+            ><button
+              class="close-tab"
+              aria-label={`${t('Close', 'Tutup')} ${note.name}`}
+              onclick={() => closeNote(note.id)}>×</button
+            >
+          </div>{/each}<button
+          class="add-tab"
+          disabled={!writable}
+          aria-label={t('New note', 'Catatan baru')}
+          onclick={() => showNote()}><Icon name="plus" /></button
+        >
+      </div>
+      {#if view === 'notes'}<div class="note-library">
+          <h2>{t('Your notes', 'Catatanmu')}</h2>
+          {#each notes as n}<button onclick={() => openNote(n.id)}
+              ><Icon name={n.icon} />{n.name}<small>{n.category}</small></button
+            >{/each}
+        </div>{/if}
+      {#if current}<div class="breadcrumb">
+          {current.category}<span>/</span>{current.name}
+        </div>
+        <textarea
+          class="note-editor"
+          readonly={!writable}
+          aria-label={t('Note content', 'Isi catatan')}
+          value={current.body}
+          oninput={(e) => editBody(e.currentTarget.value)}
+          spellcheck="true"
+        ></textarea>{:else}<div class="empty">
+          <Icon name="note" />
+          <p>
+            {t('A little space for your thoughts.', 'Ruang untuk pikiranmu.')}
+          </p>
+          <button
+            class="primary"
+            disabled={!writable}
+            onclick={() => showNote()}
+            >{t('Create a note', 'Buat catatan')}</button
+          >
+        </div>{/if}
+    </section>
+    {#if view === 'main'}<button
+        class="divider vertical"
+        aria-label="Resize notes"
+        onpointerdown={(e) => startResize(e, 'width')}
+        ondblclick={() => {
+          prefs.width = 75;
+          remember();
+        }}
+        onkeydown={(e) => {
+          if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            prefs.width = Math.max(
+              20,
+              Math.min(85, prefs.width + (e.key === 'ArrowRight' ? 2 : -2)),
+            );
+            remember();
+          }
+        }}
+      ></button>
+      <div class="right-pane" bind:this={right}>
+        <section class="preview tasks">
+          <div class="section-heading">
+            <h2>To do<span>.</span></h2>
+            <small>{t('Preview', 'Pratinjau')}</small>
+          </div>
+          <p class="muted">{t('2 of 3 completed', '2 dari 3 selesai')}</p>
+          <div class="progress"><i></i></div>
+          {#each [t('Plan the week', 'Rencanakan minggu ini'), t('Make time to read', 'Luangkan waktu membaca'), t('Review priorities', 'Tinjau prioritas')] as task, i}<div
+              class="task"
+            >
+              <span class:done={i < 2}>{i < 2 ? '✓' : ''}</span>{task}
+            </div>{/each}
+        </section>
+        <button
+          class="divider horizontal"
+          aria-label="Resize tasks"
+          onpointerdown={(e) => startResize(e, 'height')}
+          ondblclick={() => {
+            prefs.height = 49;
+            remember();
+          }}
+        ></button>
+        <section class="preview">
+          <div class="section-heading">
+            <h2>Finance<span>.</span></h2>
+            <small>{t('Preview', 'Pratinjau')}</small>
+          </div>
+          <p class="muted">
+            {t(
+              'A clearer picture of your money.',
+              'Gambaran keuangan yang lebih jelas.',
+            )}
+          </p>
+          <div class="money">
+            <small>{t('Balance', 'Saldo')}</small><strong>Rp5.500.000</strong>
+          </div>
+          <div class="transaction">
+            <span>{t('Groceries', 'Belanja')}</span><b>−Rp150.000</b>
+          </div>
+          <div class="transaction">
+            <span>{t('Internet', 'Internet')}</span><b>−Rp350.000</b>
+          </div>
+        </section>
+      </div>{/if}
+  {:else}<section class="placeholder">
+      <Icon name={view} />
+      <h1>
+        {view === 'goals'
+          ? t('Goals', 'Target')
+          : view === 'tasks'
+            ? 'To do'
+            : 'Finance'}
+      </h1>
+      <p>
+        {t(
+          'This section is being prepared. Your notes are ready to use.',
+          'Bagian ini sedang disiapkan. Catatanmu sudah bisa digunakan.',
+        )}
+      </p>
+      <button onclick={() => navigate('main')}
+        >{t('Back to workspace', 'Kembali ke workspace')}</button
+      >
+    </section>{/if}
+</div>
+<nav class="bottom-nav">
+  {#each ['notes', 'tasks', 'finance'] as item}<button
+      class:active={view === item}
+      onclick={() => navigate(item)}
+      ><Icon name={item === 'notes' ? 'note' : item} />{item === 'notes'
+        ? 'Notes'
+        : item === 'tasks'
+          ? 'To do'
+          : 'Finance'}</button
+    >{/each}
+</nav>
+<dialog bind:this={dialog}>
+  <form onsubmit={submitNote}>
+    <div class="dialog-heading">
+      <h2>
+        {editing
+          ? t('Edit note', 'Edit catatan')
+          : t('New note', 'Catatan baru')}
+      </h2>
+      <button
+        type="button"
+        aria-label="Close dialog"
+        onclick={() => dialog.close()}>×</button
+      >
+    </div>
+    <div class="icon-picker">
+      {#each ['note', 'bulb', 'folder', 'tasks', 'home', 'finance'] as icon}<button
+          type="button"
+          class:active={formIcon === icon}
+          aria-label={icon}
+          aria-pressed={formIcon === icon}
+          onclick={() => (formIcon = icon)}><Icon name={icon} /></button
+        >{/each}
+    </div>
+    <label
+      >{t('Name', 'Nama')}<input
+        bind:this={nameInput}
+        value={formName}
+        oninput={(e) => capitalise(e, 'name')}
+        oncompositionend={(e) => capitalise(e, 'name')}
+        required
+        maxlength="150"
+      /></label
+    ><label
+      >{t('Category', 'Kategori')}<input
+        value={formCategory}
+        oninput={(e) => capitalise(e, 'category')}
+        oncompositionend={(e) => capitalise(e, 'category')}
+        list="categories"
+        required
+        maxlength="60"
+      /></label
+    ><datalist id="categories"
+      >{#each categories as c}<option value={c}></option>{/each}</datalist
+    >
+    <p class="muted">Text</p>
+    <footer>
+      {#if editing}<button type="button" class="danger" onclick={removeNote}
+          >{t('Delete', 'Hapus')}</button
+        >{/if}<button type="button" onclick={() => dialog.close()}
+        >{t('Cancel', 'Batal')}</button
+      ><button class="primary" type="submit"
+        >{editing ? t('Update', 'Perbarui') : t('Create', 'Buat')}</button
+      >
+    </footer>
+  </form>
+</dialog>
+<dialog bind:this={settings}>
+  <div class="dialog-heading">
+    <h2>{t('Your workspace', 'Workspace kamu')}</h2>
+    <button aria-label="Close settings" onclick={() => settings.close()}
+      >×</button
+    >
+  </div>
+  <p>
+    {account
+      ? t(
+          'Account notes are saved to the server. This browser keeps a separate read-only offline cache, cleared on logout.',
+          'Catatan akun disimpan di server. Browser menyimpan cache offline terpisah yang hanya dapat dibaca dan dihapus saat keluar.',
+        )
+      : t(
+          'Guest data stays in this browser. Clearing site data or using a different browser can make it unavailable. Export a backup regularly.',
+          'Data tamu tersimpan di browser ini. Penghapusan data situs atau browser berbeda dapat membuatnya tidak tersedia. Unduh cadangan secara berkala.',
+        )}
+  </p>
+  <label
+    >Language / Bahasa<select
+      value={prefs.language}
+      onchange={(e) => setLanguage(e.currentTarget.value)}
+      ><option value="en">English</option><option value="id"
+        >Bahasa Indonesia</option
+      ></select
+    ></label
+  >
+  <div class="settings-actions">
+    <button onclick={download}>{t('Download backup', 'Unduh cadangan')}</button
+    ><label class="file-button"
+      >{t('Import backup', 'Impor cadangan')}<input
+        type="file"
+        accept=".json,application/json"
+        onchange={inspectFile}
+      /></label
+    ><button
+      onclick={async () => {
+        const granted = await navigator.storage?.persist?.();
+        notice = granted
+          ? t(
+              'Persistent storage granted. Backups are still recommended.',
+              'Penyimpanan persisten diberikan. Cadangan tetap disarankan.',
+            )
+          : t(
+              'Persistent storage not granted. Keep a backup.',
+              'Penyimpanan persisten tidak diberikan. Simpan cadangan.',
+            );
+      }}>{t('Protect local storage', 'Lindungi penyimpanan lokal')}</button
+    >
+  </div>
+  {#if backup}<div class="import-review">
+      <p>
+        {t(
+          `Import ${backup.notes.length} notes as new copies? Existing notes stay unchanged.`,
+          `Impor ${backup.notes.length} catatan sebagai salinan baru? Catatan lama tetap ada.`,
+        )}
+      </p>
+      <button class="primary" disabled={!writable} onclick={restore}
+        >{t('Import copies', 'Impor salinan')}</button
+      ><button onclick={() => (backup = null)}>{t('Cancel', 'Batal')}</button>
+    </div>{/if}
+  <p class="muted">
+    {online
+      ? t('Online', 'Online')
+      : account
+        ? t(
+            'Offline — account notes are read only',
+            'Offline — catatan akun hanya dapat dibaca',
+          )
+        : t(
+            'Offline — local notes remain editable',
+            'Offline — catatan lokal tetap dapat diedit',
+          )}
+  </p>
+  <p class="muted">
+    {t('Workspace load', 'Waktu buka workspace')}: {measure} · {notes.length} notes
+  </p>
+</dialog>
+
+<dialog bind:this={welcome} oncancel={(e) => e.preventDefault()}>
+  <div class="dialog-heading">
+    <h2>{t('Your space, in this browser', 'Ruangmu, di browser ini')}</h2>
+  </div>
+  <label
+    >Language / Bahasa<select
+      value={prefs.language}
+      onchange={(e) => setLanguage(e.currentTarget.value)}
+      ><option value="en">English</option><option value="id"
+        >Bahasa Indonesia</option
+      ></select
+    ></label
+  >
+  <p>
+    {t(
+      'You are using Zivizip as a guest. Your notes and workspace stay in this browser on this device and are not uploaded to our server.',
+      'Kamu menggunakan Zivizip sebagai tamu. Catatan dan workspace tersimpan di browser pada perangkat ini, dan tidak diunggah ke server kami.',
+    )}
+  </p>
+  <p>
+    {t(
+      'They will not appear automatically on another browser or device. Clearing site data or using private browsing can remove them. Download a backup regularly.',
+      'Data tidak otomatis tersedia di browser atau perangkat lain. Menghapus data situs atau memakai mode privat dapat menghilangkannya. Unduh cadangan secara berkala.',
+    )}
+  </p>
+  <p class="muted">
+    {t(
+      'If you send the account-interest form, only the email and message you submit are sent to Zivizip.',
+      'Jika mengirim formulir minat akun, hanya email dan pesan yang kamu isi yang dikirim ke Zivizip.',
+    )}
+  </p>
+  <button
+    class="primary"
+    onclick={async () => {
+      await guestDb.meta.put({ key: 'guest-notice', value: true });
+      welcome.close();
+    }}>{t('Continue as guest', 'Lanjut sebagai tamu')}</button
+  >
+</dialog>
+<dialog
+  bind:this={migration}
+  oncancel={(e) => {
+    if (switching) e.preventDefault();
+  }}
+>
+  <h2>{t('Choose your workspace', 'Pilih workspace kamu')}</h2>
+  <p>
+    {t(
+      `You have ${guestCount} local notes. Open your account workspace, or copy these notes to your account. Nothing is uploaded without your choice.`,
+      `Ada ${guestCount} catatan lokal. Buka workspace akun, atau salin catatan ini ke akunmu. Tidak ada catatan yang diunggah tanpa pilihanmu.`,
+    )}
+  </p>
+  <button disabled={switching} onclick={() => migration.close()}
+    >{t('Open account workspace', 'Buka workspace akun')}</button
+  ><button class="primary" disabled={switching} onclick={copyGuest}
+    >{switching
+      ? t('Copying…', 'Menyalin…')
+      : t('Copy local notes to account', 'Salin catatan lokal ke akun')}</button
+  >
+</dialog>
+
+<AccountDialog
+  bind:this={accountDialog}
+  language={prefs.language}
+  {online}
+  onlogin={signedIn}
+/>
