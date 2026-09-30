@@ -1,8 +1,21 @@
+import {
+  validateDocument,
+  plainText,
+  assetsIn,
+  type TextDocument,
+} from './text/document';
+import {
+  encodeMedia,
+  decodeMedia,
+  type Media,
+  type MediaBackup,
+} from './text/media';
 import { emptyScene, parseScene } from './draw/scene';
 import Dexie, { type Table } from 'dexie';
 export type NoteKind = 'text' | 'draw';
 export interface Note {
   kind?: NoteKind;
+  rich?: TextDocument;
   id: string;
   name: string;
   category: string;
@@ -23,7 +36,8 @@ export interface Preferences {
 }
 export interface Backup {
   format: 'zivizip';
-  version: 1 | 2;
+  version: 1 | 2 | 3;
+  media?: MediaBackup[];
   exportedAt: string;
   notes: Note[];
   preferences: Preferences;
@@ -39,6 +53,7 @@ export const defaults: Preferences = {
 };
 export class WorkspaceDB extends Dexie {
   notes!: Table<Note, string>;
+  media!: Table<Media, string>;
   preferences!: Table<Preferences, string>;
   meta!: Table<{ key: string; value: unknown }, string>;
   constructor(name = 'zivizip-guest-v1') {
@@ -51,6 +66,12 @@ export class WorkspaceDB extends Dexie {
       notes: 'id, createdAt, updatedAt, category',
       preferences: 'key',
       meta: 'key',
+    });
+    this.version(3).stores({
+      notes: 'id, createdAt, updatedAt, category',
+      preferences: 'key',
+      meta: 'key',
+      media: 'id',
     });
   }
 }
@@ -126,7 +147,7 @@ export function validateBackup(value: unknown): Backup {
   const b = value as Backup;
   if (
     b.format !== 'zivizip' ||
-    ![1, 2].includes(b.version) ||
+    ![1, 2, 3].includes(b.version) ||
     !Array.isArray(b.notes) ||
     b.notes.length > 10000
   )
@@ -152,8 +173,22 @@ export function validateBackup(value: unknown): Backup {
     )
       throw new Error('Invalid note in backup');
     if (n.kind === 'draw') parseScene(n.body);
+    if (n.rich) {
+      if (n.kind === 'draw') throw Error('Invalid rich note');
+      validateDocument(n.rich);
+      if (plainText(n.rich) !== n.body)
+        throw Error('Inconsistent text document');
+    }
     ids.add(n.id);
   }
+  if (b.media !== undefined && !Array.isArray(b.media))
+    throw Error('Invalid backup images');
+  const mediaIds = new Set((b.media || []).map((m) => m.id));
+  if (mediaIds.size !== (b.media || []).length)
+    throw Error('Duplicate backup images');
+  for (const n of b.notes)
+    for (const id of assetsIn(n.rich))
+      if (!mediaIds.has(id)) throw Error('Missing backup image');
   const p = b.preferences;
   if (
     !p ||
@@ -174,19 +209,40 @@ export function validateBackup(value: unknown): Backup {
     throw new Error('Invalid workspace settings');
   return b;
 }
-export async function exportWorkspace(db: WorkspaceDB): Promise<Backup> {
-  return db.transaction('r', db.notes, db.preferences, async () => ({
-    format: 'zivizip',
-    version: 2,
-    exportedAt: new Date().toISOString(),
-    notes: await db.notes.toArray(),
-    preferences: (await db.preferences.get('workspace')) || { ...defaults },
-  }));
+export async function exportWorkspace(
+  db: WorkspaceDB,
+  live?: Note[],
+): Promise<Backup> {
+  const snapshot = await db.transaction(
+    'r',
+    db.notes,
+    db.preferences,
+    async () => ({
+      format: 'zivizip' as const,
+      version: 3 as const,
+      exportedAt: new Date().toISOString(),
+      notes: live || (await db.notes.toArray()),
+      preferences: (await db.preferences.get('workspace')) || { ...defaults },
+    }),
+  );
+  const ids = [...new Set(snapshot.notes.flatMap((n) => assetsIn(n.rich)))];
+  const media: MediaBackup[] = [];
+  for (const id of ids) {
+    const m = await db.media.get(id);
+    if (!m)
+      throw Error(
+        'Some images are not cached. Open those notes online before exporting.',
+      );
+    media.push(await encodeMedia(m));
+  }
+  return { ...snapshot, media };
 }
 // Merge always creates new IDs: importing never overwrites a local note.
 export async function importWorkspace(db: WorkspaceDB, input: unknown) {
   const b = validateBackup(input);
-  return db.transaction('rw', db.notes, db.preferences, async () => {
+  const media = await Promise.all((b.media || []).map(decodeMedia));
+  return db.transaction('rw', db.notes, db.preferences, db.media, async () => {
+    await db.media.bulkPut(media);
     const ids = new Map(b.notes.map((n) => [n.id, crypto.randomUUID()]));
     const notes = b.notes.map((n) => ({
       ...n,

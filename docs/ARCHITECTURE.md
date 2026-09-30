@@ -20,13 +20,13 @@ The service owns Notes, the single-owner session, and registration-interest reco
 - Account data is stored on the server. A separate browser cache supports offline reading and is cleared on logout.
 - Login offers an explicit guest-note copy; original guest notes remain local.
 - Revision checks preserve conflicting edits as separate copies. Delete requires the current revision.
-- JSON backups include implemented note/workspace data. Draw geometry is included; attachments and full-feature archives remain planned.
+- JSON backups include implemented note/workspace data. Draw geometry and referenced image attachments are included; archives for other feature domains remain planned.
 
 ## Service boundaries
 
 | Domain  | Ownership                                                 | Status                    |
 | ------- | --------------------------------------------------------- | ------------------------- |
-| Notes   | Text/Draw notes, revisions, future attachments            | Text and Draw implemented |
+| Notes   | Text/Draw notes, revisions, image attachments             | Text and Draw implemented |
 | Tasks   | Task state and ordering                                   | Prototype                 |
 | Finance | Transactions, categories, monthly budgets and realization | Prototype                 |
 | Goals   | Goals and links to source records                         | Prototype                 |
@@ -49,3 +49,9 @@ Planned deployment uses Kubernetes, separate environments, project-specific conf
 The SVG editor loads dynamically when a Draw note opens. Shape geometry and labels use a validated, versioned JSON document in the note body. Each completed gesture creates one revision; pointer movements do not send network requests. SSE refreshes wait while a local drawing gesture or text edit is active, preserving the revision used for conflict detection.
 
 Pan and zoom are stored separately per browser workspace. Selection and undo history are transient. Account drawings follow the same login, copy, conflict, cache and offline rules as Text notes. The service worker precaches the editor for guest offline use.
+
+## Text image editing
+
+The Text editor stores typed paragraph/image blocks rather than arbitrary HTML. Normal-flow anchors reserve space at paste time; an independent image layer places pixels behind text and stores movement/rotation separately. Editing below a moved image compensates for anchor movement so the image does not drift. Explicit image deletion and select-all deletion are distinct from ordinary text deletion.
+
+Attachment bytes live outside note revisions. Guest bytes are IndexedDB blobs; the single-owner service stores content-addressed bytes in SQLite. Typing, resize and rotation only write document metadata. This keeps HTTP/SSE note synchronization independent of image byte size. A separate media store can replace the SQLite attachment table when deployment/storage requirements justify it.

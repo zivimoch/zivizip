@@ -44,4 +44,16 @@ Stale updates produce conflict copies. Stale deletes return `409`. Authenticatio
 
 Draw objects contain an ID, type, points, color, stroke width, rotation angle, label, font size and local eraser masks. Client and server validate geometry, identifiers and colors. Limits are 2 MB UTF-8 per body, 2,000 objects, 100,000 combined geometry/eraser points, and 10,000 UTF-16 code units per label. World coordinates are bounded to ±1,000,000. Invalid documents return `400`.
 
-Workspace backup version 2 includes Text and Draw notes. Import also accepts version 1 Text backups and creates new note IDs. Viewport, selection and undo history are not part of the portable document. PNG export is transparent and limited to 2,400 pixels on the longest side.
+Workspace backup versions 2 and 3 include Text and Draw notes. Import also accepts version 1 Text backups and creates new note IDs. Viewport, selection and undo history are not part of the portable document. PNG export is transparent and limited to 2,400 pixels on the longest side.
+
+## Text images and attachments
+
+Text notes may include a `rich` document containing versioned paragraph/image blocks and image placements. `body` remains their plain-text projection. Raw HTML is never stored or rendered. Draw notes cannot contain a Text document. Existing plain-text records remain compatible.
+
+`PUT /api/media/:sha256` stores one immutable WebP attachment, and `GET /api/media/:sha256` retrieves it. Both require the owner session; uploads also require the usual mutation headers. The service checks the WebP signature, content hash and 1 MB limit. Note writes reject missing attachment references. Guest attachments stay in a separate IndexedDB media table; account images are cached in the account database and cleared with it on logout.
+
+Browser paste/file input accepts images up to 15 MB and converts them to WebP with a maximum edge of 1,600 pixels before upload/storage. Each converted image must fit 1 MB; a note supports up to 100 placements. Text/image documents are limited to 2 MB, independently of their attachment bytes. Requests are limited to 4.2 MB behind a 5 MB local proxy limit.
+
+Backup version 3 embeds referenced attachment bytes once per content hash and retains placement/rotation. Versions 1 and 2 remain importable. Import validates attachment hashes before writing notes. Account copies transfer images only through the explicit guest-copy action. Images must be cached for offline viewing; unavailable images display a reconnect message. Account exports fetch missing referenced attachments before creating the archive.
+
+Removing an image removes its document reference. Unreferenced attachment bytes are currently retained to support undo and conflict copies; automated attachment garbage collection is not implemented yet. JSON backup import currently accepts files up to 50 MB.

@@ -1,5 +1,8 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
+  import TextEditor from '$lib/TextEditor.svelte';
+  import { assetsIn, type TextDocument } from '$lib/text/document';
+  import { getMedia, putMedia, decodeMedia } from '$lib/text/media';
   import DrawEditor from '$lib/DrawEditor.svelte';
   import type { Viewport } from '$lib/draw/scene';
   import Icon from '$lib/Icon.svelte';
@@ -268,6 +271,8 @@
       for (const n of guest) {
         const key = `guest-import:${n.id}:${n.revision}`;
         if (await db.meta.get(key)) continue;
+        for (const id of assetsIn(n.rich))
+          await putMedia(db, await getMedia(guestDb, id, false), true);
         const copy = await repo.copy({
           ...n,
           id: crypto.randomUUID(),
@@ -411,10 +416,10 @@
       prefs.active = prefs.open[Math.min(index, prefs.open.length - 1)] || null;
     remember();
   }
-  function editBody(body: string, original = current?.id) {
+  function editBody(body: string, original = current?.id, rich?: TextDocument) {
     if (!original || !writable) return;
     dirty.add(original);
-    notes = notes.map((n) => (n.id === original ? { ...n, body } : n));
+    notes = notes.map((n) => (n.id === original ? { ...n, body, rich } : n));
     pending++;
     queue = queue.then(async () => {
       const id = redirectedNotes.get(original) || original;
@@ -424,11 +429,14 @@
         return;
       }
       try {
-        const saved = await repo.write({ ...latest, body });
+        const saved = await repo.write({ ...latest, body, rich });
         const live = notes.find((n) => n.id === id);
         if (saved.id !== id) {
           redirectedNotes.set(original, saved.id);
-          notes = [...notes, { ...saved, body: live?.body ?? body }];
+          notes = [
+            ...notes,
+            { ...saved, body: live?.body ?? body, rich: live?.rich },
+          ];
           openNote(saved.id);
           notice = t(
             'A separate copy preserves conflicting changes.',
@@ -436,9 +444,14 @@
           );
         } else
           notes = notes.map((n) =>
-            n.id === id ? { ...saved, body: live?.body ?? body } : n,
+            n.id === id
+              ? { ...saved, body: live?.body ?? body, rich: live?.rich }
+              : n,
           );
-        if (live?.body === body) {
+        if (
+          live?.body === body &&
+          JSON.stringify(live?.rich) === JSON.stringify(rich)
+        ) {
           dirty.delete(original);
           dirty.delete(id);
           dirty = new Set(dirty);
@@ -534,7 +547,9 @@
   async function download() {
     await queue;
     try {
-      const data = await exportWorkspace(db);
+      for (const id of new Set(notes.flatMap((n) => assetsIn(n.rich))))
+        await getMedia(db, id, !!account);
+      const data = await exportWorkspace(db, notes);
       data.notes = notes.map((n) => ({ ...n }));
       data.preferences = JSON.parse(JSON.stringify(prefs));
       const url = URL.createObjectURL(
@@ -554,7 +569,7 @@
     const file = input.files?.[0];
     if (!file) return;
     try {
-      if (file.size > 20_000_000) throw new Error('Maximum backup size: 20 MB');
+      if (file.size > 50_000_000) throw new Error('Maximum backup size: 50 MB');
       backup = validateBackup(JSON.parse(await file.text()));
       error = '';
     } catch (e) {
@@ -570,6 +585,8 @@
     try {
       let count = 0;
       if (repo instanceof AccountNotes) {
+        const media = await Promise.all((backup.media || []).map(decodeMedia));
+        for (const m of media) await putMedia(db, m.blob, true);
         for (const n of backup.notes) {
           await repo.copy({ ...n, id: crypto.randomUUID(), revision: 1 });
           count++;
@@ -806,7 +823,7 @@
               onkeydown={(e) => {
                 if (e.key === 'F2') showNote(note);
               }}
-              title={t('Double-click to edit', 'Klik dua kali untuk edit')}
+              title={`${note.name} · ${t('Double-click to edit', 'Klik dua kali untuk edit')}`}
               ><Icon name={note.icon} /><span>{note.name}</span></button
             ><button
               class="close-tab"
@@ -845,14 +862,30 @@
             />
           {/key}
         {:else}
-          <textarea
-            class="note-editor"
-            readonly={!writable}
-            aria-label={t('Note content', 'Isi catatan')}
-            value={current.body}
-            oninput={(e) => editBody(e.currentTarget.value)}
-            spellcheck="true"
-          ></textarea>{/if}{:else}<div class="empty">
+          {#key `${workspaceEpoch}:${current.id}:${prefs.language}`}
+            {@const textId = current.id}
+            {@const editorDb = db}
+            {@const epoch = workspaceEpoch}
+            {@const server = !!account}
+            <TextEditor
+              body={current.body}
+              rich={current.rich}
+              {writable}
+              language={prefs.language}
+              onchange={(body, rich) => editBody(body, textId, rich)}
+              onget={(id) =>
+                getMedia(editorDb, id, server, () => epoch === workspaceEpoch)}
+              onput={(blob) =>
+                putMedia(
+                  editorDb,
+                  blob,
+                  server,
+                  () => epoch === workspaceEpoch && writable,
+                )}
+              onbusy={(value) => (drawBusy = value)}
+              onerror={problem}
+            />
+          {/key}{/if}{:else}<div class="empty">
           <Icon name="note" />
           <p>
             {t('A little space for your thoughts.', 'Ruang untuk pikiranmu.')}

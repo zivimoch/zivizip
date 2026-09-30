@@ -622,3 +622,19 @@ button:disabled {
   white-space: normal;
   padding: 8px;
 }
+
+.tab-select {
+  max-width: 220px;
+  min-width: 0;
+}
+.tab-select > span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+@media (max-width: 700px) {
+  .tab-select {
+    max-width: 180px;
+  }
+}

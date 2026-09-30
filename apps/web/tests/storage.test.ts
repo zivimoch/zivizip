@@ -87,7 +87,7 @@ it('round-trips Draw backups and accepts legacy Text backups', async () => {
   });
   await repo.write({ ...n, body });
   const backup = await exportWorkspace(db);
-  expect(backup.version).toBe(2);
+  expect(backup.version).toBe(3);
   await importWorkspace(db, backup);
   expect(
     (await repo.list()).every((n) => n.kind === 'draw' && n.body === body),
@@ -108,4 +108,41 @@ it('round-trips Draw backups and accepts legacy Text backups', async () => {
   };
   await expect(importWorkspace(db, bad)).rejects.toThrow();
   expect(await repo.list()).toHaveLength(2);
+});
+it('exports embedded attachments once and restores image placement', async () => {
+  const { hashBlob } = await import('../src/lib/text/media');
+  const { repo, db } = setup();
+  const blob = new Blob([new TextEncoder().encode('RIFF0000WEBPtest')], {
+    type: 'image/webp',
+  });
+  const asset = await hashBlob(blob);
+  await db.media.put({ id: asset, blob });
+  const note = await repo.create('With image', 'General', 'note');
+  await repo.write({
+    ...note,
+    body: 'Caption',
+    rich: {
+      version: 1,
+      blocks: [
+        { type: 'paragraph', text: 'Caption' },
+        { type: 'image', id: 'image-1' },
+      ],
+      images: [
+        { id: 'image-1', asset, w: 120, h: 90, dx: 3, dy: -20, angle: 35 },
+      ],
+    },
+  });
+  const backup = await exportWorkspace(db);
+  expect(backup.media).toHaveLength(1);
+  const target = setup();
+  await importWorkspace(target.db, backup);
+  expect((await target.repo.list())[0].rich?.images[0].angle).toBe(35);
+  expect((await target.db.media.get(asset))?.blob.size).toBe(blob.size);
+  await expect(
+    importWorkspace(target.db, {
+      ...backup,
+      media: [{ ...backup.media![0], data: 'bad' }],
+    }),
+  ).rejects.toThrow();
+  expect(await target.repo.list()).toHaveLength(1);
 });

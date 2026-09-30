@@ -10,13 +10,13 @@
 ## Initial budgets (targets, not achieved claims)
 
 - Total initial compressed JS/CSS under 150 KiB for the Notes application.
-- No storage request blocks native textarea typing.
+- No storage request blocks text editing.
 - Measure note opening and keystroke latency with 100, 1,000 and 10,000 notes before committing to a long-term loading strategy.
 - Measure on physical mobile devices before setting release gates for interaction latency.
 
 ## Scope of baseline
 
-Current UI loads all Text notes on initial open. This is adequate for the initial feature set, not yet a proven design for lifetime data. Metadata-first loading, pagination/search and editor-specific lazy loading are planned before larger datasets or images ship.
+Current UI loads all Text notes on initial open. This is adequate for the initial feature set, not yet a proven design for lifetime data. Metadata-first loading, pagination/search and editor-specific lazy loading are planned before larger datasets are supported.
 
 Later monitoring must include frontend interaction/LCP/INP, API p95/p99, errors, DB query/connection waits, and container resources. Staging/production dashboards and alerts are deferred with server work.
 
@@ -37,3 +37,9 @@ The database remains a single-owner SQLite instance. No load test, large-note co
 The Draw editor adds no third-party drawing dependency. The production build contains approximately 256 KiB of JS/CSS and 95 KiB summed gzip, including the Draw chunk (approximately 7.6 KiB gzip). The editor module executes when a Draw note is opened; the service worker still downloads it during shell precaching so guest drawings work offline.
 
 Each completed gesture saves a document revision. Rendering is scheduled once per animation frame; pointer movement does not issue writes. Undo is bounded to 40 snapshots and approximately 8 million serialized characters. A drawing is limited to 2 MB, 2,000 objects and 100,000 combined points/masks. These are guardrails, not a guarantee of fluid performance at maximum size. Large-scene interaction latency and physical-device memory remain unmeasured.
+
+## Text image baseline — 2026-09-30
+
+Production JS/CSS totals 283315 bytes, with 104480 bytes summed gzip across 17 files. The same exclusions apply as above. The Text editor is loaded on demand without an additional editor library; PWA precaching includes its chunk. These are asset measurements, not interaction latency or memory measurements.
+
+Images are resized to a maximum edge of 1,600 pixels and stored separately as WebP assets, with a 1 MB encoded limit. Typing updates the document and its image references without uploading image bytes again. A document supports up to 100 images; physical-device and large-collection performance remain unmeasured.

@@ -13,6 +13,7 @@ This document describes the target interaction model. The [verification scope](.
 ## Note tabs and metadata
 
 - Clicking anywhere on a tab activates it, except its independent close control. Closing hides the tab without deleting the note. Detail → Notes lists notes and reopens closed tabs; no separate All Notes button belongs in the tab bar.
+- Long tab names use an ellipsis within a bounded width; the full name remains available in the tooltip and accessible label.
 - Tabs support mouse/touch reordering with persistent order. Double-click/double-tap and F2 open editing. Long press does not open editing.
 - New and edit dialogs share icon, name and category fields. New notes also choose Text or Draw; existing note types are not converted during edit.
 - Focus the name field immediately. Defaults are sequential `Note1`, `Note2`, etc., category `General`/`Umum`, and empty content.
@@ -29,7 +30,7 @@ This document describes the target interaction model. The [verification scope](.
 - Paragraph spacing remains consistent before and after images. Ordinary text deletion preserves image anchors.
 - Selected images expose four circular resize handles, rotation above, and deletion below. All controls remain reachable above the editor hit area. Right-side resizing must work without requiring diagonal movement.
 - Delete/Backspace removes selected images. Ctrl/Cmd+A in the editor includes text and images, and deletion removes the complete selection.
-- Images, transforms and content persist. New Draw exports have transparent backgrounds; existing opaque screenshots retain their original pixels.
+- Images, transforms and content persist. Image bytes are stored separately from text updates, and an Add image file picker supplements clipboard paste. New Draw exports have transparent backgrounds; existing opaque screenshots retain their original pixels.
 - Typing `- `, `* ` or `• ` creates a bullet list; `1. ` or `1) ` creates numbering. Enter continues populated items and exits empty items to a normal paragraph. Tab/Shift+Tab nests/outdents; no list toolbar is required.
 - Selected list items can be dragged from their text or marker into Tasks. Create one task per item, including nested labels without duplicating descendant text. Preserve source note content.
 
@@ -40,11 +41,11 @@ This document describes the target interaction model. The [verification scope](.
 - Shapes: rectangle, ellipse, parallelogram, diamond, triangle, arrow. Support color, stroke width, undo/redo, image copy and PNG export.
 - Double-click empty space creates inline text; double-click text edits it; double-click a shape edits its label. Do not use text-entry popups.
 - Single-click selects. Marquee selection includes intersecting objects; Shift-click adds/removes objects. Move and delete selected groups together.
-- Selected objects expose resize, rotate and delete controls. Outlines, handles and action icons rotate with objects; hit testing and resizing use rotated axes. Group rotation is supported.
+- Selected objects expose resize, rotate and delete controls. Outlines, handles and action icons rotate with objects; hit testing and resizing use rotated axes. Group rotation is supported, and the rotation/deletion controls orbit and rotate with the group.
 - Arrows expose independent start/end handles instead of corner resizing. Either endpoint moves freely while the other stays fixed, including rotated arrows. Touch targets are enlarged.
 - Shape labels interrupt outlines with transparent padding around every text line, including multiline labels and PNG exports.
 - Eraser uses a circular cursor and removes touched parts of strokes/shapes rather than entire objects. Erased segments remain associated with transformed objects.
-- Deletion through selection controls, toolbar or Delete/Backspace requires confirmation and remains undoable. Undo history lasts while the canvas is open.
+- Deletion through selection controls, toolbar or Delete/Backspace happens immediately without confirmation and remains undoable with Undo or Ctrl/Cmd+Z. Undo history lasts while the canvas is open.
 - Shortcuts: S Select, H Pan, P Pen, T Text, R Rectangle, E Ellipse, A Arrow, X Eraser. Display hints; ignore tool shortcuts while typing. Ctrl/Cmd+A selects all canvas objects outside text/input editing.
 - Mobile supports drawing, selection, moving, resizing, partial erasing, double-tap text, pinch/pan, zoom controls, Fit, Edit Text and Done. The toolbar has two horizontally scrollable rows: tools and options/actions. Export/file input provide alternatives to unavailable clipboard APIs.
 - The application must store media according to guest/account boundaries with explicit limits. Prototype localStorage and large-scene performance are not production guarantees.

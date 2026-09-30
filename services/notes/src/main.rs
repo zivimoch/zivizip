@@ -1,4 +1,5 @@
 mod draw;
+mod text;
 use argon2::{password_hash::SaltString, Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use axum::{
     extract::{DefaultBodyLimit, Path, Request, State},
@@ -51,6 +52,8 @@ enum NoteKind {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 struct Note {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    rich: Option<text::Document>,
     #[serde(default)]
     kind: NoteKind,
     id: String,
@@ -273,6 +276,9 @@ fn validate(n: &Note) -> Result<()> {
         || n.icon.len() > 30
         || n.body.len() > 2_000_000
         || (n.kind == NoteKind::Draw && !draw::valid(&n.body))
+        || n.rich
+            .as_ref()
+            .is_some_and(|r| n.kind == NoteKind::Draw || !text::valid(r, &n.body))
         || n.revision < 1
         || n.created_at < 0
     {
@@ -299,6 +305,7 @@ async fn create(
     n.revision = 1;
     n.updated_at = millis();
     let db = app.db.lock().unwrap();
+    check_media(&db, &n)?;
     let exists: bool = db.query_row(
         "SELECT EXISTS(SELECT 1 FROM notes WHERE id=?)",
         [&n.id],
@@ -319,8 +326,69 @@ async fn create(
     let _ = app.events.send(());
     Ok(Json(n))
 }
+fn check_media(db: &Connection, n: &Note) -> Result<()> {
+    if let Some(rich) = &n.rich {
+        for image in &rich.images {
+            let exists: bool = db.query_row(
+                "SELECT EXISTS(SELECT 1 FROM media WHERE id=?)",
+                [&image.asset],
+                |r| r.get(0),
+            )?;
+            if !exists {
+                return Err(Error(StatusCode::BAD_REQUEST, "Missing image attachment"));
+            }
+        }
+    }
+    Ok(())
+}
+async fn put_media(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    bytes: axum::body::Bytes,
+) -> Result<StatusCode> {
+    authenticated(&app, &headers)?;
+    if !text::asset_id(&id)
+        || bytes.len() > 1_000_000
+        || bytes.len() < 12
+        || &bytes[..4] != b"RIFF"
+        || &bytes[8..12] != b"WEBP"
+        || format!("{:x}", Sha256::digest(&bytes)) != id
+    {
+        return Err(Error(StatusCode::BAD_REQUEST, "Invalid WebP attachment"));
+    }
+    let db = app.db.lock().unwrap();
+    db.execute(
+        "INSERT OR IGNORE INTO media(id,data) VALUES(?,?)",
+        params![id, bytes.as_ref()],
+    )?;
+    Ok(StatusCode::NO_CONTENT)
+}
+async fn get_media(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Result<Response> {
+    authenticated(&app, &headers)?;
+    if !text::asset_id(&id) {
+        return Err(Error(StatusCode::NOT_FOUND, "Image not found"));
+    }
+    let db = app.db.lock().unwrap();
+    let data: Vec<u8> = db
+        .query_row("SELECT data FROM media WHERE id=?", [id], |r| r.get(0))
+        .map_err(|_| Error(StatusCode::NOT_FOUND, "Image not found"))?;
+    Ok((
+        [
+            (header::CONTENT_TYPE, "image/webp"),
+            (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
+        ],
+        data,
+    )
+        .into_response())
+}
 fn write_note(db: &mut Connection, mut n: Note) -> Result<Note> {
     validate(&n)?;
+    check_media(db, &n)?;
     let tx = db.transaction()?;
     let existing = tx.query_row("SELECT data FROM notes WHERE id=?", [&n.id], row_note);
     match existing {
@@ -442,6 +510,7 @@ fn schema(db: &Connection) -> rusqlite::Result<()> {
     db.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
  CREATE TABLE IF NOT EXISTS owner(id INTEGER PRIMARY KEY CHECK(id=1),username TEXT NOT NULL, hash TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,expires INTEGER NOT NULL);
+ CREATE TABLE IF NOT EXISTS media(id TEXT PRIMARY KEY, data BLOB NOT NULL);
  CREATE TABLE IF NOT EXISTS notes(id TEXT PRIMARY KEY,revision INTEGER NOT NULL,created_at INTEGER NOT NULL,data TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS interests(id INTEGER PRIMARY KEY,email TEXT NOT NULL,message TEXT NOT NULL,created_at INTEGER NOT NULL);
  PRAGMA user_version=1;")
@@ -515,9 +584,10 @@ async fn main() {
         .route("/api/session", get(me).post(login).delete(logout))
         .route("/api/notes", get(list).post(create))
         .route("/api/notes/{id}", put(update).delete(remove))
+        .route("/api/media/{id}", get(get_media).put(put_media))
         .route("/api/events", get(events))
         .route("/api/registration-interest", post(interest).get(interests))
-        .layer(DefaultBodyLimit::max(2_100_000))
+        .layer(DefaultBodyLimit::max(4_200_000))
         .layer(middleware::from_fn_with_state(app.clone(), guard))
         .with_state(app);
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
@@ -534,6 +604,7 @@ mod tests {
     use super::*;
     fn note() -> Note {
         Note {
+            rich: None,
             kind: NoteKind::Text,
             id: Uuid::new_v4().to_string(),
             name: "Plan".into(),

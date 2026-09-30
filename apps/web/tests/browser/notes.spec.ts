@@ -15,7 +15,7 @@ test('guest note persists, closing only hides it, backup downloads', async ({
     .fill('Keep my thoughts');
   await page.waitForTimeout(300);
   await page.reload();
-  await expect(page.getByRole('textbox', { name: 'Note content' })).toHaveValue(
+  await expect(page.getByRole('textbox', { name: 'Note content' })).toHaveText(
     'Keep my thoughts',
   );
   await page
@@ -34,7 +34,7 @@ test('guest note persists, closing only hides it, backup downloads', async ({
     .locator('.note-library')
     .getByRole('button', { name: /Daily Ideas/ })
     .click();
-  await expect(page.getByRole('textbox', { name: 'Note content' })).toHaveValue(
+  await expect(page.getByRole('textbox', { name: 'Note content' })).toHaveText(
     'Keep my thoughts',
   );
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
@@ -58,7 +58,7 @@ test('mobile navigation and offline reload', async ({ page, context }) => {
   await page.reload();
   await context.setOffline(true);
   await page.reload();
-  await expect(page.getByRole('textbox', { name: 'Note content' })).toHaveValue(
+  await expect(page.getByRole('textbox', { name: 'Note content' })).toHaveText(
     'Offline works',
   );
   await page
@@ -66,7 +66,7 @@ test('mobile navigation and offline reload', async ({ page, context }) => {
     .fill('Edited offline');
   await page.waitForTimeout(300);
   await page.reload();
-  await expect(page.getByRole('textbox', { name: 'Note content' })).toHaveValue(
+  await expect(page.getByRole('textbox', { name: 'Note content' })).toHaveText(
     'Edited offline',
   );
   await expect(page.locator('body')).toHaveJSProperty('scrollWidth', 390);

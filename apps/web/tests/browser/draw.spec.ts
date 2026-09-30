@@ -44,14 +44,23 @@ test('Draw editing, selection, rotation, erasing, history and transparent export
   await page
     .getByRole('button', { name: 'Delete selected objects', exact: true })
     .click();
-  await expect(page.getByRole('dialog')).toBeVisible();
-  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await expect(page.locator('[data-shape]')).toHaveCount(2);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('[data-shape]')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await page.locator('.drawing').press('Control+a');
   const rot = (await page.locator('.selection-rotate').boundingBox())!;
   await page.mouse.move(rot.x + 18, rot.y + 18);
   await page.mouse.down();
   await page.mouse.move(rot.x + 140, rot.y + 140, { steps: 8 });
   await page.mouse.up();
+  await expect(page.locator('.selection-rotate')).not.toHaveCSS(
+    'transform',
+    'matrix(1, 0, 0, 1, 0, 0)',
+  );
+  await expect(page.locator('.selection-delete')).not.toHaveCSS(
+    'transform',
+    'matrix(1, 0, 0, 1, 0, 0)',
+  );
   await expect(page.locator('[data-shape]').first()).not.toHaveAttribute(
     'transform',
     /^rotate\(0 /,
@@ -60,7 +69,6 @@ test('Draw editing, selection, rotation, erasing, history and transparent export
   await page.locator('.drawing').press('Control+a');
   await expect(page.locator('[data-selection]')).toHaveCount(2);
   await page.locator('.drawing').press('Delete');
-  await page.getByRole('button', { name: 'Delete', exact: true }).click();
   await expect(page.locator('[data-shape]')).toHaveCount(0);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(page.locator('[data-shape]')).toHaveCount(2);

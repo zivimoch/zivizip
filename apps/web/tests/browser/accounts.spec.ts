@@ -146,26 +146,26 @@ test('owner login isolates guests, persists, syncs and reads offline, logout rev
     .click();
   await expect(
     second.getByRole('textbox', { name: 'Note content' }),
-  ).toHaveValue('Owner version one');
+  ).toHaveText('Owner version one');
   await page
     .getByRole('textbox', { name: 'Note content' })
     .fill('Realtime version two');
   await expect(
     second.getByRole('textbox', { name: 'Note content' }),
-  ).toHaveValue('Realtime version two', { timeout: 10000 });
+  ).toHaveText('Realtime version two', { timeout: 10000 });
   await page.evaluate(() => navigator.serviceWorker.ready.then(() => true));
   await context.setOffline(true);
   await page.reload();
-  await expect(page.getByRole('textbox', { name: 'Note content' })).toHaveValue(
+  await expect(page.getByRole('textbox', { name: 'Note content' })).toHaveText(
     'Realtime version two',
   );
   await expect(
     page.getByRole('textbox', { name: 'Note content' }),
-  ).toHaveAttribute('readonly', '');
+  ).toHaveAttribute('aria-readonly', 'true');
   await context.setOffline(false);
   await expect(
     page.getByRole('textbox', { name: 'Note content' }),
-  ).not.toHaveAttribute('readonly', '', { timeout: 15000 });
+  ).not.toHaveAttribute('aria-readonly', 'true', { timeout: 15000 });
   const n = (await serverNotes(context)).find((n: any) => n.id === id);
   expect(
     (
@@ -178,7 +178,7 @@ test('owner login isolates guests, persists, syncs and reads offline, logout rev
   await page.getByRole('button', { name: 'Account', exact: true }).click();
   await page.getByRole('button', { name: 'Log out', exact: true }).click();
   await expect(page.locator('.account-status')).toHaveCount(0);
-  await expect(page.getByRole('textbox', { name: 'Note content' })).toHaveValue(
+  await expect(page.getByRole('textbox', { name: 'Note content' })).toHaveText(
     'Guest-only content',
   );
   expect((await restored.request.get(`${origin}/api/notes`)).status()).toBe(
@@ -216,7 +216,7 @@ test('guest notes upload only after explicit copy and retain local originals', a
   });
   await page.getByRole('button', { name: 'Account', exact: true }).click();
   await page.getByRole('button', { name: 'Log out', exact: true }).click();
-  await expect(page.getByRole('textbox', { name: 'Note content' })).toHaveValue(
+  await expect(page.getByRole('textbox', { name: 'Note content' })).toHaveText(
     'Bring this explicitly',
   );
 });

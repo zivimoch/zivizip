@@ -11,6 +11,7 @@ import {
   union,
   visualBounds,
   type Point,
+  type Box,
   type Scene,
   type Shape,
   type ShapeType,
@@ -48,6 +49,7 @@ interface Gesture {
   origin: Point;
   angle: number;
   view: Viewport;
+  frame: { box: Box; angle: number } | null;
 }
 const icons: Record<string, string> = {
   select: 'M4 3l15 9-7 1-3 7z',
@@ -94,6 +96,7 @@ export function mountEditor(host: HTMLElement, options: Options) {
     space = false,
     dead = false,
     frame = 0;
+  let groupFrame: { box: Box; angle: number } | null = null;
   let history: string[] = [],
     redo: string[] = [];
   let textEdit: {
@@ -132,14 +135,13 @@ export function mountEditor(host: HTMLElement, options: Options) {
     )
     .join(
       '',
-    )}</div><div class="draw-options"><label>${t('Color', 'Warna')}<input type="color" data-color value="#17c5d5"></label><label>${t('Stroke', 'Tebal')}<select data-width><option>2</option><option selected>4</option><option>8</option><option>12</option></select></label><label>${t('Eraser', 'Penghapus')}<input data-eraser type="range" min="10" max="80" value="28"></label>${button('undo', 'Undo', 'Urungkan')}${button('redo', 'Redo', 'Ulangi')}${button('delete', 'Delete selection', 'Hapus pilihan')}<button type="button" data-action="out" aria-label="${t('Zoom out', 'Perkecil')}">−</button><button type="button" data-action="reset">100%</button><button type="button" data-action="in" aria-label="${t('Zoom in', 'Perbesar')}">+</button>${button('fit', 'Fit', 'Sesuaikan')}${button('text', 'Edit text', 'Edit teks')}${button('copy', 'Copy image', 'Salin gambar')}${button('export', 'Export PNG', 'Ekspor PNG')}</div></div><div class="draw-stage"><svg class="drawing" tabindex="0" role="application" aria-label="${t('Drawing canvas', 'Kanvas gambar')}"></svg><div class="eraser-cursor" hidden></div><button type="button" class="selection-rotate" aria-label="${t('Rotate selection', 'Putar pilihan')}" hidden>${icon('rotate')}</button><button type="button" class="selection-delete" aria-label="${t('Delete selected objects', 'Hapus objek terpilih')}" hidden>${icon('delete')}</button></div><p class="draw-caption">${t('Double-click to write · Shift to select more · Space + drag to pan', 'Klik dua kali untuk menulis · Shift untuk memilih banyak · Spasi + tarik untuk geser')}</p><div class="draw-message" role="status"></div><dialog class="draw-confirm"><form method="dialog"><h2>${t('Delete selected objects?', 'Hapus objek terpilih?')}</h2><p>${t('You can undo this action.', 'Tindakan ini dapat diurungkan.')}</p><div class="draw-dialog-actions"><button value="cancel">${t('Cancel', 'Batal')}</button><button value="delete" class="primary">${t('Delete', 'Hapus')}</button></div></form></dialog>`;
+    )}</div><div class="draw-options"><label>${t('Color', 'Warna')}<input type="color" data-color value="#17c5d5"></label><label>${t('Stroke', 'Tebal')}<select data-width><option>2</option><option selected>4</option><option>8</option><option>12</option></select></label><label>${t('Eraser', 'Penghapus')}<input data-eraser type="range" min="10" max="80" value="28"></label>${button('undo', 'Undo', 'Urungkan')}${button('redo', 'Redo', 'Ulangi')}${button('delete', 'Delete selection', 'Hapus pilihan')}<button type="button" data-action="out" aria-label="${t('Zoom out', 'Perkecil')}">−</button><button type="button" data-action="reset">100%</button><button type="button" data-action="in" aria-label="${t('Zoom in', 'Perbesar')}">+</button>${button('fit', 'Fit', 'Sesuaikan')}${button('text', 'Edit text', 'Edit teks')}${button('copy', 'Copy image', 'Salin gambar')}${button('export', 'Export PNG', 'Ekspor PNG')}</div></div><div class="draw-stage"><svg class="drawing" tabindex="0" role="application" aria-label="${t('Drawing canvas', 'Kanvas gambar')}"></svg><div class="eraser-cursor" hidden></div><button type="button" class="selection-rotate" aria-label="${t('Rotate selection', 'Putar pilihan')}" hidden>${icon('rotate')}</button><button type="button" class="selection-delete" aria-label="${t('Delete selected objects', 'Hapus objek terpilih')}" hidden>${icon('delete')}</button></div><p class="draw-caption">${t('Double-click to write · Shift to select more · Space + drag to pan', 'Klik dua kali untuk menulis · Shift untuk memilih banyak · Spasi + tarik untuk geser')}</p><div class="draw-message" role="status"></div>`;
   const q = <T extends Element>(s: string) => host.querySelector<T>(s)!;
   const svg = q<SVGSVGElement>('.drawing'),
     stage = q<HTMLDivElement>('.draw-stage');
   const rotation = q<HTMLButtonElement>('.selection-rotate'),
     deletion = q<HTMLButtonElement>('.selection-delete');
-  const cursor = q<HTMLDivElement>('.eraser-cursor'),
-    confirm = q<HTMLDialogElement>('.draw-confirm');
+  const cursor = q<HTMLDivElement>('.eraser-cursor');
   const color = q<HTMLInputElement>('[data-color]'),
     width = q<HTMLSelectElement>('[data-width]'),
     eraserSize = q<HTMLInputElement>('[data-eraser]');
@@ -233,9 +235,11 @@ export function mountEditor(host: HTMLElement, options: Options) {
     rotation.hidden = deletion.hidden =
       !shapes.length || !!textEdit || !opts.writable;
     if (shapes.length) {
-      const b = single ? bounds(single) : union(shapes.map(visualBounds)),
+      const b = single
+          ? bounds(single)
+          : groupFrame?.box || union(shapes.map(visualBounds)),
         c = center(b),
-        angle = single?.angle || 0;
+        angle = single ? single.angle : groupFrame?.angle || 0;
       for (const [control, y] of [
         [rotation, b.y - 32 / view.zoom],
         [deletion, b.y + b.h + 32 / view.zoom],
@@ -358,10 +362,14 @@ export function mountEditor(host: HTMLElement, options: Options) {
       origin: [0, 0],
       angle: 0,
       view: { ...view },
+      frame: groupFrame ? structuredClone(groupFrame) : null,
     });
   }
   function cancelGesture() {
-    if (gesture) scene = parseScene(gesture.before);
+    if (gesture) {
+      scene = parseScene(gesture.before);
+      groupFrame = gesture.frame;
+    }
     gesture = null;
     draft = null;
     opts.busy(false);
@@ -444,12 +452,17 @@ export function mountEditor(host: HTMLElement, options: Options) {
       const s = hit(p);
       if (s) {
         if (e.shiftKey) {
+          groupFrame = null;
           if (selected.has(s.id)) selected.delete(s.id);
           else selected.add(s.id);
-        } else if (!selected.has(s.id)) selected = new Set([s.id]);
+        } else if (!selected.has(s.id)) {
+          selected = new Set([s.id]);
+          groupFrame = null;
+        }
         if (selected.has(s.id) && opts.writable) start('move', p);
       } else {
         if (!e.shiftKey) selected.clear();
+        groupFrame = null;
         start('marquee', p);
       }
     } else if (tool === 'erase') {
@@ -459,6 +472,7 @@ export function mountEditor(host: HTMLElement, options: Options) {
       );
     } else {
       selected.clear();
+      groupFrame = null;
       start('draw', p);
       draft = {
         id: crypto.randomUUID(),
@@ -523,16 +537,23 @@ export function mountEditor(host: HTMLElement, options: Options) {
     if (g.kind === 'resize') replace([resize(g.originals[0], g.corner, p)]);
     if (g.kind === 'endpoint')
       replace([moveEndpoint(g.originals[0], g.corner, p)]);
-    if (g.kind === 'rotate')
-      replace(
-        rotateGroup(
-          g.originals,
-          g.origin,
-          ((Math.atan2(p[1] - g.origin[1], p[0] - g.origin[0]) - g.angle) *
-            180) /
-            Math.PI,
-        ),
-      );
+    if (g.kind === 'rotate') {
+      const delta =
+        ((Math.atan2(p[1] - g.origin[1], p[0] - g.origin[0]) - g.angle) * 180) /
+        Math.PI;
+      replace(rotateGroup(g.originals, g.origin, delta));
+      if (g.originals.length > 1)
+        groupFrame = { box: g.frame!.box, angle: g.frame!.angle + delta };
+    }
+    if (g.kind === 'move' && g.frame)
+      groupFrame = {
+        angle: g.frame.angle,
+        box: {
+          ...g.frame.box,
+          x: g.frame.box.x + p[0] - g.start[0],
+          y: g.frame.box.y + p[1] - g.start[1],
+        },
+      };
     if (g.kind === 'pan') {
       view.x += g.start[0] - p[0];
       view.y += g.start[1] - p[1];
@@ -543,6 +564,7 @@ export function mountEditor(host: HTMLElement, options: Options) {
         w = Math.abs(p[0] - g.start[0]),
         h = Math.abs(p[1] - g.start[1]);
       selected = new Set(g.base);
+      groupFrame = null;
       if (Math.hypot(w, h) * view.zoom > 3)
         scene.shapes.forEach((s) => {
           const b = visualBounds(s);
@@ -593,8 +615,10 @@ export function mountEditor(host: HTMLElement, options: Options) {
     if (!opts.writable) return;
     e.preventDefault();
     e.stopPropagation();
+    if (selected.size > 1 && !groupFrame)
+      groupFrame = { box: union(chosen().map(visualBounds)), angle: 0 };
     const g = start('rotate', point(e));
-    g.origin = center(union(g.originals.map(visualBounds)));
+    g.origin = center(g.frame?.box || union(g.originals.map(visualBounds)));
     g.angle = Math.atan2(g.start[1] - g.origin[1], g.start[0] - g.origin[0]);
     rotation.setPointerCapture(e.pointerId);
   };
@@ -603,19 +627,17 @@ export function mountEditor(host: HTMLElement, options: Options) {
   rotation.onpointercancel = cancelGesture;
   function remove() {
     finishText();
-    if (opts.writable && selected.size) confirm.showModal();
+    if (!opts.writable || !selected.size) return;
+    const before = snapshot();
+    scene.shapes = scene.shapes.filter((s) => !selected.has(s.id));
+    selected.clear();
+    groupFrame = null;
+    groupFrame = null;
+    record(before);
+    paint();
+    svg.focus();
   }
   deletion.onclick = remove;
-  confirm.onclose = () => {
-    if (confirm.returnValue === 'delete' && opts.writable) {
-      const before = snapshot();
-      scene.shapes = scene.shapes.filter((s) => !selected.has(s.id));
-      selected.clear();
-      record(before);
-      paint();
-    }
-    svg.focus();
-  };
   function zoom(f: number) {
     finishText();
     const r = svg.getBoundingClientRect(),
@@ -703,6 +725,7 @@ export function mountEditor(host: HTMLElement, options: Options) {
         to.push(snapshot());
         scene = parseScene(from.pop()!);
         selected.clear();
+        groupFrame = null;
         accepted = snapshot();
         opts.change(accepted);
       }
@@ -765,12 +788,12 @@ export function mountEditor(host: HTMLElement, options: Options) {
   host.addEventListener(
     'keydown',
     (e) => {
-      if (pointerTarget(e).closest('input,textarea,select') || confirm.open)
-        return;
+      if (pointerTarget(e).closest('input,textarea,select')) return;
       const k = e.key.toLowerCase();
       if ((e.ctrlKey || e.metaKey) && k === 'a') {
         e.preventDefault();
         selected = new Set(scene.shapes.map((s) => s.id));
+        groupFrame = null;
         setTool('select');
         paint();
         return;
@@ -800,6 +823,7 @@ export function mountEditor(host: HTMLElement, options: Options) {
       }
       if (e.key === 'Escape') {
         selected.clear();
+        groupFrame = null;
         cancelGesture();
         paint();
       }
@@ -827,6 +851,7 @@ export function mountEditor(host: HTMLElement, options: Options) {
       if (!host.contains(e.target as Node)) {
         finishText();
         selected.clear();
+        groupFrame = null;
         paint();
       }
     },
@@ -861,6 +886,7 @@ export function mountEditor(host: HTMLElement, options: Options) {
         history = [];
         redo = [];
         selected.clear();
+        groupFrame = null;
         paint();
       }
       paint();
