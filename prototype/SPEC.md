@@ -21,6 +21,7 @@ This document describes the target interaction model. The [verification scope](.
 - Editing offers Update and Delete; deletion requires confirmation.
 - The note header is only `Category / Note name`. Omit large titles, dates, field labels, separate rename controls and local-save labels.
 - The editor fills available height and accepts native caret placement throughout. Focus adds no colored side line or canvas border.
+- Note tab labels use compact horizontal padding and a maximum selection width of 180px on desktop / 160px on mobile; longer names retain ellipsis.
 
 ## Text and images
 
