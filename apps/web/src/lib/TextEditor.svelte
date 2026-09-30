@@ -4,6 +4,7 @@
   import type { mountText } from './text/editor';
   import './text/editor.css';
   export let body: string;
+  export let toolbar: HTMLElement | undefined = undefined;
   export let rich: TextDocument | undefined = undefined;
   export let writable: boolean;
   export let language: 'en' | 'id';
@@ -15,6 +16,7 @@
   let host: HTMLDivElement;
   let editor: ReturnType<typeof mountText> | undefined;
   $: options = {
+    toolbar,
     body,
     rich,
     writable,

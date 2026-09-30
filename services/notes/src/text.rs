@@ -10,8 +10,14 @@ pub struct Document {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(tag = "type", rename_all = "lowercase", deny_unknown_fields)]
 pub enum Block {
-    Paragraph { text: String },
-    Image { id: String },
+    Paragraph {
+        text: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        height: Option<f64>,
+    },
+    Image {
+        id: String,
+    },
 }
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(deny_unknown_fields)]
@@ -23,6 +29,8 @@ pub struct Image {
     pub dx: f64,
     pub dy: f64,
     pub angle: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flow: Option<f64>,
 }
 pub fn asset_id(id: &str) -> bool {
     id.len() == 64
@@ -57,6 +65,9 @@ pub fn valid(doc: &Document, body: &str) -> bool {
             || im.h > 10000.
             || im.dx.abs() > 100000.
             || im.dy.abs() > 100000.
+            || im
+                .flow
+                .is_some_and(|v| !v.is_finite() || !(0. ..=10000.).contains(&v))
             || im.angle.abs() > 360000.
         {
             return false;
@@ -66,7 +77,12 @@ pub fn valid(doc: &Document, body: &str) -> bool {
     let mut paragraphs = Vec::new();
     for block in &doc.blocks {
         match block {
-            Block::Paragraph { text } => paragraphs.push(text.as_str()),
+            Block::Paragraph { text, height } => {
+                if height.is_some_and(|v| !v.is_finite() || v <= 0. || v > 40.) {
+                    return false;
+                }
+                paragraphs.push(text.as_str());
+            }
             Block::Image { id } => {
                 if !ids.contains(id) || !anchors.insert(id) {
                     return false;
@@ -85,6 +101,7 @@ mod tests {
             version: 1,
             blocks: vec![Block::Paragraph {
                 text: "Hello".into(),
+                height: None,
             }],
             images: vec![],
         };

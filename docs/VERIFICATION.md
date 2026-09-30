@@ -7,9 +7,9 @@ Verified locally on 2026-09-30:
 | Check               | Result                | Coverage                                                                                                                                                                                |
 | ------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Svelte/TypeScript   | No errors or warnings | Types and component diagnostics                                                                                                                                                         |
-| Frontend unit tests | 14 passed             | Persistence, conflicts, backup validation, storage isolation, stale-response protection, empty HTTP responses, Draw geometry, rotation, image documents and media backup validation     |
+| Frontend unit tests | 16 passed             | Persistence, conflicts, backup validation, storage isolation, stale-response protection, empty HTTP responses, Draw geometry, rotation, image documents and media backup validation     |
 | Rust unit tests     | 5 passed              | Conflicts, recovery after deletion, input, Draw and Text document validation                                                                                                            |
-| Browser scenarios   | 20 passed             | Guest onboarding, languages, mobile, account isolation, copying, SSE, offline, logout, browser restart, Draw transforms/export, image anchoring/controls/sync, touch resize/move/delete |
+| Browser scenarios   | 21 passed             | Guest onboarding, languages, mobile, account isolation, copying, SSE, offline, logout, browser restart, Draw transforms/export, image anchoring/controls/sync, touch resize/move/delete |
 | Container restart   | Passed                | Notes and sessions survive service restart                                                                                                                                              |
 
 The complete browser suite passed with one worker; an earlier parallel run had one intermittent workspace-startup timeout. Browser checks use Chrome, a desktop viewport, and a 390px mobile viewport. The persistent-session test closes and reopens a browser process. Draw tests additionally dispatch Chrome touch events for drawing, resizing, double-tap text and pinch zoom. PNG output is checked for a transparent corner pixel. This is not physical-phone testing or a production load test.
@@ -28,9 +28,11 @@ The complete browser suite passed with one worker; an earlier parallel run had o
 9. Create a Draw note. Add shapes and text, marquee-select several objects, rotate, resize, and move an arrow endpoint. Delete selected objects without confirmation and undo the change.
 10. Partially erase a shape, reload, and export a transparent PNG. Repeat with an account and verify changes from another session.
 
-11. Paste an image between paragraphs. Type above and below it, drag it upward, resize both right corners, rotate, delete and undo. Verify Ctrl/Cmd+A includes images and the backup contains their media. After moving an image, verify its former space is editable. Backspace from the paragraph below and Delete from the paragraph above remove an adjacent image; Undo restores it.
+11. Paste an image between paragraphs. Type above and below it, drag it upward, resize both right corners, rotate, delete and undo. Verify Ctrl/Cmd+A includes images and the backup contains their media. After moving an image, verify its former space is editable and the text below stays at the same position. Backspace from the paragraph below and Delete from the paragraph above remove an adjacent image; Undo restores it.
 12. Open an image note from another authenticated browser and then offline after caching it. Verify mobile image movement, resize and deletion.
+
+13. Type `- ` or `1. ` to start a list. Verify Enter continuation, empty-item exit, Tab/Shift+Tab nesting, alternating letters/numbers, and persistence after reload. Confirm Add image remains in the breadcrumb row.
 
 ## Scope
 
-Automatic lists and rich text formatting, Tasks, Finance, Goals, Web Push, prototype-data migration, and deployment remain outside the implemented Notes/account flow. Account backup import can complete partially if a request fails; it is not an atomic server transaction. Large collections and real-device performance need separate verification.
+Rich formatting beyond automatic lists, Tasks, Finance, Goals, Web Push, prototype-data migration, and deployment remain outside the implemented Notes/account flow. Account backup import can complete partially if a request fails; it is not an atomic server transaction. Large collections and real-device performance need separate verification.

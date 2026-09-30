@@ -56,6 +56,7 @@
   let backup: Backup | null = null;
   let online = true;
   let queue = Promise.resolve();
+  let textTools: HTMLDivElement;
   let pending = 0;
   let dragId: string | null = null;
   let workspace: HTMLDivElement;
@@ -844,7 +845,13 @@
             >{/each}
         </div>{/if}
       {#if current}<div class="breadcrumb">
-          {current.category}<span>/</span>{current.name}
+          <span class="breadcrumb-path"
+            >{current.category}<span>/</span>{current.name}</span
+          >
+          {#if current.kind !== 'draw'}<div
+              class="breadcrumb-tools"
+              bind:this={textTools}
+            ></div>{/if}
         </div>
         {#if current.kind === 'draw'}
           {#key `${workspaceEpoch}:${current.id}:${prefs.language}`}
@@ -868,6 +875,7 @@
             {@const epoch = workspaceEpoch}
             {@const server = !!account}
             <TextEditor
+              toolbar={textTools}
               body={current.body}
               rich={current.rich}
               {writable}

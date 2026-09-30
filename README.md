@@ -9,12 +9,13 @@ Zivizip opens directly into your workspace. Guest notes stay in your browser; th
 - Text and Draw notes with categories, reorderable tabs, and recoverable edit conflicts.
 - Infinite drawing canvas with shapes, inline labels, selection, transforms, partial erasing, and transparent PNG export.
 - Text images with caret insertion, positioning, resizing, rotation, and portable attachments.
+- Automatic bullets and nested numbering with alternating numeric/alphabetic levels.
 - Guest editing offline, with versioned JSON backup and import.
 - Owner login with persistent sessions and a separate read-only offline cache.
 - Explicit copying of guest notes into the account; local originals are preserved.
 - Installable PWA shell, responsive layout, and English/Indonesian interface.
 
-Automatic lists, Tasks, Finance, and Goals are available in the interaction prototype and are being integrated into the application. Public account registration and push notifications are not available yet.
+Tasks, Finance, and Goals are available in the interaction prototype and are being integrated into the application. Public account registration and push notifications are not available yet.
 
 ## Quick start
 

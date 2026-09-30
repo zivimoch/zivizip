@@ -48,7 +48,7 @@ Workspace backup versions 2 and 3 include Text and Draw notes. Import also accep
 
 ## Text images and attachments
 
-Text notes may include a `rich` document containing versioned paragraph/image blocks and image placements. `body` remains their plain-text projection. Raw HTML is never stored or rendered. Draw notes cannot contain a Text document. Existing plain-text records remain compatible.
+Text notes may include a `rich` document containing versioned paragraph/image blocks and image placements. `body` remains their plain-text projection. Raw HTML is never stored or rendered. Draw notes cannot contain a Text document. Existing plain-text records remain compatible. Optional image `flow` (0–10,000 px) and empty-paragraph `height` (greater than 0, up to 40 px) preserve editable spacing after image movement. Missing fields retain ordinary paragraph and image flow behavior. Automatic list markers are stored in paragraph text.
 
 `PUT /api/media/:sha256` stores one immutable WebP attachment, and `GET /api/media/:sha256` retrieves it. Both require the owner session; uploads also require the usual mutation headers. The service checks the WebP signature, content hash and 1 MB limit. Note writes reject missing attachment references. Guest attachments stay in a separate IndexedDB media table; account images are cached in the account database and cleared with it on logout.
 

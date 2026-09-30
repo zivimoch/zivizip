@@ -50,8 +50,10 @@ The SVG editor loads dynamically when a Draw note opens. Shape geometry and labe
 
 Pan and zoom are stored separately per browser workspace. Selection and undo history are transient. Account drawings follow the same login, copy, conflict, cache and offline rules as Text notes. The service worker precaches the editor for guest offline use.
 
-## Text image editing
+## Text editing
 
-The Text editor stores typed paragraph/image blocks rather than arbitrary HTML. Normal-flow anchors reserve space at paste time; an independent image layer places pixels behind text and stores movement/rotation separately. Editing below a moved image compensates for anchor movement so the image does not drift. Offset images release reserved flow space. Backspace/Delete at image boundaries and range deletion remove the affected images; the editor history restores them with undo.
+The Text editor stores typed paragraph/image blocks rather than arbitrary HTML. Normal-flow anchors reserve space at paste time; an independent image layer places pixels behind text and stores movement/rotation separately. Editing below a moved image compensates for anchor movement so the image does not drift. Moving an image converts its reserved flow space to editable blank paragraphs, preserving the vertical position of subsequent text. Optional paragraph heights retain the exact spacing until a blank line is edited. Backspace/Delete at image boundaries and range deletion remove the affected images; the editor history restores them with undo.
 
 Attachment bytes live outside note revisions. Guest bytes are IndexedDB blobs; the single-owner service stores content-addressed bytes in SQLite. Typing, resize and rotation only write document metadata. This keeps HTTP/SSE note synchronization independent of image byte size. A separate media store can replace the SQLite attachment table when deployment/storage requirements justify it.
+
+Automatic list markers remain plain text in the portable document. Enter continues the current list or exits an empty item; Tab/Shift+Tab changes depth and alternates numeric/alphabetic levels. This uses the same storage, conflict and offline paths as ordinary paragraphs. Task conversion remains part of the Tasks integration.

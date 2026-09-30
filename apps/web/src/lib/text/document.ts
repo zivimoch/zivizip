@@ -6,9 +6,10 @@ export interface TextImage {
   dx: number;
   dy: number;
   angle: number;
+  flow?: number;
 }
 export type Block =
-  | { type: 'paragraph'; text: string }
+  | { type: 'paragraph'; text: string; height?: number }
   | { type: 'image'; id: string };
 export interface TextDocument {
   version: 1;
@@ -52,6 +53,8 @@ export function validateDocument(doc: TextDocument): void {
       im.h > 10000 ||
       Math.abs(im.dx) > 100000 ||
       Math.abs(im.dy) > 100000 ||
+      (im.flow !== undefined &&
+        (!Number.isFinite(im.flow) || im.flow < 0 || im.flow > 10000)) ||
       Math.abs(im.angle) > 360000
     )
       throw Error('Invalid image placement');
@@ -62,6 +65,11 @@ export function validateDocument(doc: TextDocument): void {
     if (!b || (b.type !== 'paragraph' && b.type !== 'image'))
       throw Error('Invalid text block');
     if (b.type === 'paragraph') {
+      if (
+        b.height !== undefined &&
+        (!Number.isFinite(b.height) || b.height <= 0 || b.height > 40)
+      )
+        throw Error('Invalid paragraph spacing');
       if (typeof b.text !== 'string') throw Error('Invalid paragraph');
     } else {
       if (!ids.has(b.id) || anchors.has(b.id))

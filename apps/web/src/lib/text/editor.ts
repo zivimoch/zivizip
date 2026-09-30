@@ -6,6 +6,7 @@ import {
   type TextImage,
   type Block,
 } from './document';
+import { listItem, listPrefix, nestedPrefix } from './lists';
 import { prepareImage } from './media';
 import { turn, type Point } from '../draw/scene';
 interface Options {
@@ -18,6 +19,7 @@ interface Options {
   get: (id: string) => Promise<Blob>;
   busy: (value: boolean) => void;
   error: (error: unknown) => void;
+  toolbar?: HTMLElement;
 }
 export function mountText(host: HTMLElement, options: Options) {
   let opts = options,
@@ -77,7 +79,8 @@ export function mountText(host: HTMLElement, options: Options) {
     file.click();
   };
   tools.append(add, file);
-  host.append(tools, layer, editor, controls, status);
+  (opts.toolbar || host).append(tools);
+  host.append(layer, editor, controls, status);
   const positions = new Map<string, { x: number; y: number }>();
   let savedRange: Range | null = null;
   const anchor = (id: string) =>
@@ -88,9 +91,15 @@ export function mountText(host: HTMLElement, options: Options) {
       ? sel.getRangeAt(0).cloneRange()
       : null;
   }
-  function paragraph(text = '') {
+  function paragraph(text = '', height?: number) {
     const p = document.createElement('div');
     p.className = 'text-paragraph';
+    if (height !== undefined) {
+      p.dataset.height = String(height);
+      if (!text) {
+        p.style.minHeight = p.style.lineHeight = height + 'px';
+      }
+    }
     if (text) p.textContent = text;
     else p.append(document.createElement('br'));
     return p;
@@ -106,7 +115,7 @@ export function mountText(host: HTMLElement, options: Options) {
   function render() {
     editor.replaceChildren(
       ...doc.blocks.map((b) =>
-        b.type === 'paragraph' ? paragraph(b.text) : spacer(b.id),
+        b.type === 'paragraph' ? paragraph(b.text, b.height) : spacer(b.id),
       ),
     );
     if (!editor.childNodes.length) editor.append(paragraph());
@@ -122,7 +131,14 @@ export function mountText(host: HTMLElement, options: Options) {
       const text =
         node instanceof HTMLElement ? node.innerText : node.textContent || '';
       const lines = text === '\n' ? [''] : text.split('\n');
-      for (const text of lines) blocks.push({ type: 'paragraph', text });
+      for (const text of lines)
+        blocks.push({
+          type: 'paragraph',
+          text,
+          ...(node instanceof HTMLElement && node.dataset.height && !text
+            ? { height: Number(node.dataset.height) }
+            : {}),
+        });
     });
     doc.blocks = blocks.length ? blocks : [{ type: 'paragraph', text: '' }];
   }
@@ -141,14 +157,20 @@ export function mountText(host: HTMLElement, options: Options) {
     accepted = next;
     opts.change(
       plainText(doc),
-      doc.images.length ? structuredClone(doc) : undefined,
+      doc.images.length ||
+        doc.blocks.some((b) => b.type === 'paragraph' && b.height !== undefined)
+        ? structuredClone(doc)
+        : undefined,
     );
   }
   function emit() {
     accepted = JSON.stringify(doc);
     opts.change(
       plainText(doc),
-      doc.images.length ? structuredClone(doc) : undefined,
+      doc.images.length ||
+        doc.blocks.some((b) => b.type === 'paragraph' && b.height !== undefined)
+        ? structuredClone(doc)
+        : undefined,
     );
   }
   function caret(p: Node, offset = 0) {
@@ -220,6 +242,70 @@ export function mountText(host: HTMLElement, options: Options) {
     caret(b);
     return b;
   }
+  function setParagraphText(
+    p: HTMLElement,
+    text: string,
+    offset = text.length,
+  ) {
+    delete p.dataset.height;
+    p.style.minHeight = p.style.lineHeight = '';
+    p.replaceChildren(document.createTextNode(text));
+    caret(p.firstChild!, Math.max(0, Math.min(offset, text.length)));
+  }
+  function enterParagraph() {
+    const previous = accepted,
+      r = range();
+    const original = r ? targetParagraph(r) : null;
+    const item = original ? listItem(original.textContent || '') : null;
+    if (r?.collapsed && item && !item.content.trim()) {
+      setParagraphText(original!, '');
+      persist(previous);
+      paint();
+      return;
+    }
+    let y = 0;
+    if (r) {
+      let b = r.getClientRects()[0];
+      if (!b?.height) b = targetParagraph(r).getBoundingClientRect();
+      y = b.top - editor.getBoundingClientRect().top;
+    }
+    const keep = doc.images
+      .filter((im) => y > (positions.get(im.id)?.y || 0) + 2)
+      .map((im) => ({ im, y: positions.get(im.id)!.y }));
+    const next = splitAtCaret();
+    if (item && next) {
+      const prefix = listPrefix(item.kind, item.depth, item.value + 1);
+      setParagraphText(next, prefix + (next.textContent || ''), prefix.length);
+    }
+    paint();
+    for (const k of keep) k.im.dy += k.y - (positions.get(k.im.id)?.y ?? k.y);
+    persist(previous);
+    paint();
+  }
+  function indentList(backward: boolean) {
+    const r = range();
+    if (!r) return false;
+    const p = targetParagraph(r),
+      item = listItem(p.textContent || '');
+    if (!item) return false;
+    const prefix = r.cloneRange();
+    prefix.selectNodeContents(p);
+    prefix.setEnd(r.startContainer, r.startOffset);
+    const offset = prefix.toString().length;
+    const preceding = [...editor.children]
+      .slice(0, [...editor.children].indexOf(p))
+      .map((el) => el.textContent || '');
+    const next = nestedPrefix(item, backward, preceding),
+      previous = accepted;
+    setParagraphText(
+      p,
+      next + item.content,
+      Math.max(next.length, offset + next.length - item.prefix.length),
+    );
+    persist(previous);
+    paint();
+    return true;
+  }
   function overText(x: number, y: number) {
     const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
     let node: Node | null;
@@ -249,8 +335,7 @@ export function mountText(host: HTMLElement, options: Options) {
     for (const im of doc.images) {
       const a = anchor(im.id);
       if (a) {
-        // Offset images float behind text without leaving an uneditable flow gap.
-        a.style.height = `${im.dx || im.dy ? 0 : im.h + 20}px`;
+        a.style.height = `${im.flow ?? im.h}px`;
         a.style.width = '100%';
         const r = a.getBoundingClientRect();
         positions.set(im.id, {
@@ -319,14 +404,15 @@ export function mountText(host: HTMLElement, options: Options) {
         const rotate = document.createElement('button');
         rotate.type = 'button';
         rotate.className = 'image-rotate';
-        rotate.textContent = '↻';
+        rotate.innerHTML =
+          '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9a8 8 0 1 1 0 6M4 3v6h6"/></svg>';
         rotate.setAttribute('aria-label', t('Rotate image', 'Putar gambar'));
         const del = document.createElement('button');
         del.type = 'button';
         del.className = 'image-delete';
         del.setAttribute('aria-label', t('Delete image', 'Hapus gambar'));
         del.innerHTML =
-          '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7"/></svg>';
+          '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15"/></svg>';
         del.onpointerdown = (e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -337,16 +423,9 @@ export function mountText(host: HTMLElement, options: Options) {
           remove(im.id);
         };
         del.onclick = () => remove(im.id);
-        const move = document.createElement('button');
-        move.type = 'button';
-        move.className = 'image-move';
-        move.textContent = '✥';
-        move.setAttribute('aria-label', t('Move image', 'Pindahkan gambar'));
-        if (p.y + editor.offsetTop - host.scrollTop < 50) {
+        if (p.y + editor.offsetTop - host.scrollTop < 50)
           rotate.style.top = '4px';
-          move.style.top = '4px';
-        }
-        frame.append(rotate, del, move);
+        frame.append(rotate, del);
         controls.append(frame);
       }
     }
@@ -484,6 +563,11 @@ export function mountText(host: HTMLElement, options: Options) {
       e.preventDefault();
       return;
     }
+    if ((e as InputEvent).inputType === 'insertParagraph') {
+      e.preventDefault();
+      enterParagraph();
+      return;
+    }
     before = accepted;
     stationary = [];
     const r = range();
@@ -511,6 +595,18 @@ export function mountText(host: HTMLElement, options: Options) {
     }
   });
   editor.addEventListener('input', (e) => {
+    const selection = range();
+    if (selection?.collapsed && !(e as InputEvent).isComposing) {
+      const p = targetParagraph(selection),
+        text = p.textContent || '',
+        item = listItem(text);
+      if (item && !item.content && /^[ \t]*[-*][ \u00a0]$/.test(text))
+        setParagraphText(p, listPrefix('bullet', item.depth));
+      if (p.dataset.height && p.textContent) {
+        delete p.dataset.height;
+        p.style.minHeight = p.style.lineHeight = '';
+      }
+    }
     // Native range deletion can remove image anchors along with selected text.
     doc.images = doc.images.filter((im) => anchor(im.id));
     paint();
@@ -590,24 +686,13 @@ export function mountText(host: HTMLElement, options: Options) {
       active = null;
       paint();
     }
+    if (e.key === 'Tab' && indentList(e.shiftKey)) {
+      e.preventDefault();
+      return;
+    }
     if (e.key === 'Enter' && !cmd) {
       e.preventDefault();
-      const previous = accepted;
-      const r = range();
-      let y = 0;
-      if (r) {
-        let b = r.getClientRects()[0];
-        if (!b?.height) b = targetParagraph(r).getBoundingClientRect();
-        y = b.top - editor.getBoundingClientRect().top;
-      }
-      const keep = doc.images
-        .filter((im) => y > (positions.get(im.id)?.y || 0) + 2)
-        .map((im) => ({ im, y: positions.get(im.id)!.y }));
-      splitAtCaret();
-      paint();
-      for (const k of keep) k.im.dy += k.y - (positions.get(k.im.id)?.y || k.y);
-      persist(previous);
-      paint();
+      enterParagraph();
       return;
     }
     if (
@@ -722,6 +807,24 @@ export function mountText(host: HTMLElement, options: Options) {
   host.addEventListener('pointerup', () => {
     if (!gesture) return;
     const previous = gesture.before;
+    const im = doc.images.find((im) => im.id === gesture!.id)!;
+    if (
+      gesture.kind === 'move' &&
+      (im.dx !== gesture.image.dx || im.dy !== gesture.image.dy) &&
+      (im.flow ?? im.h) > 0
+    ) {
+      const a = anchor(im.id)!;
+      let remaining = im.flow ?? im.h;
+      const lines: HTMLElement[] = [];
+      const lineHeight = parseFloat(getComputedStyle(editor).lineHeight);
+      while (remaining > 0.01) {
+        const height = Math.min(remaining, lineHeight);
+        lines.push(paragraph('', height));
+        remaining -= height;
+      }
+      im.flow = 0;
+      a.after(...lines);
+    }
     gesture = null;
     persist(previous);
     opts.busy(false);
@@ -772,6 +875,7 @@ export function mountText(host: HTMLElement, options: Options) {
       abort.abort();
       resizeObserver.disconnect();
       for (const url of urls.values()) URL.revokeObjectURL(url);
+      tools.remove();
       host.replaceChildren();
       opts.busy(false);
     },

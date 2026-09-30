@@ -119,6 +119,9 @@ test('moving an image releases its former space for typing and deletion', async 
   await paste(page);
   await page.keyboard.type('Below');
   const original = await position(page);
+  const belowY = (await page.locator('.text-paragraph').last().boundingBox())!
+    .y;
+  expect(belowY - original.y - original.height).toBeLessThan(2);
   await page.mouse.move(
     original.x + original.width / 2,
     original.y + original.height / 2,
@@ -130,7 +133,13 @@ test('moving an image releases its former space for typing and deletion', async 
   await page.mouse.up();
   await expect(page.locator('.text-image-anchor')).toHaveCSS('height', '0px');
   const last = page.locator('.text-paragraph').last();
-  expect((await last.boundingBox())!.y).toBeLessThan(original.y + 35);
+  expect((await last.boundingBox())!.y).toBeCloseTo(belowY, 0);
+  const former = page.locator('.text-paragraph[data-height]').first();
+  await former.click();
+  await page.keyboard.type('Reused space');
+  await expect(
+    page.getByRole('textbox', { name: 'Note content' }),
+  ).toContainText('Reused space');
   await last.click();
   await page.keyboard.press('End');
   await page.keyboard.type(' editable');
@@ -150,7 +159,7 @@ test('moving an image releases its former space for typing and deletion', async 
                 .objectStore('notes')
                 .getAll();
               request.onsuccess = () => {
-                resolve(request.result.map((n) => n.body));
+                resolve(request.result.map((n) => n.body.split('\n').at(-1)));
                 db.close();
               };
               request.onerror = () => {
@@ -161,9 +170,7 @@ test('moving an image releases its former space for typing and deletion', async 
           }),
       ),
     )
-    .toContain(
-      'Line 0\nLine 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6\nLine 7\nBelow editabl',
-    );
+    .toContain('Below editabl');
   await page.reload();
   await expect(page.locator('.text-image-anchor')).toHaveCSS('height', '0px');
   await expect(page.locator('.text-paragraph').last()).toHaveText(
@@ -297,6 +304,31 @@ test('account images upload once, synchronize privately and remain cached offlin
         return n?.rich?.images.length || 0;
       })
       .toBe(1);
+    const placed = await position(page);
+    const captionY = (await page
+      .locator('.text-paragraph')
+      .last()
+      .boundingBox())!.y;
+    await page.mouse.move(
+      placed.x + placed.width / 2,
+      placed.y + placed.height / 2,
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      placed.x + placed.width / 2 + 40,
+      placed.y + placed.height / 2 + 40,
+      { steps: 5 },
+    );
+    await page.mouse.up();
+    expect(
+      (await page.locator('.text-paragraph').last().boundingBox())!.y,
+    ).toBeCloseTo(captionY, 0);
+    await expect
+      .poll(
+        async () =>
+          (await rows()).find((n: any) => n.id === id)?.rich?.images[0]?.flow,
+      )
+      .toBe(0);
     const n = (await rows()).find((n: any) => n.id === id),
       asset = n.rich.images[0].asset;
     expect(uploads).toBe(1);
@@ -319,6 +351,12 @@ test('account images upload once, synchronize privately and remain cached offlin
       .getByRole('button', { name: new RegExp(n.name) })
       .click();
     await expect(second.locator('.text-image img')).toBeVisible();
+    await expect(second.locator('.text-image-anchor')).toHaveCSS(
+      'height',
+      '0px',
+    );
+    await page.locator('.text-paragraph').last().click();
+    await page.keyboard.press('End');
     await page.keyboard.type(' More');
     expect(uploads).toBe(1);
     await context.setOffline(true);
@@ -372,17 +410,22 @@ test('mobile image controls support touch resize, movement and deletion', async 
       touchPoints: [],
     });
     expect((await position(page)).width).toBeGreaterThan(im.width + 10);
-    const move = (await page
-      .getByRole('button', { name: 'Move image', exact: true })
-      .boundingBox())!;
+    await expect(
+      page.getByRole('button', { name: 'Move image', exact: true }),
+    ).toHaveCount(0);
+    const move = await position(page);
     const before = await position(page);
     await cdp.send('Input.dispatchTouchEvent', {
       type: 'touchStart',
-      touchPoints: [{ x: move.x + 18, y: move.y + 18 }],
+      touchPoints: [
+        { x: move.x + move.width / 2, y: move.y + move.height / 2 },
+      ],
     });
     await cdp.send('Input.dispatchTouchEvent', {
       type: 'touchMove',
-      touchPoints: [{ x: move.x + 28, y: move.y + 78 }],
+      touchPoints: [
+        { x: move.x + move.width / 2 + 10, y: move.y + move.height / 2 + 60 },
+      ],
     });
     await cdp.send('Input.dispatchTouchEvent', {
       type: 'touchEnd',

@@ -34,3 +34,11 @@ it('preserves paragraphs and validates image references without accepting HTML',
     }),
   ).toThrow();
 });
+
+it('validates editable image space without discarding placement metadata', () => {
+  const doc = fromText('');
+  doc.blocks = [{ type: 'paragraph', text: '', height: 20 }];
+  expect(() => validateDocument(doc)).not.toThrow();
+  doc.blocks[0] = { type: 'paragraph', text: '', height: -1 };
+  expect(() => validateDocument(doc)).toThrow();
+});

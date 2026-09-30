@@ -638,3 +638,17 @@ button:disabled {
     max-width: 180px;
   }
 }
+
+.breadcrumb {
+  align-items: center;
+  justify-content: space-between;
+}
+.breadcrumb-path {
+  display: flex;
+  gap: 12px;
+  min-width: 0;
+  overflow: hidden;
+}
+.breadcrumb-tools {
+  flex-shrink: 0;
+}
