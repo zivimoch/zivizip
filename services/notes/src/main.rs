@@ -1,4 +1,5 @@
 mod draw;
+mod finance;
 mod tasks;
 mod text;
 use argon2::{password_hash::SaltString, Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
@@ -513,6 +514,8 @@ fn schema(db: &Connection) -> rusqlite::Result<()> {
  CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,expires INTEGER NOT NULL);
  CREATE TABLE IF NOT EXISTS media(id TEXT PRIMARY KEY, data BLOB NOT NULL);
  CREATE TABLE IF NOT EXISTS task_workspace(id INTEGER PRIMARY KEY CHECK(id=1),data TEXT NOT NULL);
+ CREATE TABLE IF NOT EXISTS finance_workspace(id INTEGER PRIMARY KEY CHECK(id=1),data TEXT NOT NULL);
+ INSERT OR IGNORE INTO finance_workspace VALUES(1,'{\"revision\":0,\"items\":[]}');
  INSERT OR IGNORE INTO task_workspace VALUES(1,'{\"revision\":0,\"items\":[]}');
  CREATE TABLE IF NOT EXISTS notes(id TEXT PRIMARY KEY,revision INTEGER NOT NULL,created_at INTEGER NOT NULL,data TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS interests(id INTEGER PRIMARY KEY,email TEXT NOT NULL,message TEXT NOT NULL,created_at INTEGER NOT NULL);
@@ -587,6 +590,7 @@ async fn main() {
         .route("/api/session", get(me).post(login).delete(logout))
         .route("/api/notes", get(list).post(create))
         .route("/api/tasks", get(tasks::list).put(tasks::update))
+        .route("/api/finance", get(finance::list).put(finance::update))
         .route("/api/notes/{id}", put(update).delete(remove))
         .route("/api/media/{id}", get(get_media).put(put_media))
         .route("/api/events", get(events))

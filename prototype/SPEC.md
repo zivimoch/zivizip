@@ -23,7 +23,7 @@ This document describes the target interaction model. The [verification scope](.
 - The editor fills available height and accepts native caret placement throughout. Focus adds no colored side line or canvas border.
 - Note tab labels use compact horizontal padding and a maximum selection width of 180px on desktop / 160px on mobile; longer names retain ellipsis.
 
-- Workspace styling follows the prototype palette, 14px sans-serif UI, 15px editor text, compact tabs, thin splitters and responsive note margins. Account status belongs to the sidebar rather than above note tabs. Finance preview uses three summary cards and category pills.
+- Workspace styling follows the prototype palette, 14px sans-serif UI, 15px editor text, compact tabs, thin splitters and responsive note margins. Account status belongs to the sidebar rather than above note tabs. Finance uses three summary cards and category pills.
 
 ## Text and images
 
@@ -69,6 +69,14 @@ This document describes the target interaction model. The [verification scope](.
 - Guest tasks persist offline in IndexedDB; account tasks use revision-checked server storage and SSE, with a read-only offline cache. Version 4 workspace backups include active and archived tasks. Guest copying remains explicit.
 - Background refreshes leave existing Tasks controls enabled and retain unchanged rows, selection and scroll position. Saving a note must not make Tasks flash or fade.
 - The target shared Tasks/Finance entry form includes description, category with history suggestions, date and amount. An amount associates the entry with Finance. This shared form is not yet implemented.
+
+## Finance transactions
+
+- Main shows income, expenses and balance for the selected month above a scrollable ledger. Toggle grouping by date/category; dates sort newest first. The month and grouping choice persist within the browser workspace.
+- Add through the header `+`; clicking a transaction opens its edit modal. Autofocus the description. Fields are explicit income/expense type, description, positive integer IDR amount, searchable/free-input category and date. Category suggestions come from existing transactions.
+- Saving switches to the transaction's month. Confirm deletion and recalculate totals. Actual transactions remain independent of planned budgets and task amounts.
+- Guest transactions stay editable offline; account transactions synchronize and are read-only offline. Revisions reject conflicting writes while retaining form values for reload/retry. Login requires explicit consent to copy guest transactions, with stable copy identifiers to avoid duplicate retries.
+- Workspace backups include transactions. Import validates them and creates new IDs without replacing existing data. Monthly planning follows the transaction implementation.
 
 ## Finance planning
 

@@ -2,7 +2,7 @@
 
 A personal workspace for notes, tasks, finances, and goals.
 
-Zivizip opens directly into your workspace. Guest notes and tasks stay in your browser; the owner account stores them on the server and synchronizes changes across sessions.
+Zivizip opens directly into your workspace. Guest data stays in your browser; the owner account stores notes, tasks and transactions on the server and synchronizes changes across sessions.
 
 ## Features
 
@@ -11,12 +11,13 @@ Zivizip opens directly into your workspace. Guest notes and tasks stay in your b
 - Text images with caret insertion, positioning, resizing, rotation, and portable attachments.
 - Automatic bullets and nested numbering with alternating numeric/alphabetic levels.
 - Tasks with due dates, related amounts, group reordering, completion and archives. Drag note list items into Tasks without changing the source.
+- Income and expense transactions with category suggestions, monthly totals, date/category grouping and revision-checked editing.
 - Guest editing offline, with versioned JSON backup and import.
 - Owner login with persistent sessions and a separate read-only offline cache.
-- Explicit copying of guest notes and tasks into the account; local originals are preserved.
+- Explicit copying of the guest workspace into the account; local originals are preserved.
 - Installable PWA shell, responsive layout, and English/Indonesian interface.
 
-Finance and Goals remain interaction prototypes. Related task amounts do not create financial transactions yet. Public account registration and push notifications are not available yet.
+Monthly financial planning and Goals remain interaction prototypes. Related task amounts do not create financial transactions yet. Public account registration and push notifications are not available yet.
 
 ## Quick start
 

@@ -249,7 +249,7 @@ test('list text drags into tasks and tasks are backed up and editable offline', 
   const data = JSON.parse(
     fs.readFileSync((await (await download).path())!, 'utf8'),
   );
-  expect(data.version).toBe(4);
+  expect(data.version).toBe(5);
   expect(data.tasks).toHaveLength(3);
   await page.getByRole('button', { name: 'Close settings' }).click();
   await page.evaluate(() => navigator.serviceWorker.ready.then(() => true));

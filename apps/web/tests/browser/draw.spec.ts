@@ -48,6 +48,7 @@ test('Draw editing, selection, rotation, erasing, history and transparent export
   await expect(page.locator('[data-shape]')).toHaveCount(0);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await page.locator('.drawing').press('Control+a');
+  await expect(page.locator('.selection-rotate')).toBeVisible();
   const rot = (await page.locator('.selection-rotate').boundingBox())!;
   await page.mouse.move(rot.x + 18, rot.y + 18);
   await page.mouse.down();

@@ -3,6 +3,8 @@
   import TextEditor from '$lib/TextEditor.svelte';
   import TasksPanel from '$lib/TasksPanel.svelte';
   import { TasksRepository, readTaskState } from '$lib/tasks';
+  import FinancePanel from '$lib/FinancePanel.svelte';
+  import { FinanceRepository, readFinanceState } from '$lib/finance';
   import { assetsIn, type TextDocument } from '$lib/text/document';
   import { getMedia, putMedia, decodeMedia } from '$lib/text/media';
   import DrawEditor from '$lib/DrawEditor.svelte';
@@ -80,6 +82,9 @@
   let tasksRepo: TasksRepository;
   let taskBusy = false;
   let taskRefresh = 0;
+  let financeRepo: FinanceRepository;
+  let financeBusy = false;
+  $: workspaceBusy = taskBusy || financeBusy;
   let alive = true;
   let workspaceEpoch = 0;
   const redirectedNotes = new Map<string, string>();
@@ -126,6 +131,11 @@
       !!account,
       () => epoch === workspaceEpoch,
     );
+    financeRepo = new FinanceRepository(
+      db,
+      !!account,
+      () => epoch === workspaceEpoch,
+    );
     taskRefresh++;
   }
   async function activate(user: Account | null, fetchServer = true) {
@@ -158,6 +168,12 @@
         () => epoch === workspaceEpoch,
       );
       await nextTasks.list(fetchServer);
+      const nextFinance = new FinanceRepository(
+        nextDb,
+        !!user,
+        () => epoch === workspaceEpoch,
+      );
+      await nextFinance.list(fetchServer);
       if (user) await guestDb.meta.put({ key: 'active-account', value: user });
       else await guestDb.meta.delete('active-account');
       eventSource?.close();
@@ -173,12 +189,18 @@
       notes = nextNotes;
       prefs = nextPrefs;
       tasksRepo = nextTasks;
+      financeRepo = nextFinance;
       taskRefresh++;
       if (user && fetchServer) listen();
     } catch (e) {
       if (nextDb !== guestDb) nextDb.close();
       const epoch = workspaceEpoch;
       tasksRepo = new TasksRepository(
+        db,
+        !!account,
+        () => epoch === workspaceEpoch,
+      );
+      financeRepo = new FinanceRepository(
         db,
         !!account,
         () => epoch === workspaceEpoch,
@@ -193,7 +215,7 @@
     if (
       !account ||
       pending ||
-      taskBusy ||
+      workspaceBusy ||
       drawBusy ||
       dirty.size ||
       switching ||
@@ -211,7 +233,7 @@
       if (
         epoch !== workspaceEpoch ||
         pending ||
-        taskBusy ||
+        workspaceBusy ||
         drawBusy ||
         dirty.size ||
         switching
@@ -231,7 +253,7 @@
         e instanceof ApiError &&
         e.status === 401 &&
         !pending &&
-        !taskBusy &&
+        !workspaceBusy &&
         !dirty.size
       ) {
         if (repo instanceof AccountNotes) repo.deactivate();
@@ -258,21 +280,22 @@
     };
   }
   async function signedIn(user: Account) {
-    if (taskBusy) throw Error('Please wait for tasks to finish saving');
+    if (workspaceBusy) throw Error('Please wait for changes to finish saving');
     await queue;
     if (dirty.size) throw new Error('Save or download pending changes first');
     await activate(user);
     channel?.postMessage('session');
     guestCount =
       (await guestDb.notes.count()) +
-      readTaskState((await guestDb.meta.get('tasks'))?.value).items.length;
+      readTaskState((await guestDb.meta.get('tasks'))?.value).items.length +
+      readFinanceState((await guestDb.meta.get('finance'))?.value).items.length;
     if (guestCount) {
       await tick();
       migration.showModal();
     }
   }
   async function signedOut() {
-    if (taskBusy) return;
+    if (workspaceBusy) return;
     await queue;
     if (dirty.size) {
       notice = t(
@@ -301,7 +324,7 @@
     }
   }
   async function copyGuest() {
-    if (!(repo instanceof AccountNotes) || !writable || taskBusy) return;
+    if (!(repo instanceof AccountNotes) || !writable || workspaceBusy) return;
     switching = true;
     try {
       const guest = await guestDb.notes.toArray();
@@ -344,12 +367,38 @@
           ),
         ]);
       }
+      const guestTransactions = readFinanceState(
+        (await guestDb.meta.get('finance'))?.value,
+      ).items;
+      if (guestTransactions.length) {
+        const currentFinance = await financeRepo.list();
+        const copies = await Promise.all(
+          guestTransactions.map(async (item) => {
+            const digest = await crypto.subtle.digest(
+              'SHA-256',
+              new TextEncoder().encode(`guest-transaction:${item.id}`),
+            );
+            return {
+              ...item,
+              id: [...new Uint8Array(digest)]
+                .map((byte) => byte.toString(16).padStart(2, '0'))
+                .join(''),
+            };
+          }),
+        );
+        await financeRepo.write(currentFinance, [
+          ...currentFinance.items,
+          ...copies.filter(
+            (item) => !currentFinance.items.some((old) => old.id === item.id),
+          ),
+        ]);
+      }
       notes = await repo.list();
       taskRefresh++;
       migration.close();
       notice = t(
-        'Guest notes and tasks copied to your account. Local originals remain available.',
-        'Catatan dan tugas tamu disalin ke akun. Data asli tetap tersedia secara lokal.',
+        'Guest workspace copied to your account. Local originals remain available.',
+        'Workspace tamu disalin ke akun. Data asli tetap tersedia secara lokal.',
       );
     } catch (e) {
       problem(e);
@@ -406,7 +455,7 @@
     window.addEventListener('online', connectivity);
     window.addEventListener('offline', connectivity);
     const leave = (e: BeforeUnloadEvent) => {
-      if (taskBusy || drawBusy || error || pending || dirty.size) {
+      if (workspaceBusy || drawBusy || error || pending || dirty.size) {
         e.preventDefault();
         e.returnValue = '';
       }
@@ -414,7 +463,7 @@
     window.addEventListener('beforeunload', leave);
     channel = new BroadcastChannel('zivizip-session');
     channel.onmessage = async () => {
-      if (taskBusy || pending || dirty.size) {
+      if (workspaceBusy || pending || dirty.size) {
         verified = false;
         notice = t(
           'Account changed in another tab. Download pending edits before reloading.',
@@ -610,9 +659,12 @@
     if (start !== null) input.setSelectionRange(start, end);
   }
   async function download() {
-    if (taskBusy) return;
+    if (workspaceBusy) return;
     await queue;
     try {
+      if (account && online) {
+        await Promise.all([tasksRepo.list(), financeRepo.list()]);
+      }
       for (const id of new Set(notes.flatMap((n) => assetsIn(n.rich))))
         await getMedia(db, id, !!account);
       const data = await exportWorkspace(db, notes);
@@ -646,11 +698,12 @@
     input.value = '';
   }
   async function restore() {
-    if (!backup || !writable || taskBusy) return;
+    if (!backup || !writable || workspaceBusy) return;
     await queue;
     try {
       let count = 0;
       const taskCount = backup.tasks?.length || 0;
+      const transactionCount = backup.transactions?.length || 0;
       if (repo instanceof AccountNotes) {
         const media = await Promise.all((backup.media || []).map(decodeMedia));
         for (const m of media) await putMedia(db, m.blob, true);
@@ -660,6 +713,8 @@
         }
         notes = await repo.list();
         if (backup.tasks?.length) await tasksRepo.merge(backup.tasks);
+        if (backup.transactions?.length)
+          await financeRepo.merge(backup.transactions);
         taskRefresh++;
       } else {
         count = await importWorkspace(db, backup);
@@ -668,8 +723,8 @@
       }
       backup = null;
       notice = t(
-        `${count} notes and ${taskCount} tasks imported as new copies.`,
-        `${count} catatan dan ${taskCount} tugas diimpor sebagai salinan baru.`,
+        `${count} notes, ${taskCount} tasks and ${transactionCount} transactions imported as new copies.`,
+        `${count} catatan, ${taskCount} tugas dan ${transactionCount} transaksi diimpor sebagai salinan baru.`,
       );
     } catch (e) {
       problem(e);
@@ -821,7 +876,7 @@
               : t('Guest workspace', 'Workspace tamu')}
           </p>
           {#if account}<button
-              disabled={taskBusy ||
+              disabled={workspaceBusy ||
                 switching ||
                 pending > 0 ||
                 dirty.size > 0 ||
@@ -836,7 +891,10 @@
                   'Hubungkan internet untuk keluar dengan aman.',
                 )}</small
               >{/if}{:else}<button
-              disabled={taskBusy || switching || pending > 0 || dirty.size > 0}
+              disabled={workspaceBusy ||
+                switching ||
+                pending > 0 ||
+                dirty.size > 0}
               onclick={() => {
                 accountMenu = false;
                 mobileMenu = false;
@@ -1016,53 +1074,13 @@
             remember();
           }}
         ></button>
-        <section class="preview">
-          <div class="section-heading">
-            <h2>Finance<span>.</span></h2>
-            <small>{t('Preview', 'Pratinjau')}</small>
-          </div>
-          <div class="finance-meta">
-            <span>{t('By category', 'Per kategori')}</span><span
-              >{new Intl.DateTimeFormat(prefs.language === 'en' ? 'en' : 'id', {
-                month: 'long',
-                year: 'numeric',
-              }).format(new Date())}</span
-            >
-          </div>
-          <div class="finance-summary">
-            <div class="money">
-              <small>{t('Income', 'Pemasukan')}</small><strong
-                >Rp8.000.000</strong
-              >
-            </div>
-            <div class="money expense">
-              <small>{t('Expenses', 'Pengeluaran')}</small><strong
-                >Rp2.500.000</strong
-              >
-            </div>
-            <div class="money">
-              <small>{t('Balance', 'Saldo')}</small><strong>Rp5,5 jt</strong>
-            </div>
-          </div>
-          <p class="finance-date">
-            {t('Recent transactions', 'Transaksi terbaru')}
-          </p>
-          <div class="transaction">
-            <span class="category">{t('Food', 'Makanan')}</span><span
-              class="description">{t('Lunch', 'Makan siang')}</span
-            ><b>−Rp35.000</b>
-          </div>
-          <div class="transaction">
-            <span class="category">{t('Transport', 'Transportasi')}</span><span
-              class="description">{t('Ride home', 'Perjalanan pulang')}</span
-            ><b>−Rp20.000</b>
-          </div>
-          <div class="transaction">
-            <span class="category">{t('Bills', 'Tagihan')}</span><span
-              class="description">{t('Internet', 'Internet')}</span
-            ><b>−Rp350.000</b>
-          </div>
-        </section>
+        {#key financeRepo.db.name}<FinancePanel
+            repository={financeRepo}
+            {writable}
+            language={prefs.language}
+            refreshToken={taskRefresh}
+            onbusy={(value) => (financeBusy = value)}
+          />{/key}
       </div>{/if}
   {:else if view === 'tasks'}<div class="tasks-page">
       {#key tasksRepo.db.name}<TasksPanel
@@ -1071,6 +1089,15 @@
           language={prefs.language}
           refreshToken={taskRefresh}
           onbusy={(value) => (taskBusy = value)}
+        />{/key}
+    </div>
+  {:else if view === 'finance'}<div class="finance-page">
+      {#key financeRepo.db.name}<FinancePanel
+          repository={financeRepo}
+          {writable}
+          language={prefs.language}
+          refreshToken={taskRefresh}
+          onbusy={(value) => (financeBusy = value)}
         />{/key}
     </div>
   {:else}<section class="placeholder">
@@ -1179,8 +1206,8 @@
   <p>
     {account
       ? t(
-          'Account notes are saved to the server. This browser keeps a separate read-only offline cache, cleared on logout.',
-          'Catatan akun disimpan di server. Browser menyimpan cache offline terpisah yang hanya dapat dibaca dan dihapus saat keluar.',
+          'Account data is saved to the server. This browser keeps a separate read-only offline cache, cleared on logout.',
+          'Data akun disimpan di server. Browser menyimpan cache offline terpisah yang hanya dapat dibaca dan dihapus saat keluar.',
         )
       : t(
           'Guest data stays in this browser. Clearing site data or using a different browser can make it unavailable. Export a backup regularly.',
@@ -1222,8 +1249,8 @@
   {#if backup}<div class="import-review">
       <p>
         {t(
-          `Import ${backup.notes.length} notes and ${backup.tasks?.length || 0} tasks as new copies? Existing data stays unchanged.`,
-          `Impor ${backup.notes.length} catatan dan ${backup.tasks?.length || 0} tugas sebagai salinan baru? Data lama tetap ada.`,
+          `Import ${backup.notes.length} notes, ${backup.tasks?.length || 0} tasks and ${backup.transactions?.length || 0} transactions as new copies? Existing data stays unchanged.`,
+          `Impor ${backup.notes.length} catatan, ${backup.tasks?.length || 0} tugas dan ${backup.transactions?.length || 0} transaksi sebagai salinan baru? Data lama tetap ada.`,
         )}
       </p>
       <button class="primary" disabled={!writable} onclick={restore}
@@ -1296,8 +1323,8 @@
   <h2>{t('Choose your workspace', 'Pilih workspace kamu')}</h2>
   <p>
     {t(
-      `You have ${guestCount} local notes and tasks. Open your account workspace, or copy this data to your account. Nothing is uploaded without your choice.`,
-      `Ada ${guestCount} catatan dan tugas lokal. Buka workspace akun, atau salin data ini ke akunmu. Tidak ada data yang diunggah tanpa pilihanmu.`,
+      `You have ${guestCount} local notes, tasks and transactions. Open your account workspace, or copy this data to your account. Nothing is uploaded without your choice.`,
+      `Ada ${guestCount} catatan, tugas dan transaksi lokal. Buka workspace akun, atau salin data ini ke akunmu. Tidak ada data yang diunggah tanpa pilihanmu.`,
     )}
   </p>
   <button disabled={switching} onclick={() => migration.close()}

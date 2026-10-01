@@ -2,17 +2,17 @@
 
 ## Automated coverage
 
-Verified locally on 2026-10-01:
+Verified locally on 2026-10-02:
 
 | Check               | Result                | Coverage                                                                                                                                                                                  |
 | ------------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Svelte/TypeScript   | No errors or warnings | Types and component diagnostics                                                                                                                                                           |
-| Frontend unit tests | 21 passed             | Notes/media persistence, conflicts and backups; Draw geometry; task validation, chronological ordering, archives, stale revisions, late-response cache protection and workspace isolation |
-| Rust unit tests     | 6 passed              | Notes conflicts and recovery; Draw/Text validation; task calendar validation and atomic revision checks                                                                                   |
-| Browser scenarios   | 27 passed             | Notes/Draw/images/lists; native list selection and drag feedback; Tasks bulk deletion, dates, archives, mobile touch, backup, SSE, guest copying and stable controls during note edits    |
+| Frontend unit tests | 24 passed             | Notes/media persistence, conflicts and backups; Draw geometry; task validation, chronological ordering, archives, stale revisions, late-response cache protection and workspace isolation |
+| Rust unit tests     | 7 passed              | Notes conflicts and recovery; Draw/Text validation; task calendar validation and atomic revision checks                                                                                   |
+| Browser scenarios   | 30 passed             | Notes/Draw/images/lists; native list selection and drag feedback; Tasks bulk deletion, dates, archives, mobile touch, backup, SSE, guest copying and stable controls during note edits    |
 | Container restart   | Passed                | Notes and sessions survive service restart                                                                                                                                                |
 
-The browser scenarios were checked with one worker; the Tasks group was rerun after correcting the rapid-click state on dialog cancellation. Repeated local runs can exhaust the 15-minute login-attempt limit; restart the local API between repeated acceptance runs or allow that window to expire. Do not disable the limit for deployment. Browser checks use Chrome, a desktop viewport, and a 390px mobile viewport. The persistent-session test closes and reopens a browser process. Touch tests dispatch Chrome touch events for Draw and Tasks. PNG output is checked for a transparent corner pixel. This is not physical-phone or physical-touchpad testing, or a production load test.
+The browser scenarios were checked with one worker, including targeted reruns after correcting field selectors and waiting for Draw selection rendering. Repeated local runs can exhaust the 15-minute login-attempt limit; restart the local API between repeated acceptance runs or allow that window to expire. Do not disable the limit for deployment. Browser checks use Chrome, a desktop viewport, and a 390px mobile viewport. The persistent-session test closes and reopens a browser process. Touch tests dispatch Chrome touch events for Draw and Tasks. PNG output is checked for a transparent corner pixel. This is not physical-phone or physical-touchpad testing, or a production load test.
 
 ## Manual acceptance
 
@@ -38,8 +38,11 @@ The browser scenarios were checked with one worker; the Tasks group was rerun af
 16. Double-click and extend a text selection in a list without moving its content. Drag selected list text from Notes into Tasks. Verify the dashed drop target and cyan hover feedback, one task per nonempty label, and unchanged source text. Export a backup and confirm active/archived tasks are included. Type in an account note while watching Tasks: background synchronization must not disable or replace unchanged task rows.
 17. Test guest tasks offline and account tasks from another authenticated browser. Verify account writes are disabled offline, stale revisions are rejected, logout restores the guest list and explicit workspace copy transfers guest tasks.
 
+18. Add income and expenses through Finance, change the month and toggle date/category grouping. Edit an amount, cancel deletion and then confirm it. Check recalculated totals and category suggestions.
+19. Test guest transactions offline, backup/import, mobile forms and Indonesian labels. In two account sessions, verify live updates, stale-write rejection with retained form values, offline reading, logout isolation and explicit guest copying.
+
 ## Scope
 
-Rich formatting beyond automatic lists, Finance, Goals, shared Tasks/Finance entry, Web Push, prototype-data migration, and deployment remain outside the implemented flow. Task amounts currently remain metadata. Account backup import can complete partially if a request fails; it is not an atomic server transaction. Large collections and real-device performance need separate verification.
+Rich formatting beyond automatic lists, monthly financial planning, Goals, shared Tasks/Finance entry, Web Push, prototype-data migration, and deployment remain outside the implemented flow. Task amounts currently remain metadata. Account backup import can complete partially if a request fails; it is not an atomic server transaction. Large collections and real-device performance need separate verification.
 
-Workspace styling was compared with the prototype at 1864×1000 and 390×844 viewports. Tabs start at the workspace top; account status stays in the sidebar. Finance remains a labeled preview.
+Workspace styling was compared with the prototype at 1864×1000 and 390×844 viewports. Tabs start at the workspace top; account status stays in the sidebar. Finance transactions were also checked at 1600×1000 and 390×844; the ledger is functional and monthly planning remains outside this verification.

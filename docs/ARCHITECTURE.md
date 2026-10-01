@@ -12,24 +12,24 @@ Browser
 
 SvelteKit builds a static application served by Nginx. Vite provides the development server. Both proxy same-origin API requests to the Notes service; the database and API container have no host-facing ports.
 
-The service owns Notes, Tasks, the single-owner session, and registration-interest records. Account notes and tasks synchronize over HTTP and SSE. The service worker caches the application shell and excludes API requests.
+The service owns Notes, Tasks, Finance transactions, the single-owner session, and registration-interest records. Account changes synchronize over HTTP and SSE. The service worker caches the application shell and excludes API requests.
 
 ## Storage boundaries
 
 - Guest data is scoped to the browser profile and origin. It is never uploaded merely by logging in.
 - Account data is stored on the server. A separate browser cache supports offline reading and is cleared on logout.
-- Login offers an explicit guest-workspace copy; original guest notes and tasks remain local.
+- Login offers an explicit guest-workspace copy; original notes, tasks and transactions remain local.
 - Revision checks preserve conflicting edits as separate copies. Delete requires the current revision.
-- Version 4 JSON backups include notes, Draw geometry, referenced image attachments, active/archived tasks and workspace preferences. Versions 1–3 remain importable.
+- Version 5 JSON backups include notes, Draw geometry, referenced image attachments, active/archived tasks, transactions and workspace preferences. Versions 1–4 remain importable.
 
 ## Service boundaries
 
-| Domain  | Ownership                                                 | Status                    |
-| ------- | --------------------------------------------------------- | ------------------------- |
-| Notes   | Text/Draw notes, revisions, image attachments             | Text and Draw implemented |
-| Tasks   | Task state, dates, related amounts, ordering and archives | Implemented in local API  |
-| Finance | Transactions, categories, monthly budgets and realization | Prototype                 |
-| Goals   | Goals and links to source records                         | Prototype                 |
+| Domain  | Ownership                                                 | Status                                                 |
+| ------- | --------------------------------------------------------- | ------------------------------------------------------ |
+| Notes   | Text/Draw notes, revisions, image attachments             | Text and Draw implemented                              |
+| Tasks   | Task state, dates, related amounts, ordering and archives | Implemented in local API                               |
+| Finance | Transactions, categories, monthly budgets and realization | Transactions implemented; planning remains a prototype |
+| Goals   | Goals and links to source records                         | Prototype                                              |
 
 Future services must communicate through APIs or events, rather than writing each other's tables. Goals should consume Tasks/Finance changes and retain only their own relationships and aggregates.
 
@@ -69,3 +69,11 @@ An ordered task snapshot has one revision. SQLite transactions and IndexedDB tra
 Background reads do not disable existing task controls. Unchanged revisions leave the rendered list intact; reads invalidated by a local write or modal opening cannot replace its state. Cache writes retain the highest acknowledged revision so a delayed response cannot undo a completed write in offline storage.
 
 The snapshot is bounded to 10,000 tasks and 2 MB. Updates currently send the full snapshot; this is a simple initial consistency model, not a large-collection performance claim. Per-task revisions, operation-based reordering and paginated archives are future scaling options. Task amounts are metadata; creating/completing tasks does not yet create Finance transactions.
+
+## Finance ledger
+
+Finance uses its own repository, SQLite snapshot table and authenticated endpoints within the local API process. Transactions carry an explicit income/expense type, integer IDR amount, category and calendar date. Monthly totals and date/category groups are derived in the browser. Budgets and automatic task links are not part of this ledger milestone.
+
+Writes use a single snapshot revision with atomic conflict checks. Guest tabs use BroadcastChannel; account sessions use the existing SSE invalidation channel. Background reads keep controls stable and never replace newer cached revisions. Modal fields survive a rejected write so users can reload and retry. Offline account data comes only from the separate account cache. Logout clears that cache, while explicit guest copying uses stable transaction IDs to avoid duplication on retry.
+
+Snapshots are bounded to 10,000 transactions and 2 MB; full-history pagination and operation-level updates remain future scaling work. Guest imports are atomic across workspace stores. Account imports span several API calls and can complete partially; they are not one cross-domain transaction.

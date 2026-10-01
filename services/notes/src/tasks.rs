@@ -18,7 +18,7 @@ pub struct TaskState {
     revision: i64,
     items: Vec<Task>,
 }
-fn valid_date(date: &str) -> bool {
+pub(super) fn valid_date(date: &str) -> bool {
     if date.is_empty() {
         return true;
     }

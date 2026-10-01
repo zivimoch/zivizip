@@ -13,6 +13,11 @@ import {
 import { emptyScene, parseScene } from './draw/scene';
 import Dexie, { type Table } from 'dexie';
 import { readTaskState, validateTasks, type Task } from './tasks';
+import {
+  readFinanceState,
+  validateTransactions,
+  type Transaction,
+} from './finance';
 export type NoteKind = 'text' | 'draw';
 export interface Note {
   kind?: NoteKind;
@@ -37,8 +42,9 @@ export interface Preferences {
 }
 export interface Backup {
   format: 'zivizip';
-  version: 1 | 2 | 3 | 4;
+  version: 1 | 2 | 3 | 4 | 5;
   tasks?: Task[];
+  transactions?: Transaction[];
   media?: MediaBackup[];
   exportedAt: string;
   notes: Note[];
@@ -149,12 +155,14 @@ export function validateBackup(value: unknown): Backup {
   const b = value as Backup;
   if (
     b.format !== 'zivizip' ||
-    ![1, 2, 3, 4].includes(b.version) ||
+    ![1, 2, 3, 4, 5].includes(b.version) ||
     !Array.isArray(b.notes) ||
     b.notes.length > 10000
   )
     throw new Error('Unsupported backup format');
-  if (b.version === 4 || b.tasks !== undefined) validateTasks(b.tasks!);
+  if (b.version >= 4 || b.tasks !== undefined) validateTasks(b.tasks!);
+  if (b.version >= 5 || b.transactions !== undefined)
+    validateTransactions(b.transactions!);
   const ids = new Set<string>();
   for (const n of b.notes) {
     if (
@@ -223,8 +231,10 @@ export async function exportWorkspace(
     db.meta,
     async () => ({
       format: 'zivizip' as const,
-      version: 4 as const,
+      version: 5 as const,
       tasks: readTaskState((await db.meta.get('tasks'))?.value).items,
+      transactions: readFinanceState((await db.meta.get('finance'))?.value)
+        .items,
       exportedAt: new Date().toISOString(),
       notes: live || (await db.notes.toArray()),
       preferences: (await db.preferences.get('workspace')) || { ...defaults },
@@ -253,6 +263,21 @@ export async function importWorkspace(db: WorkspaceDB, input: unknown) {
     db.media,
     db.meta,
     async () => {
+      if (b.transactions?.length) {
+        const current = readFinanceState((await db.meta.get('finance'))?.value);
+        const items = [
+          ...current.items,
+          ...b.transactions.map((item) => ({
+            ...item,
+            id: crypto.randomUUID(),
+          })),
+        ];
+        validateTransactions(items);
+        await db.meta.put({
+          key: 'finance',
+          value: { revision: current.revision + 1, items },
+        });
+      }
       if (b.tasks?.length) {
         const current = readTaskState((await db.meta.get('tasks'))?.value);
         const items = [

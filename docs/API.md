@@ -15,6 +15,8 @@ All endpoints use the frontend origin. Mutations require an allowed `Origin` and
 | `GET /api/events`                 | Owner                | SSE invalidation notifications     |
 | `GET /api/tasks`                  | Owner                | Task workspace and revision        |
 | `PUT /api/tasks`                  | Owner                | Replace task workspace at revision |
+| `GET /api/finance`                | Owner                | Transaction snapshot and revision  |
+| `PUT /api/finance`                | Owner                | Replace transactions at revision   |
 | `POST /api/registration-interest` | Public, rate-limited | Submit email and message           |
 | `GET /api/registration-interest`  | Owner                | Latest 200 submissions             |
 
@@ -68,4 +70,12 @@ Removing an image removes its document reference. Unreferenced attachment bytes 
 
 Limits: 10,000 tasks, 2 MB serialized items, unique alphanumeric/hyphen IDs up to 64 characters, nonempty titles up to 150 UTF-16 units, valid calendar dates and integer amounts from zero through 1 trillion IDR. Authentication and mutation-origin rules apply to both endpoints. Existing account-local tasks are migrated before their browser cache is replaced; guest tasks are only copied with explicit consent.
 
-Backup version 4 adds active and archived tasks to version 3 media/notes. Import accepts versions 1–4 and assigns new IDs to imported tasks. Server imports across Notes, media and Tasks can complete partially if a request fails; they are not one atomic transaction.
+Backup version 4 adds active and archived tasks to version 3 media/notes. Version 5 additionally includes transactions. Import accepts versions 1–5 and assigns new IDs to imported records. Server imports across Notes, media, Tasks and Finance can complete partially if a request fails; they are not one atomic transaction.
+
+## Finance
+
+`GET /api/finance` returns `{ "revision": 0, "items": [] }` for an empty ledger. Each transaction contains `id`, `type` (`income` or `expense`), `title`, `category`, `date` (`YYYY-MM-DD`), `amount` (positive integer IDR), and `createdAt` (milliseconds). Type is explicit and is not inferred from category names. Client month/group filters do not change stored data.
+
+`PUT /api/finance` replaces the snapshot only at the supplied revision, increments that revision and emits an SSE invalidation. Stale revisions return `409`; malformed transactions return `400`. Rejections leave the previous snapshot intact. The session and mutation-origin requirements match Tasks. No guest ledger is uploaded on login without the explicit workspace-copy choice.
+
+Limits: 10,000 transactions, 2 MB serialized items, unique alphanumeric/hyphen IDs up to 64 characters, nonempty descriptions up to 150 UTF-16 units, nonempty categories up to 60 units, valid dates and amounts from 1 through 1 trillion IDR. Combined absolute amounts cannot exceed JavaScript's safe-integer range. Account writes require connectivity; cached transactions are read-only offline.
