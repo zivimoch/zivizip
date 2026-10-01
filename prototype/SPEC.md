@@ -36,6 +36,8 @@ This document describes the target interaction model. The [verification scope](.
 - Images, transforms and content persist. Image bytes are stored separately from text updates, and an Add image file picker in the breadcrumb row supplements clipboard paste. New Draw exports have transparent backgrounds; existing opaque screenshots retain their original pixels.
 - Typing `- `, `* ` or `• ` creates a bullet list; `1. ` or `1) ` creates numbering. Enter continues populated items and exits empty items to a normal paragraph. Tab/Shift+Tab nests/outdents; nested ordered levels alternate numbers and letters (1 → a → 1 or a → 1 → a). No list toolbar is required.
 - Selected list items can be dragged from their text or marker into Tasks. Create one task per item, including nested labels without duplicating descendant text. Preserve source note content.
+- Keep native text selection in lists: click to position the caret, double-click to select a word and double-click-drag to extend the selection. List paragraphs are not draggable blocks. Select text first, then drag the selection into Tasks.
+- During list dragging, Tasks shows a dashed outline; hovering over it adds a cyan outline and tinted background. Drop, cancellation and leaving the target clear the relevant feedback. A task-transfer drag never moves or duplicates the source inside Notes.
 
 ## Draw
 
@@ -57,13 +59,15 @@ This document describes the target interaction model. The [verification scope](.
 
 - Add tasks through the header `+` button and a modal with title, optional due date and related amount. Editing uses the same modal; deletion requires confirmation. No inline add form or browser prompts.
 - Show completed/active counts and percentage above a scrollable list. Archive completed tasks together; viewing the archive offers restoration to the active list with completion cleared.
-- Dated tasks always precede undated tasks. Drag rows directly to reorder within the dated/undated groups; undated rows cannot move above dated rows. No separate drag icon.
+- Dated tasks always precede undated tasks and sort by due date ascending. Manual drag order applies to tasks sharing a date and to undated tasks; dragging cannot override chronological order. No separate drag icon.
 - Single-click selects; double-clicking the row or F2 edits. Completion controls act independently.
 - Shift-click toggles multiple selection. Dragging a selected row moves the selected group while preserving relative order and date-group boundaries. Clicking an unselected row selects it alone; clicking outside clears selection.
+- With Tasks focused, Delete opens one confirmation for the complete selection. The contextual Delete button provides the same action without a keyboard. Only the selected IDs are removed in one revision-checked write; cancelling preserves every task. Delete while editing a text field is ordinary text editing.
 - Selection highlight extends 12px left without moving text or completion controls.
 - Completed text keeps its normal color with no strikethrough; the completion control indicates state.
 - On mobile, double-tap edits. Tap to select before touch-dragging; unselected rows allow normal vertical scrolling. Keyboard users can focus rows, press F2/Enter to edit, Shift+Space to select and Alt+Arrow to reorder.
 - Guest tasks persist offline in IndexedDB; account tasks use revision-checked server storage and SSE, with a read-only offline cache. Version 4 workspace backups include active and archived tasks. Guest copying remains explicit.
+- Background refreshes leave existing Tasks controls enabled and retain unchanged rows, selection and scroll position. Saving a note must not make Tasks flash or fade.
 - The target shared Tasks/Finance entry form includes description, category with history suggestions, date and amount. An amount associates the entry with Finance. This shared form is not yet implemented.
 
 ## Finance planning

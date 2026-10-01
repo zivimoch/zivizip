@@ -58,10 +58,14 @@ Attachment bytes live outside note revisions. Guest bytes are IndexedDB blobs; t
 
 Automatic list markers remain plain text in the portable document. Enter continues the current list or exits an empty item; Tab/Shift+Tab changes depth and alternates numeric/alphabetic levels. This uses the same storage, conflict and offline paths as ordinary paragraphs. Dragging selected list lines into Tasks copies their labels without changing the source.
 
+List paragraphs preserve native browser text selection rather than setting `draggable` on each block. A native drag of selected list text carries task labels and activates the Tasks drop feedback. Drops back into the source editor are ignored for this task-transfer payload.
+
 ## Task workspace
 
 Tasks use a separate frontend repository and Rust module within the existing API process. This keeps ownership distinct without adding a deployment dependency to the local milestone. Extraction into a standalone service remains a deployment decision.
 
 An ordered task snapshot has one revision. SQLite transactions and IndexedDB transactions reject stale updates rather than silently overwriting another writer. Account changes trigger the existing SSE invalidation channel; guest tabs use BroadcastChannel. Refresh waits during drag and modal editing. A stale modal retains its fields so the user can reload the list and retry. Account data is cached separately and remains read-only offline.
+
+Background reads do not disable existing task controls. Unchanged revisions leave the rendered list intact; reads invalidated by a local write or modal opening cannot replace its state. Cache writes retain the highest acknowledged revision so a delayed response cannot undo a completed write in offline storage.
 
 The snapshot is bounded to 10,000 tasks and 2 MB. Updates currently send the full snapshot; this is a simple initial consistency model, not a large-collection performance claim. Per-task revisions, operation-based reordering and paginated archives are future scaling options. Task amounts are metadata; creating/completing tasks does not yet create Finance transactions.

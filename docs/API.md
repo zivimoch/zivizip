@@ -62,7 +62,7 @@ Removing an image removes its document reference. Unreferenced attachment bytes 
 
 ## Tasks
 
-`GET /api/tasks` returns `{ "revision": 0, "items": [] }` for a new account workspace. Each task contains `id`, `title`, `date` (empty or `YYYY-MM-DD`), `amount` (integer IDR), `done`, `archived`, and `createdAt` (milliseconds). Array order is the manual order; the UI stably groups dated tasks before undated tasks.
+`GET /api/tasks` returns `{ "revision": 0, "items": [] }` for a new account workspace. Each task contains `id`, `title`, `date` (empty or `YYYY-MM-DD`), `amount` (integer IDR), `done`, `archived`, and `createdAt` (milliseconds). The UI sorts dated tasks chronologically before undated tasks. Array order breaks ties for equal dates and determines undated order.
 
 `PUT /api/tasks` accepts the same shape with the last-read revision. One transaction validates and replaces the snapshot, increments the revision and emits an SSE invalidation. A stale revision returns `409` without changing server data. Client drafts remain available for reload/retry. This differs from Notes conflict copies: no duplicate tasks are created automatically.
 

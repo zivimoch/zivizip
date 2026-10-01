@@ -19,6 +19,7 @@
     archived = false,
     message = '';
   let selected = new Set<string>();
+  let deleteIds: string[] = [];
   let panel: HTMLElement,
     list: HTMLDivElement,
     modal: HTMLDialogElement,
@@ -40,6 +41,10 @@
   let lastTap = { id: '', time: 0 },
     suppressDouble = false;
   let alive = true;
+  let reading = false,
+    readEpoch = 0;
+  let listDropReady = false,
+    listDropOver = false;
   let seenRefresh = refreshToken;
   $: t =
     language === 'en'
@@ -58,28 +63,45 @@
     onbusy(value);
   }
   async function refresh(force = false) {
-    if (busy || drag || (formOpen && !force) || !alive) return;
-    setBusy(true);
+    if (busy || reading || drag || (formOpen && !force) || !alive) return;
+    const initial = !initialized,
+      revision = state.revision,
+      target = repository,
+      epoch = ++readEpoch;
+    reading = true;
+    if (initial) setBusy(true);
     try {
-      const next = await repository.list(writable);
-      if (alive) {
-        state = next;
+      const next = await target.list(writable);
+      if (
+        alive &&
+        epoch === readEpoch &&
+        target === repository &&
+        !drag &&
+        (!formOpen || force) &&
+        revision === state.revision
+      ) {
+        if (initial || next.revision !== state.revision) {
+          state = next;
+          selected = new Set(
+            [...selected].filter((id) => next.items.some((t) => t.id === id)),
+          );
+        }
         message = '';
-        selected = new Set(
-          [...selected].filter((id) => next.items.some((t) => t.id === id)),
-        );
       }
     } catch (error) {
-      if (alive) message = (error as Error).message;
+      if (alive && epoch === readEpoch && target === repository)
+        message = (error as Error).message;
     } finally {
+      reading = false;
       if (alive) {
         initialized = true;
-        setBusy(false);
+        if (initial) setBusy(false);
       }
     }
   }
   async function commit(items: Task[]) {
     if (!writable || busy || !initialized) return false;
+    readEpoch++;
     setBusy(true);
     message = '';
     try {
@@ -98,6 +120,8 @@
   }
   async function open(task?: Task) {
     if (!writable || busy) return;
+    lastTap = { id: '', time: 0 };
+    readEpoch++;
     editing = task?.id || null;
     title = task?.title || '';
     date = task?.date || '';
@@ -110,9 +134,11 @@
     titleInput.focus();
   }
   function close() {
+    lastTap = { id: '', time: 0 };
     modal.close();
     formOpen = false;
     deleting = false;
+    deleteIds = [];
     void refresh();
   }
   async function submit() {
@@ -141,6 +167,38 @@
         )
       : [...state.items, task];
     if (await commit(items)) close();
+  }
+  async function requestDelete(ids: string[], fromEditor = false) {
+    if (!writable || busy) return;
+    lastTap = { id: '', time: 0 };
+    deleteIds = ids.filter((id) => state.items.some((task) => task.id === id));
+    if (!deleteIds.length) return;
+    readEpoch++;
+    if (!fromEditor) editing = null;
+    deleting = true;
+    formOpen = true;
+    message = '';
+    if (!modal.open) modal.showModal();
+    await tick();
+    modal.querySelector<HTMLButtonElement>('footer button')?.focus();
+  }
+  function deleteKey(event: KeyboardEvent) {
+    if (
+      event.key !== 'Delete' ||
+      event.repeat ||
+      !selected.size ||
+      formOpen ||
+      !panel.contains(event.target as Node)
+    )
+      return;
+    if (
+      (event.target as HTMLElement).closest(
+        'input,textarea,select,[contenteditable="true"]',
+      )
+    )
+      return;
+    event.preventDefault();
+    void requestDelete([...selected]);
   }
   async function toggle(task: Task) {
     if (
@@ -211,7 +269,7 @@
     if (target && list.contains(target)) {
       const item = state.items.find((t) => t.id === target.dataset.task),
         source = state.items.find((t) => t.id === drag!.id);
-      if (item && source && !!item.date === !!source.date) {
+      if (item && source && item.date === source.date) {
         const box = target.getBoundingClientRect();
         draftOrder = moveTasks(
           draftOrder || state.items,
@@ -271,7 +329,7 @@
     }
     if (event.altKey && ['ArrowUp', 'ArrowDown'].includes(event.key)) {
       event.preventDefault();
-      const group = rows.filter((t) => !!t.date === !!task.date),
+      const group = rows.filter((t) => t.date === task.date),
         next = group[group.indexOf(task) + (event.key === 'ArrowUp' ? -1 : 1)];
       if (next)
         void commit(
@@ -285,6 +343,7 @@
     }
   }
   async function dropNote(event: DragEvent) {
+    clearDropFeedback();
     const raw = event.dataTransfer?.getData('application/x-zivizip-list');
     if (!raw || !writable || busy) return;
     event.preventDefault();
@@ -313,6 +372,10 @@
       message = (error as Error).message;
     }
   }
+  function clearDropFeedback() {
+    listDropReady = false;
+    listDropOver = false;
+  }
   const money = (n: number) =>
     new Intl.NumberFormat('id-ID', {
       style: 'currency',
@@ -340,10 +403,18 @@
 </script>
 
 <svelte:document
+  onkeydown={deleteKey}
+  ondragstart={(event) => {
+    listDropReady =
+      writable &&
+      !!event.dataTransfer?.types.includes('application/x-zivizip-list');
+  }}
+  ondragend={clearDropFeedback}
+  ondrop={clearDropFeedback}
   onpointerdown={(event) => {
     if (
       !(event.target instanceof Element) ||
-      !event.target.closest('[data-task]') ||
+      !event.target.closest('[data-task],.task-delete-selected') ||
       !panel.contains(event.target)
     )
       selected = new Set();
@@ -351,28 +422,54 @@
 />
 <section
   class="tasks-panel"
+  class:list-drop-ready={listDropReady && writable}
+  class:list-drop-over={listDropOver && writable}
   bind:this={panel}
   aria-label="To do"
   ondragover={(e) => {
     if (
       writable &&
       e.dataTransfer?.types.includes('application/x-zivizip-list')
-    )
+    ) {
       e.preventDefault();
+      e.dataTransfer!.dropEffect = 'copy';
+      listDropReady = true;
+      listDropOver = true;
+    }
+  }}
+  ondragleave={(event) => {
+    if (
+      !(event.relatedTarget instanceof Node) ||
+      !panel.contains(event.relatedTarget)
+    )
+      listDropOver = false;
   }}
   ondrop={dropNote}
 >
   <div class="section-heading">
     <h2>To do<span>.</span></h2>
     <div class="task-actions">
-      <button
-        class="archive-button"
-        disabled={!writable || busy || !done}
-        onclick={archiveDone}
-        ><Icon name="archive" /><span
-          >{t('Archive completed', 'Arsipkan selesai')}</span
-        ></button
-      >
+      {#if selected.size}<button
+          class="task-delete-selected danger"
+          disabled={!writable || busy}
+          onclick={() => requestDelete([...selected])}
+          aria-label={t(
+            `Delete selected tasks (${selected.size})`,
+            `Hapus tugas terpilih (${selected.size})`,
+          )}
+          ><Icon name="trash" /><span
+            >{t('Delete', 'Hapus')} ({selected.size})</span
+          ></button
+        >
+      {:else}
+        <button
+          class="archive-button"
+          disabled={!writable || busy || !done}
+          onclick={archiveDone}
+          ><Icon name="archive" /><span
+            >{t('Archive completed', 'Arsipkan selesai')}</span
+          ></button
+        >{/if}
       <button
         class="task-add"
         aria-label={t('Add task', 'Tambah tugas')}
@@ -497,7 +594,12 @@
     <div class="dialog-heading">
       <h2>
         {deleting
-          ? t('Delete task?', 'Hapus tugas?')
+          ? deleteIds.length > 1
+            ? t(
+                `Delete ${deleteIds.length} tasks?`,
+                `Hapus ${deleteIds.length} tugas?`,
+              )
+            : t('Delete task?', 'Hapus tugas?')
           : editing
             ? t('Edit task', 'Edit tugas')
             : t('New task', 'Tugas baru')}
@@ -511,8 +613,12 @@
     </div>
     {#if deleting}<p>
         {t(
-          'This task will be permanently deleted.',
-          'Tugas ini akan dihapus permanen.',
+          deleteIds.length > 1
+            ? `These ${deleteIds.length} tasks will be permanently deleted.`
+            : 'This task will be permanently deleted.',
+          deleteIds.length > 1
+            ? `${deleteIds.length} tugas ini akan dihapus permanen.`
+            : 'Tugas ini akan dihapus permanen.',
         )}
       </p>
     {:else}<label
@@ -552,7 +658,7 @@
           class="danger"
           type="button"
           disabled={busy}
-          onclick={() => (deleting = true)}
+          onclick={() => requestDelete([editing!], true)}
           >{t('Delete task', 'Hapus tugas')}</button
         >{/if}
     {/if}
@@ -564,7 +670,7 @@
       <button
         type="button"
         disabled={busy}
-        onclick={() => (deleting ? (deleting = false) : close())}
+        onclick={() => (deleting && editing ? (deleting = false) : close())}
         >{t('Cancel', 'Batal')}</button
       >
       {#if deleting}<button
@@ -572,8 +678,12 @@
           class="danger"
           disabled={busy}
           onclick={async () => {
-            if (await commit(state.items.filter((t) => t.id !== editing)))
+            if (
+              await commit(state.items.filter((t) => !deleteIds.includes(t.id)))
+            ) {
+              selected = new Set();
               close();
+            }
           }}>{t('Delete', 'Hapus')}</button
         >
       {:else}<button class="primary" type="submit" disabled={busy || !writable}
@@ -590,6 +700,15 @@
     min-height: 0;
     height: 100%;
     padding: 25px;
+  }
+  .list-drop-ready {
+    outline: 1px dashed #35636d;
+    outline-offset: -3px;
+  }
+  .list-drop-over {
+    background: #00394055;
+    outline: 2px dashed var(--accent);
+    outline-offset: -3px;
   }
   .task-actions {
     display: flex;

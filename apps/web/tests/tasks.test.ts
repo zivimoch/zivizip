@@ -33,7 +33,7 @@ afterEach(async () => {
   for (const db of dbs) await db.delete();
   dbs.length = 0;
 });
-it('keeps dated tasks first and moves selected groups without changing archived order', () => {
+it('sorts dates ascending and moves selected groups without changing archived order', () => {
   const items = [
     task('a'),
     task('d1', '2026-10-30'),
@@ -43,16 +43,16 @@ it('keeps dated tasks first and moves selected groups without changing archived 
     { ...task('archive'), archived: true },
   ];
   expect(visibleTasks(items).map((t) => t.id)).toEqual([
-    'd1',
     'd2',
+    'd1',
     'a',
     'b',
     'c',
   ]);
   const moved = moveTasks(items, new Set(['a', 'b']), 'c', true);
   expect(visibleTasks(moved).map((t) => t.id)).toEqual([
-    'd1',
     'd2',
+    'd1',
     'c',
     'a',
     'b',
@@ -134,4 +134,28 @@ it('migrates account-local tasks only after server acceptance and preserves gues
   expect(JSON.stringify(fetcher.mock.calls)).not.toContain('private');
   await account.db.delete();
   expect((await guest.list()).items.map((t) => t.id)).toEqual(['private']);
+});
+
+it('keeps acknowledged task changes when an older background read arrives late', async () => {
+  const repo = setup(true);
+  const initial = { revision: 1, items: [task('first')] };
+  const updated = { revision: 2, items: [task('first'), task('second')] };
+  await repo.db.meta.put({ key: 'tasks', value: initial });
+  let release!: (value: Response) => void;
+  const fetcher = vi
+    .fn()
+    .mockImplementationOnce(
+      () => new Promise<Response>((resolve) => (release = resolve)),
+    )
+    .mockResolvedValueOnce(new Response(JSON.stringify(updated)));
+  vi.stubGlobal('fetch', fetcher);
+  const refresh = repo.list();
+  await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
+  await repo.write(initial, updated.items);
+  release(new Response(JSON.stringify(initial)));
+  expect((await refresh).revision).toBe(2);
+  expect((await repo.list(false)).items.map((t) => t.id)).toEqual([
+    'first',
+    'second',
+  ]);
 });

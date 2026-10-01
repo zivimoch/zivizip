@@ -69,7 +69,10 @@ export function readTaskState(value: unknown): TaskState {
 export const visibleTasks = (items: Task[], archived = false) =>
   items
     .filter((t) => t.archived === archived)
-    .sort((a, b) => Number(!!b.date) - Number(!!a.date));
+    .sort(
+      (a, b) =>
+        Number(!!b.date) - Number(!!a.date) || a.date.localeCompare(b.date),
+    );
 export function moveTasks(
   items: Task[],
   ids: Set<string>,
@@ -98,6 +101,16 @@ export class TasksRepository {
   private check() {
     if (!this.active()) throw Error('Workspace changed');
   }
+  private async cache(state: TaskState) {
+    return this.db.transaction('rw', this.db.meta, async () => {
+      this.check();
+      const cached = readTaskState((await this.db.meta.get('tasks'))?.value);
+      // A delayed refresh must not replace a newer acknowledged write.
+      if (cached.revision > state.revision) return cached;
+      await this.db.meta.put({ key: 'tasks', value: state });
+      return state;
+    });
+  }
   async list(online = true): Promise<TaskState> {
     this.check();
     const cached = await this.db.meta.get('tasks');
@@ -118,8 +131,7 @@ export class TasksRepository {
       this.check();
     }
     state = readTaskState(state);
-    await this.db.meta.put({ key: 'tasks', value: state });
-    return state;
+    return this.cache(state);
   }
   async write(state: TaskState, items: Task[]): Promise<TaskState> {
     this.check();
@@ -132,8 +144,7 @@ export class TasksRepository {
         }),
       );
       this.check();
-      await this.db.meta.put({ key: 'tasks', value: saved });
-      return saved;
+      return this.cache(saved);
     }
     return this.db.transaction('rw', this.db.meta, async () => {
       this.check();

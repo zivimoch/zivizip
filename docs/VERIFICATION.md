@@ -4,15 +4,15 @@
 
 Verified locally on 2026-10-01:
 
-| Check               | Result                | Coverage                                                                                                                                                                     |
-| ------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Svelte/TypeScript   | No errors or warnings | Types and component diagnostics                                                                                                                                              |
-| Frontend unit tests | 20 passed             | Notes/media persistence, conflicts and backups; Draw geometry; task validation, ordering, archives, legacy migration, stale revisions and workspace isolation                |
-| Rust unit tests     | 6 passed              | Notes conflicts and recovery; Draw/Text validation; task calendar validation and atomic revision checks                                                                      |
-| Browser scenarios   | 25 passed             | Notes/Draw/images/lists; account/offline flows; Tasks modal, dates, amount, group drag, archive/restore, mobile touch, list transfer, backup, SSE and explicit guest copying |
-| Container restart   | Passed                | Notes and sessions survive service restart                                                                                                                                   |
+| Check               | Result                | Coverage                                                                                                                                                                                  |
+| ------------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Svelte/TypeScript   | No errors or warnings | Types and component diagnostics                                                                                                                                                           |
+| Frontend unit tests | 21 passed             | Notes/media persistence, conflicts and backups; Draw geometry; task validation, chronological ordering, archives, stale revisions, late-response cache protection and workspace isolation |
+| Rust unit tests     | 6 passed              | Notes conflicts and recovery; Draw/Text validation; task calendar validation and atomic revision checks                                                                                   |
+| Browser scenarios   | 27 passed             | Notes/Draw/images/lists; native list selection and drag feedback; Tasks bulk deletion, dates, archives, mobile touch, backup, SSE, guest copying and stable controls during note edits    |
+| Container restart   | Passed                | Notes and sessions survive service restart                                                                                                                                                |
 
-The complete browser suite passed with one worker. Repeated local runs can exhaust the 15-minute login-attempt limit; restart the local API between repeated acceptance runs or allow that window to expire. Do not disable the limit for deployment. Browser checks use Chrome, a desktop viewport, and a 390px mobile viewport. The persistent-session test closes and reopens a browser process. Touch tests dispatch Chrome touch events for Draw and Tasks. PNG output is checked for a transparent corner pixel. This is not physical-phone testing or a production load test.
+The browser scenarios were checked with one worker; the Tasks group was rerun after correcting the rapid-click state on dialog cancellation. Repeated local runs can exhaust the 15-minute login-attempt limit; restart the local API between repeated acceptance runs or allow that window to expire. Do not disable the limit for deployment. Browser checks use Chrome, a desktop viewport, and a 390px mobile viewport. The persistent-session test closes and reopens a browser process. Touch tests dispatch Chrome touch events for Draw and Tasks. PNG output is checked for a transparent corner pixel. This is not physical-phone or physical-touchpad testing, or a production load test.
 
 ## Manual acceptance
 
@@ -33,9 +33,9 @@ The complete browser suite passed with one worker. Repeated local runs can exhau
 
 13. Type `- ` or `1. ` to start a list. Verify Enter continuation, empty-item exit, Tab/Shift+Tab nesting, alternating letters/numbers, and persistence after reload. Confirm Add image remains in the breadcrumb row.
 
-14. Add tasks through `+`, including an optional due date and amount. Double-click or press F2 to edit; delete through the modal and confirm. Dated tasks remain above undated tasks. Shift-select several rows and drag them together; click outside to clear selection.
+14. Add tasks through `+`, including an optional due date and amount. Double-click or press F2 to edit. Dates sort earliest first, above undated tasks; drag reorders within the same date or the undated group. Shift-select several rows and drag them together, or press Delete/use the selected-items Delete button and confirm to remove them together. Click outside to clear selection.
 15. Complete a task and confirm its text stays unchanged. Archive completed tasks, open the archive and restore one. Verify active totals exclude archived tasks.
-16. Drag a list line or selected list lines from Notes into Tasks. Verify one task per nonempty label and unchanged source text. Export a backup and confirm active/archived tasks are included.
+16. Double-click and extend a text selection in a list without moving its content. Drag selected list text from Notes into Tasks. Verify the dashed drop target and cyan hover feedback, one task per nonempty label, and unchanged source text. Export a backup and confirm active/archived tasks are included. Type in an account note while watching Tasks: background synchronization must not disable or replace unchanged task rows.
 17. Test guest tasks offline and account tasks from another authenticated browser. Verify account writes are disabled offline, stale revisions are rejected, logout restores the guest list and explicit workspace copy transfers guest tasks.
 
 ## Scope

@@ -3,6 +3,28 @@ import fs from 'node:fs';
 const credentials = new URL('../../../../.local/owner.json', import.meta.url);
 const origin = 'http://127.0.0.1:4174';
 const headers = { Origin: origin, 'X-Zivizip': '1' };
+async function dragSelectedList(page: Page) {
+  const start = await page.evaluate(() => {
+    const rect = getSelection()!.getRangeAt(0).getClientRects()[0];
+    return {
+      x: rect.left + Math.min(30, rect.width / 2),
+      y: rect.top + rect.height / 2,
+    };
+  });
+  const panel = page.locator('.tasks-panel');
+  const box = (await panel.boundingBox())!;
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(start.x + 20, start.y + 10, { steps: 4 });
+  await expect(panel).toHaveClass(/list-drop-ready/);
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, {
+    steps: 8,
+  });
+  await expect(panel).toHaveClass(/list-drop-over/);
+  await expect(panel).toHaveCSS('outline-style', 'dashed');
+  await page.mouse.up();
+  await expect(panel).not.toHaveClass(/list-drop-(ready|over)/);
+}
 async function visit(page: Page) {
   await page.goto('/');
   await page
@@ -115,6 +137,55 @@ test('task modal, date bands, group dragging, completion, archive and deletion f
     'Alpha',
   ]);
 });
+test('dates sort chronologically and Delete removes the whole selection', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await visit(page);
+  await add(page, 'Late', '2026-10-30');
+  await add(page, 'No date A');
+  await add(page, 'Early', '2026-10-02');
+  await add(page, 'Middle', '2026-10-10');
+  await add(page, 'No date B');
+  await expect(page.locator('.task-title')).toHaveText([
+    'Early',
+    'Middle',
+    'Late',
+    'No date A',
+    'No date B',
+  ]);
+  await drag(page, 'Late', 'Early', false);
+  await expect(page.locator('.task-title')).toHaveText([
+    'Early',
+    'Middle',
+    'Late',
+    'No date A',
+    'No date B',
+  ]);
+  await row(page, 'Late').click();
+  await row(page, 'No date A').click({ modifiers: ['Shift'] });
+  await page.keyboard.press('Delete');
+  await expect(page.getByRole('dialog')).toContainText('Delete 2 tasks?');
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(page.locator('.task-row')).toHaveCount(5);
+  await row(page, 'Late').click();
+  await row(page, 'No date A').click({ modifiers: ['Shift'] });
+  await page
+    .getByRole('button', { name: 'Delete selected tasks (2)', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(page.locator('.task-title')).toHaveText([
+    'Early',
+    'Middle',
+    'No date B',
+  ]);
+  await page.reload();
+  await expect(page.locator('.task-title')).toHaveText([
+    'Early',
+    'Middle',
+    'No date B',
+  ]);
+});
 test('list text drags into tasks and tasks are backed up and editable offline', async ({
   page,
   context,
@@ -131,7 +202,13 @@ test('list text drags into tasks and tasks are backed up and editable offline', 
   await page
     .locator('.text-paragraph')
     .first()
-    .dragTo(page.locator('.tasks-panel'));
+    .evaluate((el) => {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      getSelection()!.removeAllRanges();
+      getSelection()!.addRange(range);
+    });
+  await dragSelectedList(page);
   await expect(row(page, 'Review priorities')).toBeVisible();
   await expect(editor).toContainText('Review priorities');
   // Selected list text carries one task per line, without modifying its source.
@@ -142,11 +219,28 @@ test('list text drags into tasks and tasks are backed up and editable offline', 
     selection.removeAllRanges();
     selection.addRange(range);
   });
-  await page
-    .locator('.text-paragraph')
-    .first()
-    .dragTo(page.locator('.tasks-panel'));
+  await dragSelectedList(page);
   await expect(page.locator('.task-row')).toHaveCount(3);
+  // Cancelling a native drag clears the prototype's drop feedback.
+  await editor.evaluate((el) => {
+    const r = document.createRange();
+    r.selectNodeContents(el);
+    getSelection()!.removeAllRanges();
+    getSelection()!.addRange(r);
+  });
+  const selected = await editor.evaluate(() => {
+    const b = getSelection()!.getRangeAt(0).getClientRects()[0];
+    return { x: b.left + 30, y: b.top + b.height / 2 };
+  });
+  await page.mouse.move(selected.x, selected.y);
+  await page.mouse.down();
+  await page.mouse.move(selected.x + 30, selected.y + 10, { steps: 4 });
+  await expect(page.locator('.tasks-panel')).toHaveClass(/list-drop-ready/);
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await expect(page.locator('.tasks-panel')).not.toHaveClass(
+    /list-drop-(ready|over)/,
+  );
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   const download = page.waitForEvent('download');
   await page
@@ -240,6 +334,7 @@ test('account tasks sync, reject stale revisions, remain after logout, and stay 
     storageState: await context.storageState(),
     viewport: { width: 1600, height: 1000 },
   });
+  let noteId: string | undefined;
   try {
     const second = await secondContext.newPage();
     await second.goto('/');
@@ -249,6 +344,54 @@ test('account tasks sync, reject stale revisions, remain after logout, and stay 
     const before = await (await context.request.get('/api/tasks')).json();
     await add(page, label);
     await expect(row(second, label)).toBeVisible({ timeout: 15000 });
+    // Note saves still trigger account refresh, but Tasks must remain interactive and visually stable.
+    let taskReads = 0;
+    await page.route('**/api/tasks', async (route) => {
+      if (route.request().method() !== 'GET') return route.continue();
+      const response = await route.fetch();
+      taskReads++;
+      await new Promise((resolve) => setTimeout(resolve, 180));
+      await route.fulfill({ response });
+    });
+    const audit = await page.locator('.tasks-panel').evaluateHandle((panel) => {
+      const state = {
+        disabledChanges: 0,
+        row: panel.querySelector('[data-task]'),
+        observer: null as MutationObserver | null,
+      };
+      state.observer = new MutationObserver(
+        (records) => (state.disabledChanges += records.length),
+      );
+      state.observer.observe(panel, {
+        attributes: true,
+        subtree: true,
+        attributeFilter: ['disabled'],
+      });
+      return state;
+    });
+    await page.getByRole('button', { name: 'New note', exact: true }).click();
+    await page.getByLabel('Name', { exact: true }).fill(label);
+    const noteName = await page
+      .getByLabel('Name', { exact: true })
+      .inputValue();
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
+    noteId = (await (await context.request.get('/api/notes')).json()).find(
+      (n: any) => n.name === noteName,
+    )?.id;
+    expect(noteId).toBeTruthy();
+    await page.getByRole('textbox', { name: 'Note content' }).click();
+    await page.keyboard.type('Keep the task list steady while writing.', {
+      delay: 35,
+    });
+    await expect.poll(() => taskReads).toBeGreaterThan(0);
+    expect(
+      await audit.evaluate((state) => ({
+        disabled: state.disabledChanges,
+        connected: state.row?.isConnected,
+      })),
+    ).toEqual({ disabled: 0, connected: true });
+    await audit.evaluate((state) => state.observer!.disconnect());
+    await page.unrouteAll({ behavior: 'wait' });
     expect(
       (
         await context.request.put('/api/tasks', { headers, data: before })
@@ -291,6 +434,16 @@ test('account tasks sync, reject stale revisions, remain after logout, and stay 
     ).toBe(true);
   } finally {
     await context.request.post('/api/session', { headers, data: credential });
+    if (noteId) {
+      const note = (
+        await (await context.request.get('/api/notes')).json()
+      ).find((n: any) => n.id === noteId);
+      if (note)
+        await context.request.delete(`/api/notes/${noteId}`, {
+          headers,
+          data: note,
+        });
+    }
     const current = await (await context.request.get('/api/tasks')).json();
     const removed = await context.request.put('/api/tasks', {
       headers,
