@@ -261,7 +261,7 @@ test('moving an image upward keeps it stationary when typing below it, and backu
   const data = JSON.parse(
     fs.readFileSync((await (await downloaded).path())!, 'utf8'),
   );
-  expect(data.version).toBe(3);
+  expect(data.version).toBe(4);
   expect(data.media).toHaveLength(1);
   expect(data.notes[0].rich.images).toHaveLength(1);
   await page.getByRole('button', { name: 'Close settings' }).click();

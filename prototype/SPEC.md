@@ -55,11 +55,15 @@ This document describes the target interaction model. The [verification scope](.
 
 ## Tasks
 
+- Add tasks through the header `+` button and a modal with title, optional due date and related amount. Editing uses the same modal; deletion requires confirmation. No inline add form or browser prompts.
+- Show completed/active counts and percentage above a scrollable list. Archive completed tasks together; viewing the archive offers restoration to the active list with completion cleared.
 - Dated tasks always precede undated tasks. Drag rows directly to reorder within the dated/undated groups; undated rows cannot move above dated rows. No separate drag icon.
 - Single-click selects; double-clicking the row or F2 edits. Completion controls act independently.
 - Shift-click toggles multiple selection. Dragging a selected row moves the selected group while preserving relative order and date-group boundaries. Clicking an unselected row selects it alone; clicking outside clears selection.
 - Selection highlight extends 12px left without moving text or completion controls.
 - Completed text keeps its normal color with no strikethrough; the completion control indicates state.
+- On mobile, double-tap edits. Tap to select before touch-dragging; unselected rows allow normal vertical scrolling. Keyboard users can focus rows, press F2/Enter to edit, Shift+Space to select and Alt+Arrow to reorder.
+- Guest tasks persist offline in IndexedDB; account tasks use revision-checked server storage and SSE, with a read-only offline cache. Version 4 workspace backups include active and archived tasks. Guest copying remains explicit.
 - The target shared Tasks/Finance entry form includes description, category with history suggestions, date and amount. An amount associates the entry with Finance. This shared form is not yet implemented.
 
 ## Finance planning

@@ -1,6 +1,9 @@
 <script lang="ts">
   export let name = 'note';
   const paths: Record<string, string> = {
+    archive: 'M3 3h18v4H3z M5 7v14h14V7 M9 11h6',
+    calendar: 'M5 4h14v17H5z M5 9h14 M8 2v4 M16 2v4',
+    tick: 'm5 12 4 4 10-10',
     account: 'M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0 M4 22v-3a8 8 0 0 1 16 0v3',
     home: 'M3 10 12 3l9 7v11h-6v-7H9v7H3z',
     layers: 'm12 3 10 5-10 5L2 8z M2 12l10 5 10-5 M2 16l10 5 10-5',

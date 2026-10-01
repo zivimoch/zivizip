@@ -12,6 +12,7 @@ import {
 } from './text/media';
 import { emptyScene, parseScene } from './draw/scene';
 import Dexie, { type Table } from 'dexie';
+import { readTaskState, validateTasks, type Task } from './tasks';
 export type NoteKind = 'text' | 'draw';
 export interface Note {
   kind?: NoteKind;
@@ -36,7 +37,8 @@ export interface Preferences {
 }
 export interface Backup {
   format: 'zivizip';
-  version: 1 | 2 | 3;
+  version: 1 | 2 | 3 | 4;
+  tasks?: Task[];
   media?: MediaBackup[];
   exportedAt: string;
   notes: Note[];
@@ -147,11 +149,12 @@ export function validateBackup(value: unknown): Backup {
   const b = value as Backup;
   if (
     b.format !== 'zivizip' ||
-    ![1, 2, 3].includes(b.version) ||
+    ![1, 2, 3, 4].includes(b.version) ||
     !Array.isArray(b.notes) ||
     b.notes.length > 10000
   )
     throw new Error('Unsupported backup format');
+  if (b.version === 4 || b.tasks !== undefined) validateTasks(b.tasks!);
   const ids = new Set<string>();
   for (const n of b.notes) {
     if (
@@ -217,9 +220,11 @@ export async function exportWorkspace(
     'r',
     db.notes,
     db.preferences,
+    db.meta,
     async () => ({
       format: 'zivizip' as const,
-      version: 3 as const,
+      version: 4 as const,
+      tasks: readTaskState((await db.meta.get('tasks'))?.value).items,
       exportedAt: new Date().toISOString(),
       notes: live || (await db.notes.toArray()),
       preferences: (await db.preferences.get('workspace')) || { ...defaults },
@@ -241,22 +246,44 @@ export async function exportWorkspace(
 export async function importWorkspace(db: WorkspaceDB, input: unknown) {
   const b = validateBackup(input);
   const media = await Promise.all((b.media || []).map(decodeMedia));
-  return db.transaction('rw', db.notes, db.preferences, db.media, async () => {
-    await db.media.bulkPut(media);
-    const ids = new Map(b.notes.map((n) => [n.id, crypto.randomUUID()]));
-    const notes = b.notes.map((n) => ({
-      ...n,
-      id: ids.get(n.id)!,
-      revision: 1,
-    }));
-    await db.notes.bulkAdd(notes);
-    const pref = (await db.preferences.get('workspace')) || { ...defaults };
-    pref.open = [...pref.open, ...b.preferences.open.map((id) => ids.get(id)!)];
-    pref.active = b.preferences.active
-      ? ids.get(b.preferences.active)!
-      : pref.active;
-    pref.counter = Math.max(pref.counter, b.preferences.counter);
-    await db.preferences.put(pref);
-    return notes.length;
-  });
+  return db.transaction(
+    'rw',
+    db.notes,
+    db.preferences,
+    db.media,
+    db.meta,
+    async () => {
+      if (b.tasks?.length) {
+        const current = readTaskState((await db.meta.get('tasks'))?.value);
+        const items = [
+          ...current.items,
+          ...b.tasks.map((t) => ({ ...t, id: crypto.randomUUID() })),
+        ];
+        validateTasks(items);
+        await db.meta.put({
+          key: 'tasks',
+          value: { revision: current.revision + 1, items },
+        });
+      }
+      await db.media.bulkPut(media);
+      const ids = new Map(b.notes.map((n) => [n.id, crypto.randomUUID()]));
+      const notes = b.notes.map((n) => ({
+        ...n,
+        id: ids.get(n.id)!,
+        revision: 1,
+      }));
+      await db.notes.bulkAdd(notes);
+      const pref = (await db.preferences.get('workspace')) || { ...defaults };
+      pref.open = [
+        ...pref.open,
+        ...b.preferences.open.map((id) => ids.get(id)!),
+      ];
+      pref.active = b.preferences.active
+        ? ids.get(b.preferences.active)!
+        : pref.active;
+      pref.counter = Math.max(pref.counter, b.preferences.counter);
+      await db.preferences.put(pref);
+      return notes.length;
+    },
+  );
 }

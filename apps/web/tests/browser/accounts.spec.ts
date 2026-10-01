@@ -205,7 +205,10 @@ test('guest notes upload only after explicit copy and retain local originals', a
   await page.waitForTimeout(400);
   await login(page);
   await page
-    .getByRole('button', { name: 'Copy local notes to account', exact: true })
+    .getByRole('button', {
+      name: 'Copy local workspace to account',
+      exact: true,
+    })
     .click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   const n = (await serverNotes(context)).find((n: any) => n.name === label);
@@ -301,6 +304,14 @@ test('a failed account load cannot turn guest notes into server writes', async (
   await expect(page.getByRole('alert')).toContainText('Unable to sign in');
   await page.getByRole('button', { name: 'Close account dialog' }).click();
   await expect(page.locator('.account-status')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Add task', exact: true }).click();
+  await page
+    .getByLabel('What would you like to finish?')
+    .fill('Guest task during outage');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.locator('.task-title')).toHaveText(
+    'Guest task during outage',
+  );
   await page
     .getByRole('textbox', { name: 'Note content' })
     .fill('Still private guest content');

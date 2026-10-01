@@ -120,8 +120,36 @@ export function mountText(host: HTMLElement, options: Options) {
       ),
     );
     if (!editor.childNodes.length) editor.append(paragraph());
+    markLists();
     paint();
   }
+  function markLists() {
+    for (const child of editor.children) {
+      if (child instanceof HTMLElement)
+        child.draggable = !!listItem(child.textContent || '');
+    }
+  }
+  editor.addEventListener('dragstart', (event) => {
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    const selection = range();
+    const paragraphs = [...editor.children].filter(
+      (el) => el instanceof HTMLElement && el.draggable,
+    );
+    const rows =
+      selection && !selection.collapsed
+        ? paragraphs.filter((el) => selection.intersectsNode(el))
+        : paragraphs.filter((el) => el === target || el.contains(target));
+    const titles = rows
+      .map((el) => listItem(el.textContent || '')?.content.trim())
+      .filter((title): title is string => !!title);
+    if (!event.dataTransfer || !titles.length) return;
+    event.dataTransfer.setData(
+      'application/x-zivizip-list',
+      JSON.stringify(titles),
+    );
+    event.dataTransfer.setData('text/plain', titles.join('\n'));
+    event.dataTransfer.effectAllowed = 'copy';
+  });
   function read() {
     const blocks: Block[] = [];
     editor.childNodes.forEach((node) => {
@@ -145,6 +173,7 @@ export function mountText(host: HTMLElement, options: Options) {
   }
   function persist(previous = accepted) {
     read();
+    markLists();
     validateDocument(doc);
     const next = JSON.stringify(doc);
     if (next === previous) return;

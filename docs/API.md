@@ -2,19 +2,21 @@
 
 All endpoints use the frontend origin. Mutations require an allowed `Origin` and `X-Zivizip: 1`. API responses use `Cache-Control: no-store`.
 
-| Endpoint                          | Access               | Purpose                         |
-| --------------------------------- | -------------------- | ------------------------------- |
-| `GET /api/health`                 | Public               | Service health                  |
-| `POST /api/session`               | Owner credentials    | Sign in                         |
-| `GET /api/session`                | Session              | Restore and renew session       |
-| `DELETE /api/session`             | Current cookie       | Revoke session                  |
-| `GET /api/notes`                  | Owner                | List notes                      |
-| `POST /api/notes`                 | Owner                | Create note                     |
-| `PUT /api/notes/:id`              | Owner                | Update note with revision check |
-| `DELETE /api/notes/:id`           | Owner                | Delete at the supplied revision |
-| `GET /api/events`                 | Owner                | SSE invalidation notifications  |
-| `POST /api/registration-interest` | Public, rate-limited | Submit email and message        |
-| `GET /api/registration-interest`  | Owner                | Latest 200 submissions          |
+| Endpoint                          | Access               | Purpose                            |
+| --------------------------------- | -------------------- | ---------------------------------- |
+| `GET /api/health`                 | Public               | Service health                     |
+| `POST /api/session`               | Owner credentials    | Sign in                            |
+| `GET /api/session`                | Session              | Restore and renew session          |
+| `DELETE /api/session`             | Current cookie       | Revoke session                     |
+| `GET /api/notes`                  | Owner                | List notes                         |
+| `POST /api/notes`                 | Owner                | Create note                        |
+| `PUT /api/notes/:id`              | Owner                | Update note with revision check    |
+| `DELETE /api/notes/:id`           | Owner                | Delete at the supplied revision    |
+| `GET /api/events`                 | Owner                | SSE invalidation notifications     |
+| `GET /api/tasks`                  | Owner                | Task workspace and revision        |
+| `PUT /api/tasks`                  | Owner                | Replace task workspace at revision |
+| `POST /api/registration-interest` | Public, rate-limited | Submit email and message           |
+| `GET /api/registration-interest`  | Owner                | Latest 200 submissions             |
 
 ## Owner setup
 
@@ -57,3 +59,13 @@ Browser paste/file input accepts images up to 15 MB and converts them to WebP wi
 Backup version 3 embeds referenced attachment bytes once per content hash and retains placement/rotation. Versions 1 and 2 remain importable. Import validates attachment hashes before writing notes. Account copies transfer images only through the explicit guest-copy action. Images must be cached for offline viewing; unavailable images display a reconnect message. Account exports fetch missing referenced attachments before creating the archive.
 
 Removing an image removes its document reference. Unreferenced attachment bytes are currently retained to support undo and conflict copies; automated attachment garbage collection is not implemented yet. JSON backup import currently accepts files up to 50 MB.
+
+## Tasks
+
+`GET /api/tasks` returns `{ "revision": 0, "items": [] }` for a new account workspace. Each task contains `id`, `title`, `date` (empty or `YYYY-MM-DD`), `amount` (integer IDR), `done`, `archived`, and `createdAt` (milliseconds). Array order is the manual order; the UI stably groups dated tasks before undated tasks.
+
+`PUT /api/tasks` accepts the same shape with the last-read revision. One transaction validates and replaces the snapshot, increments the revision and emits an SSE invalidation. A stale revision returns `409` without changing server data. Client drafts remain available for reload/retry. This differs from Notes conflict copies: no duplicate tasks are created automatically.
+
+Limits: 10,000 tasks, 2 MB serialized items, unique alphanumeric/hyphen IDs up to 64 characters, nonempty titles up to 150 UTF-16 units, valid calendar dates and integer amounts from zero through 1 trillion IDR. Authentication and mutation-origin rules apply to both endpoints. Existing account-local tasks are migrated before their browser cache is replaced; guest tasks are only copied with explicit consent.
+
+Backup version 4 adds active and archived tasks to version 3 media/notes. Import accepts versions 1–4 and assigns new IDs to imported tasks. Server imports across Notes, media and Tasks can complete partially if a request fails; they are not one atomic transaction.

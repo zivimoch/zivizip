@@ -259,6 +259,14 @@ small {
   border-bottom: 1px solid #213038;
   font-size: 14px;
 }
+.tasks-slot {
+  flex: 0 0 var(--tasks);
+  min-height: 0;
+}
+.tasks-page {
+  height: 100%;
+  min-height: 0;
+}
 .task > span {
   width: 23px;
   height: 23px;

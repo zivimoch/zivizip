@@ -12,22 +12,22 @@ Browser
 
 SvelteKit builds a static application served by Nginx. Vite provides the development server. Both proxy same-origin API requests to the Notes service; the database and API container have no host-facing ports.
 
-The service owns Notes, the single-owner session, and registration-interest records. Account notes synchronize over HTTP and SSE. The service worker caches the application shell and excludes API requests.
+The service owns Notes, Tasks, the single-owner session, and registration-interest records. Account notes and tasks synchronize over HTTP and SSE. The service worker caches the application shell and excludes API requests.
 
 ## Storage boundaries
 
 - Guest data is scoped to the browser profile and origin. It is never uploaded merely by logging in.
 - Account data is stored on the server. A separate browser cache supports offline reading and is cleared on logout.
-- Login offers an explicit guest-note copy; original guest notes remain local.
+- Login offers an explicit guest-workspace copy; original guest notes and tasks remain local.
 - Revision checks preserve conflicting edits as separate copies. Delete requires the current revision.
-- JSON backups include implemented note/workspace data. Draw geometry and referenced image attachments are included; archives for other feature domains remain planned.
+- Version 4 JSON backups include notes, Draw geometry, referenced image attachments, active/archived tasks and workspace preferences. Versions 1–3 remain importable.
 
 ## Service boundaries
 
 | Domain  | Ownership                                                 | Status                    |
 | ------- | --------------------------------------------------------- | ------------------------- |
 | Notes   | Text/Draw notes, revisions, image attachments             | Text and Draw implemented |
-| Tasks   | Task state and ordering                                   | Prototype                 |
+| Tasks   | Task state, dates, related amounts, ordering and archives | Implemented in local API  |
 | Finance | Transactions, categories, monthly budgets and realization | Prototype                 |
 | Goals   | Goals and links to source records                         | Prototype                 |
 
@@ -56,4 +56,12 @@ The Text editor stores typed paragraph/image blocks rather than arbitrary HTML. 
 
 Attachment bytes live outside note revisions. Guest bytes are IndexedDB blobs; the single-owner service stores content-addressed bytes in SQLite. Typing, resize and rotation only write document metadata. This keeps HTTP/SSE note synchronization independent of image byte size. A separate media store can replace the SQLite attachment table when deployment/storage requirements justify it.
 
-Automatic list markers remain plain text in the portable document. Enter continues the current list or exits an empty item; Tab/Shift+Tab changes depth and alternates numeric/alphabetic levels. This uses the same storage, conflict and offline paths as ordinary paragraphs. Task conversion remains part of the Tasks integration.
+Automatic list markers remain plain text in the portable document. Enter continues the current list or exits an empty item; Tab/Shift+Tab changes depth and alternates numeric/alphabetic levels. This uses the same storage, conflict and offline paths as ordinary paragraphs. Dragging selected list lines into Tasks copies their labels without changing the source.
+
+## Task workspace
+
+Tasks use a separate frontend repository and Rust module within the existing API process. This keeps ownership distinct without adding a deployment dependency to the local milestone. Extraction into a standalone service remains a deployment decision.
+
+An ordered task snapshot has one revision. SQLite transactions and IndexedDB transactions reject stale updates rather than silently overwriting another writer. Account changes trigger the existing SSE invalidation channel; guest tabs use BroadcastChannel. Refresh waits during drag and modal editing. A stale modal retains its fields so the user can reload the list and retry. Account data is cached separately and remains read-only offline.
+
+The snapshot is bounded to 10,000 tasks and 2 MB. Updates currently send the full snapshot; this is a simple initial consistency model, not a large-collection performance claim. Per-task revisions, operation-based reordering and paginated archives are future scaling options. Task amounts are metadata; creating/completing tasks does not yet create Finance transactions.

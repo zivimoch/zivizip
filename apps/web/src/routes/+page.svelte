@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
   import TextEditor from '$lib/TextEditor.svelte';
+  import TasksPanel from '$lib/TasksPanel.svelte';
+  import { TasksRepository, readTaskState } from '$lib/tasks';
   import { assetsIn, type TextDocument } from '$lib/text/document';
   import { getMedia, putMedia, decodeMedia } from '$lib/text/media';
   import DrawEditor from '$lib/DrawEditor.svelte';
@@ -75,6 +77,9 @@
   let migration: HTMLDialogElement;
   let guestCount = 0;
   let dirty = new Set<string>();
+  let tasksRepo: TasksRepository;
+  let taskBusy = false;
+  let taskRefresh = 0;
   let alive = true;
   let workspaceEpoch = 0;
   const redirectedNotes = new Map<string, string>();
@@ -115,6 +120,13 @@
     prefs.open = prefs.open.filter((id) => notes.some((n) => n.id === id));
     if (!prefs.open.includes(prefs.active || ''))
       prefs.active = prefs.open[0] || null;
+    const epoch = workspaceEpoch;
+    tasksRepo = new TasksRepository(
+      db,
+      !!account,
+      () => epoch === workspaceEpoch,
+    );
+    taskRefresh++;
   }
   async function activate(user: Account | null, fetchServer = true) {
     switching = true;
@@ -139,6 +151,13 @@
       if (!nextPrefs.open.includes(nextPrefs.active || ''))
         nextPrefs.active = nextPrefs.open[0] || null;
       const nextViews = await loadDrawViews(nextDb);
+      const epoch = workspaceEpoch;
+      const nextTasks = new TasksRepository(
+        nextDb,
+        !!user,
+        () => epoch === workspaceEpoch,
+      );
+      await nextTasks.list(fetchServer);
       if (user) await guestDb.meta.put({ key: 'active-account', value: user });
       else await guestDb.meta.delete('active-account');
       eventSource?.close();
@@ -153,9 +172,18 @@
       drawViews = nextViews;
       notes = nextNotes;
       prefs = nextPrefs;
+      tasksRepo = nextTasks;
+      taskRefresh++;
       if (user && fetchServer) listen();
     } catch (e) {
       if (nextDb !== guestDb) nextDb.close();
+      const epoch = workspaceEpoch;
+      tasksRepo = new TasksRepository(
+        db,
+        !!account,
+        () => epoch === workspaceEpoch,
+      );
+      taskRefresh++;
       throw e;
     } finally {
       switching = false;
@@ -165,6 +193,7 @@
     if (
       !account ||
       pending ||
+      taskBusy ||
       drawBusy ||
       dirty.size ||
       switching ||
@@ -182,12 +211,14 @@
       if (
         epoch !== workspaceEpoch ||
         pending ||
+        taskBusy ||
         drawBusy ||
         dirty.size ||
         switching
       )
         return;
       notes = fresh;
+      taskRefresh++;
       verified = true;
       prefs.open = prefs.open.filter((id) => fresh.some((n) => n.id === id));
       if (!prefs.open.includes(prefs.active || ''))
@@ -200,6 +231,7 @@
         e instanceof ApiError &&
         e.status === 401 &&
         !pending &&
+        !taskBusy &&
         !dirty.size
       ) {
         if (repo instanceof AccountNotes) repo.deactivate();
@@ -226,17 +258,21 @@
     };
   }
   async function signedIn(user: Account) {
+    if (taskBusy) throw Error('Please wait for tasks to finish saving');
     await queue;
     if (dirty.size) throw new Error('Save or download pending changes first');
     await activate(user);
     channel?.postMessage('session');
-    guestCount = await guestDb.notes.count();
+    guestCount =
+      (await guestDb.notes.count()) +
+      readTaskState((await guestDb.meta.get('tasks'))?.value).items.length;
     if (guestCount) {
       await tick();
       migration.showModal();
     }
   }
   async function signedOut() {
+    if (taskBusy) return;
     await queue;
     if (dirty.size) {
       notice = t(
@@ -255,8 +291,8 @@
       await activate(null);
       channel?.postMessage('session');
       notice = t(
-        'Logged out. Your guest notes are unchanged.',
-        'Berhasil keluar. Catatan tamu tetap tersimpan.',
+        'Logged out. Your guest workspace is unchanged.',
+        'Berhasil keluar. Workspace tamu tetap tersimpan.',
       );
     } catch (e) {
       problem(e);
@@ -265,7 +301,7 @@
     }
   }
   async function copyGuest() {
-    if (!(repo instanceof AccountNotes) || !writable) return;
+    if (!(repo instanceof AccountNotes) || !writable || taskBusy) return;
     switching = true;
     try {
       const guest = await guestDb.notes.toArray();
@@ -281,11 +317,39 @@
         });
         await db.meta.put({ key, value: copy.id });
       }
+      const guestTasks = readTaskState(
+        (await guestDb.meta.get('tasks'))?.value,
+      ).items;
+      if (guestTasks.length) {
+        const currentTasks = await tasksRepo.list();
+        // Stable copy IDs make retries safe even if the response was interrupted.
+        const copies = await Promise.all(
+          guestTasks.map(async (task) => {
+            const digest = await crypto.subtle.digest(
+              'SHA-256',
+              new TextEncoder().encode(`guest-task:${task.id}`),
+            );
+            return {
+              ...task,
+              id: [...new Uint8Array(digest)]
+                .map((byte) => byte.toString(16).padStart(2, '0'))
+                .join(''),
+            };
+          }),
+        );
+        await tasksRepo.write(currentTasks, [
+          ...currentTasks.items,
+          ...copies.filter(
+            (task) => !currentTasks.items.some((old) => old.id === task.id),
+          ),
+        ]);
+      }
       notes = await repo.list();
+      taskRefresh++;
       migration.close();
       notice = t(
-        'Guest notes copied to your account. Local originals remain available.',
-        'Catatan tamu disalin ke akun. Catatan asli tetap tersedia secara lokal.',
+        'Guest notes and tasks copied to your account. Local originals remain available.',
+        'Catatan dan tugas tamu disalin ke akun. Data asli tetap tersedia secara lokal.',
       );
     } catch (e) {
       problem(e);
@@ -342,7 +406,7 @@
     window.addEventListener('online', connectivity);
     window.addEventListener('offline', connectivity);
     const leave = (e: BeforeUnloadEvent) => {
-      if (drawBusy || error || pending || dirty.size) {
+      if (taskBusy || drawBusy || error || pending || dirty.size) {
         e.preventDefault();
         e.returnValue = '';
       }
@@ -350,7 +414,7 @@
     window.addEventListener('beforeunload', leave);
     channel = new BroadcastChannel('zivizip-session');
     channel.onmessage = async () => {
-      if (pending || dirty.size) {
+      if (taskBusy || pending || dirty.size) {
         verified = false;
         notice = t(
           'Account changed in another tab. Download pending edits before reloading.',
@@ -546,6 +610,7 @@
     if (start !== null) input.setSelectionRange(start, end);
   }
   async function download() {
+    if (taskBusy) return;
     await queue;
     try {
       for (const id of new Set(notes.flatMap((n) => assetsIn(n.rich))))
@@ -581,10 +646,11 @@
     input.value = '';
   }
   async function restore() {
-    if (!backup || !writable) return;
+    if (!backup || !writable || taskBusy) return;
     await queue;
     try {
       let count = 0;
+      const taskCount = backup.tasks?.length || 0;
       if (repo instanceof AccountNotes) {
         const media = await Promise.all((backup.media || []).map(decodeMedia));
         for (const m of media) await putMedia(db, m.blob, true);
@@ -593,6 +659,8 @@
           count++;
         }
         notes = await repo.list();
+        if (backup.tasks?.length) await tasksRepo.merge(backup.tasks);
+        taskRefresh++;
       } else {
         count = await importWorkspace(db, backup);
         await load();
@@ -600,8 +668,8 @@
       }
       backup = null;
       notice = t(
-        `${count} notes imported as new copies.`,
-        `${count} catatan diimpor sebagai salinan baru.`,
+        `${count} notes and ${taskCount} tasks imported as new copies.`,
+        `${count} catatan dan ${taskCount} tugas diimpor sebagai salinan baru.`,
       );
     } catch (e) {
       problem(e);
@@ -753,7 +821,11 @@
               : t('Guest workspace', 'Workspace tamu')}
           </p>
           {#if account}<button
-              disabled={switching || pending > 0 || dirty.size > 0 || !online}
+              disabled={taskBusy ||
+                switching ||
+                pending > 0 ||
+                dirty.size > 0 ||
+                !online}
               onclick={async () => {
                 accountMenu = false;
                 await signedOut();
@@ -764,7 +836,7 @@
                   'Hubungkan internet untuk keluar dengan aman.',
                 )}</small
               >{/if}{:else}<button
-              disabled={switching || pending > 0 || dirty.size > 0}
+              disabled={taskBusy || switching || pending > 0 || dirty.size > 0}
               onclick={() => {
                 accountMenu = false;
                 mobileMenu = false;
@@ -926,19 +998,15 @@
         }}
       ></button>
       <div class="right-pane" bind:this={right}>
-        <section class="preview tasks">
-          <div class="section-heading">
-            <h2>To do<span>.</span></h2>
-            <small>{t('Preview', 'Pratinjau')}</small>
-          </div>
-          <p class="muted">{t('2 of 3 completed', '2 dari 3 selesai')}</p>
-          <div class="progress"><i></i></div>
-          {#each [t('Plan the week', 'Rencanakan minggu ini'), t('Make time to read', 'Luangkan waktu membaca'), t('Review priorities', 'Tinjau prioritas')] as task, i}<div
-              class="task"
-            >
-              <span class:done={i < 2}>{i < 2 ? '✓' : ''}</span>{task}
-            </div>{/each}
-        </section>
+        <div class="tasks-slot">
+          {#key tasksRepo.db.name}<TasksPanel
+              repository={tasksRepo}
+              {writable}
+              language={prefs.language}
+              refreshToken={taskRefresh}
+              onbusy={(value) => (taskBusy = value)}
+            />{/key}
+        </div>
         <button
           class="divider horizontal"
           aria-label="Resize tasks"
@@ -996,6 +1064,15 @@
           </div>
         </section>
       </div>{/if}
+  {:else if view === 'tasks'}<div class="tasks-page">
+      {#key tasksRepo.db.name}<TasksPanel
+          repository={tasksRepo}
+          {writable}
+          language={prefs.language}
+          refreshToken={taskRefresh}
+          onbusy={(value) => (taskBusy = value)}
+        />{/key}
+    </div>
   {:else}<section class="placeholder">
       <Icon name={view} />
       <h1>
@@ -1145,8 +1222,8 @@
   {#if backup}<div class="import-review">
       <p>
         {t(
-          `Import ${backup.notes.length} notes as new copies? Existing notes stay unchanged.`,
-          `Impor ${backup.notes.length} catatan sebagai salinan baru? Catatan lama tetap ada.`,
+          `Import ${backup.notes.length} notes and ${backup.tasks?.length || 0} tasks as new copies? Existing data stays unchanged.`,
+          `Impor ${backup.notes.length} catatan dan ${backup.tasks?.length || 0} tugas sebagai salinan baru? Data lama tetap ada.`,
         )}
       </p>
       <button class="primary" disabled={!writable} onclick={restore}
@@ -1219,8 +1296,8 @@
   <h2>{t('Choose your workspace', 'Pilih workspace kamu')}</h2>
   <p>
     {t(
-      `You have ${guestCount} local notes. Open your account workspace, or copy these notes to your account. Nothing is uploaded without your choice.`,
-      `Ada ${guestCount} catatan lokal. Buka workspace akun, atau salin catatan ini ke akunmu. Tidak ada catatan yang diunggah tanpa pilihanmu.`,
+      `You have ${guestCount} local notes and tasks. Open your account workspace, or copy this data to your account. Nothing is uploaded without your choice.`,
+      `Ada ${guestCount} catatan dan tugas lokal. Buka workspace akun, atau salin data ini ke akunmu. Tidak ada data yang diunggah tanpa pilihanmu.`,
     )}
   </p>
   <button disabled={switching} onclick={() => migration.close()}
@@ -1228,7 +1305,10 @@
   ><button class="primary" disabled={switching} onclick={copyGuest}
     >{switching
       ? t('Copying…', 'Menyalin…')
-      : t('Copy local notes to account', 'Salin catatan lokal ke akun')}</button
+      : t(
+          'Copy local workspace to account',
+          'Salin workspace lokal ke akun',
+        )}</button
   >
 </dialog>
 

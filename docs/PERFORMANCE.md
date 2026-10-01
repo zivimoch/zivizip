@@ -43,3 +43,9 @@ Each completed gesture saves a document revision. Rendering is scheduled once pe
 Production JS/CSS totals 283315 bytes, with 104480 bytes summed gzip across 17 files. The same exclusions apply as above. The Text editor is loaded on demand without an additional editor library; PWA precaching includes its chunk. These are asset measurements, not interaction latency or memory measurements.
 
 Images are resized to a maximum edge of 1,600 pixels and stored separately as WebP assets, with a 1 MB encoded limit. Typing updates the document and its image references without uploading image bytes again. A document supports up to 100 images; physical-device and large-collection performance remain unmeasured.
+
+## Tasks baseline — 2026-10-01
+
+The compiled Docker preview contains 314,393 bytes of JavaScript/CSS across 18 files, totaling 114,342 bytes (111.7 KiB) when each file is gzip-compressed. The measurement includes the existing editors and uses the same exclusions as earlier baselines. Tasks adds no third-party UI or drag library.
+
+Reordering writes once after a completed drag, not on pointer movement. The current task API transfers a full revisioned snapshot, bounded to 10,000 items and 2 MB. Large-list interaction latency, request cost near the limit and physical-device memory have not been measured.
