@@ -37,6 +37,7 @@ test('guest note persists, closing only hides it, backup downloads', async ({
   await expect(page.getByRole('textbox', { name: 'Note content' })).toHaveText(
     'Keep my thoughts',
   );
+  await page.locator('.sidebar').hover();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download backup' }).click();

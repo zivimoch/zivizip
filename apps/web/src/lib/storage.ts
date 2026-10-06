@@ -1,4 +1,10 @@
 import {
+  readPlanningState,
+  validatePlanning,
+  mergePlanning,
+  type PlanningData,
+} from './planning';
+import {
   validateDocument,
   plainText,
   assetsIn,
@@ -42,7 +48,8 @@ export interface Preferences {
 }
 export interface Backup {
   format: 'zivizip';
-  version: 1 | 2 | 3 | 4 | 5;
+  version: 1 | 2 | 3 | 4 | 5 | 6;
+  planning?: PlanningData;
   tasks?: Task[];
   transactions?: Transaction[];
   media?: MediaBackup[];
@@ -155,7 +162,7 @@ export function validateBackup(value: unknown): Backup {
   const b = value as Backup;
   if (
     b.format !== 'zivizip' ||
-    ![1, 2, 3, 4, 5].includes(b.version) ||
+    ![1, 2, 3, 4, 5, 6].includes(b.version) ||
     !Array.isArray(b.notes) ||
     b.notes.length > 10000
   )
@@ -163,6 +170,7 @@ export function validateBackup(value: unknown): Backup {
   if (b.version >= 4 || b.tasks !== undefined) validateTasks(b.tasks!);
   if (b.version >= 5 || b.transactions !== undefined)
     validateTransactions(b.transactions!);
+  if (b.version >= 6 || b.planning !== undefined) validatePlanning(b.planning!);
   const ids = new Set<string>();
   for (const n of b.notes) {
     if (
@@ -231,7 +239,13 @@ export async function exportWorkspace(
     db.meta,
     async () => ({
       format: 'zivizip' as const,
-      version: 5 as const,
+      version: 6 as const,
+      planning: await (async () => {
+        const { months, items } = readPlanningState(
+          (await db.meta.get('planning'))?.value,
+        );
+        return { months, items };
+      })(),
       tasks: readTaskState((await db.meta.get('tasks'))?.value).items,
       transactions: readFinanceState((await db.meta.get('finance'))?.value)
         .items,
@@ -263,6 +277,17 @@ export async function importWorkspace(db: WorkspaceDB, input: unknown) {
     db.media,
     db.meta,
     async () => {
+      if (b.planning) {
+        const current = readPlanningState(
+          (await db.meta.get('planning'))?.value,
+        );
+        const merged = mergePlanning(current, b.planning);
+        validatePlanning(merged);
+        await db.meta.put({
+          key: 'planning',
+          value: { ...merged, revision: current.revision + 1 },
+        });
+      }
       if (b.transactions?.length) {
         const current = readFinanceState((await db.meta.get('finance'))?.value);
         const items = [

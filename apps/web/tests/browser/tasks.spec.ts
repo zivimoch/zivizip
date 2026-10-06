@@ -241,6 +241,8 @@ test('list text drags into tasks and tasks are backed up and editable offline', 
   await expect(page.locator('.tasks-panel')).not.toHaveClass(
     /list-drop-(ready|over)/,
   );
+  await page.locator('.sidebar').hover();
+  await page.locator('.sidebar').hover();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   const download = page.waitForEvent('download');
   await page
@@ -249,7 +251,7 @@ test('list text drags into tasks and tasks are backed up and editable offline', 
   const data = JSON.parse(
     fs.readFileSync((await (await download).path())!, 'utf8'),
   );
-  expect(data.version).toBe(5);
+  expect(data.version).toBe(6);
   expect(data.tasks).toHaveLength(3);
   await page.getByRole('button', { name: 'Close settings' }).click();
   await page.evaluate(() => navigator.serviceWorker.ready.then(() => true));

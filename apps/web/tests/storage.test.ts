@@ -87,7 +87,7 @@ it('round-trips Draw backups and accepts legacy Text backups', async () => {
   });
   await repo.write({ ...n, body });
   const backup = await exportWorkspace(db);
-  expect(backup.version).toBe(5);
+  expect(backup.version).toBe(6);
   await importWorkspace(db, backup);
   expect(
     (await repo.list()).every((n) => n.kind === 'draw' && n.body === body),

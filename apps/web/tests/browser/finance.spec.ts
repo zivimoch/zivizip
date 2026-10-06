@@ -105,6 +105,8 @@ test('guest transactions filter, group, edit, delete, survive offline and round-
   ).toHaveAttribute('title', /850\.000/);
   await context.setOffline(false);
   await page.screenshot({ path: '/tmp/zivizip-finance-desktop.png' });
+  await page.locator('.sidebar').hover();
+  await page.locator('.sidebar').hover();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   const download = page.waitForEvent('download');
   await page
@@ -112,13 +114,15 @@ test('guest transactions filter, group, edit, delete, survive offline and round-
     .click();
   const file = (await (await download).path())!;
   const backup = JSON.parse(fs.readFileSync(file, 'utf8'));
-  expect(backup.version).toBe(5);
+  expect(backup.version).toBe(6);
   expect(backup.transactions).toHaveLength(2);
   const targetContext = await browser.newContext({
     viewport: { width: 1600, height: 1000 },
   });
   const target = await targetContext.newPage();
   await visit(target);
+  await target.locator('.sidebar').hover();
+  await target.locator('.sidebar').hover();
   await target.getByRole('button', { name: 'Settings', exact: true }).click();
   await target
     .locator('input[type="file"][accept=".json,application/json"]')
@@ -160,6 +164,8 @@ test('mobile finance supports transaction forms and language switching without o
   ).toBe(true);
   await page.screenshot({ path: '/tmp/zivizip-finance-mobile.png' });
   await page.getByRole('button', { name: 'Open menu', exact: true }).tap();
+  await page.locator('.sidebar').hover();
+  await page.locator('.sidebar').hover();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page
     .getByRole('dialog')

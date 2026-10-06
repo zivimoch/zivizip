@@ -5,6 +5,7 @@
   import { TasksRepository, readTaskState } from '$lib/tasks';
   import FinancePanel from '$lib/FinancePanel.svelte';
   import { FinanceRepository, readFinanceState } from '$lib/finance';
+  import { PlanningRepository, readPlanningState } from '$lib/planning';
   import { assetsIn, type TextDocument } from '$lib/text/document';
   import { getMedia, putMedia, decodeMedia } from '$lib/text/media';
   import DrawEditor from '$lib/DrawEditor.svelte';
@@ -84,7 +85,9 @@
   let taskRefresh = 0;
   let financeRepo: FinanceRepository;
   let financeBusy = false;
-  $: workspaceBusy = taskBusy || financeBusy;
+  let planningRepo: PlanningRepository;
+  let planningBusy = false;
+  $: workspaceBusy = taskBusy || financeBusy || planningBusy;
   let alive = true;
   let workspaceEpoch = 0;
   const redirectedNotes = new Map<string, string>();
@@ -136,6 +139,11 @@
       !!account,
       () => epoch === workspaceEpoch,
     );
+    planningRepo = new PlanningRepository(
+      db,
+      !!account,
+      () => epoch === workspaceEpoch,
+    );
     taskRefresh++;
   }
   async function activate(user: Account | null, fetchServer = true) {
@@ -174,6 +182,12 @@
         () => epoch === workspaceEpoch,
       );
       await nextFinance.list(fetchServer);
+      const nextPlanning = new PlanningRepository(
+        nextDb,
+        !!user,
+        () => epoch === workspaceEpoch,
+      );
+      await nextPlanning.list(fetchServer);
       if (user) await guestDb.meta.put({ key: 'active-account', value: user });
       else await guestDb.meta.delete('active-account');
       eventSource?.close();
@@ -190,6 +204,7 @@
       prefs = nextPrefs;
       tasksRepo = nextTasks;
       financeRepo = nextFinance;
+      planningRepo = nextPlanning;
       taskRefresh++;
       if (user && fetchServer) listen();
     } catch (e) {
@@ -201,6 +216,11 @@
         () => epoch === workspaceEpoch,
       );
       financeRepo = new FinanceRepository(
+        db,
+        !!account,
+        () => epoch === workspaceEpoch,
+      );
+      planningRepo = new PlanningRepository(
         db,
         !!account,
         () => epoch === workspaceEpoch,
@@ -288,7 +308,10 @@
     guestCount =
       (await guestDb.notes.count()) +
       readTaskState((await guestDb.meta.get('tasks'))?.value).items.length +
-      readFinanceState((await guestDb.meta.get('finance'))?.value).items.length;
+      readFinanceState((await guestDb.meta.get('finance'))?.value).items
+        .length +
+      readPlanningState((await guestDb.meta.get('planning'))?.value).months
+        .length;
     if (guestCount) {
       await tick();
       migration.showModal();
@@ -393,6 +416,10 @@
           ),
         ]);
       }
+      const guestPlans = readPlanningState(
+        (await guestDb.meta.get('planning'))?.value,
+      );
+      if (guestPlans.months.length) await planningRepo.merge(guestPlans);
       notes = await repo.list();
       taskRefresh++;
       migration.close();
@@ -663,7 +690,11 @@
     await queue;
     try {
       if (account && online) {
-        await Promise.all([tasksRepo.list(), financeRepo.list()]);
+        await Promise.all([
+          tasksRepo.list(),
+          financeRepo.list(),
+          planningRepo.list(),
+        ]);
       }
       for (const id of new Set(notes.flatMap((n) => assetsIn(n.rich))))
         await getMedia(db, id, !!account);
@@ -715,6 +746,7 @@
         if (backup.tasks?.length) await tasksRepo.merge(backup.tasks);
         if (backup.transactions?.length)
           await financeRepo.merge(backup.transactions);
+        if (backup.planning) await planningRepo.merge(backup.planning);
         taskRefresh++;
       } else {
         count = await importWorkspace(db, backup);
@@ -723,8 +755,8 @@
       }
       backup = null;
       notice = t(
-        `${count} notes, ${taskCount} tasks and ${transactionCount} transactions imported as new copies.`,
-        `${count} catatan, ${taskCount} tugas dan ${transactionCount} transaksi diimpor sebagai salinan baru.`,
+        `${count} notes, ${taskCount} tasks and ${transactionCount} transactions imported as new copies. Financial plans merged.`,
+        `${count} catatan, ${taskCount} tugas dan ${transactionCount} transaksi diimpor sebagai salinan baru. Rencana keuangan digabungkan.`,
       );
     } catch (e) {
       problem(e);
@@ -806,12 +838,26 @@
   ><b>zivizip<span>.</span></b>
 </header>
 <aside class:expanded={mobileMenu} class="sidebar">
-  <div class="brand">
-    <span class="brand-mark">z</span><b>zivizip</b><button
+  <div class="sidebar-heading">
+    <a
+      class="brand"
+      href="/"
+      aria-label="Zivizip Main"
+      onclick={(event) => {
+        event.preventDefault();
+        navigate('main');
+      }}
+    >
+      <span class="brand-mark">z</span><b>zivizip</b>
+    </a>
+    <button
       class="hide-menu"
       aria-label="Close menu"
       onclick={() => (mobileMenu = false)}>←</button
     >
+  </div>
+  <div class="workspace-label">
+    {t('PERSONAL WORKSPACE', 'WORKSPACE PRIBADI')}
   </div>
   <nav>
     <button
@@ -835,7 +881,16 @@
     >{#if details}<div class="detail">
         {#each ['notes', 'tasks', 'finance'] as item}<button
             class:active={view === item}
-            title={item}
+            title={item === 'notes'
+              ? 'Notes'
+              : item === 'tasks'
+                ? 'To do'
+                : 'Finance'}
+            aria-label={item === 'notes'
+              ? 'Notes'
+              : item === 'tasks'
+                ? 'To do'
+                : 'Finance'}
             onclick={() => navigate(item)}
             ><Icon name={item === 'notes' ? 'note' : item} /><span
               >{item === 'notes'
@@ -848,70 +903,75 @@
       </div>{/if}
   </nav>
   <div class="sidebar-footer">
-    <div class="account-control">
-      {#if account}<div class="account-status">
-          {account.username} · {writable
-            ? t(
-                'Account workspace · synced to server',
-                'Workspace akun · tersimpan di server',
-              )
-            : t(
-                'Account cache · read only until connected',
-                'Cache akun · hanya baca sampai terhubung',
-              )}
-        </div>{/if}
+    <div class="sidebar-profile">
+      <div class="account-control">
+        {#if account}<div class="account-status">
+            {account.username} · {writable
+              ? t(
+                  'Account workspace · synced to server',
+                  'Workspace akun · tersimpan di server',
+                )
+              : t(
+                  'Account cache · read only until connected',
+                  'Cache akun · hanya baca sampai terhubung',
+                )}
+          </div>{/if}
 
+        <button
+          class="account-button"
+          aria-label={t('Account', 'Akun')}
+          aria-expanded={accountMenu}
+          onclick={() => (accountMenu = !accountMenu)}
+          ><span class="avatar" aria-hidden="true"
+            >{account ? account.username[0].toUpperCase() : 'Z'}</span
+          ><span class="profile-name"
+            >{account ? account.username : t('Guest', 'Tamu')}<small
+              >{t('Your space.', 'Ruang milikmu.')}</small
+            ></span
+          ></button
+        >{#if accountMenu}<div class="account-menu">
+            <p>
+              {account
+                ? account.username
+                : t('Guest workspace', 'Workspace tamu')}
+            </p>
+            {#if account}<button
+                disabled={workspaceBusy ||
+                  switching ||
+                  pending > 0 ||
+                  dirty.size > 0 ||
+                  !online}
+                onclick={async () => {
+                  accountMenu = false;
+                  await signedOut();
+                }}>{t('Log out', 'Keluar')}</button
+              >{#if !online}<small
+                  >{t(
+                    'Reconnect to log out securely.',
+                    'Hubungkan internet untuk keluar dengan aman.',
+                  )}</small
+                >{/if}{:else}<button
+                disabled={workspaceBusy ||
+                  switching ||
+                  pending > 0 ||
+                  dirty.size > 0}
+                onclick={() => {
+                  accountMenu = false;
+                  mobileMenu = false;
+                  accountDialog.open();
+                }}>{t('Log in', 'Masuk')}</button
+              >{/if}<button onclick={() => (accountMenu = false)}
+              >{t('Close', 'Tutup')}</button
+            >
+          </div>{/if}
+      </div>
       <button
-        class="account-button"
-        aria-label={t('Account', 'Akun')}
-        aria-expanded={accountMenu}
-        onclick={() => (accountMenu = !accountMenu)}
-        ><span class="avatar" aria-hidden="true"
-          >{account ? account.username[0].toUpperCase() : 'Z'}</span
-        ><span>{account ? account.username : t('Guest', 'Tamu')}</span></button
-      >{#if accountMenu}<div class="account-menu">
-          <p>
-            {account
-              ? account.username
-              : t('Guest workspace', 'Workspace tamu')}
-          </p>
-          {#if account}<button
-              disabled={workspaceBusy ||
-                switching ||
-                pending > 0 ||
-                dirty.size > 0 ||
-                !online}
-              onclick={async () => {
-                accountMenu = false;
-                await signedOut();
-              }}>{t('Log out', 'Keluar')}</button
-            >{#if !online}<small
-                >{t(
-                  'Reconnect to log out securely.',
-                  'Hubungkan internet untuk keluar dengan aman.',
-                )}</small
-              >{/if}{:else}<button
-              disabled={workspaceBusy ||
-                switching ||
-                pending > 0 ||
-                dirty.size > 0}
-              onclick={() => {
-                accountMenu = false;
-                mobileMenu = false;
-                accountDialog.open();
-              }}>{t('Log in', 'Masuk')}</button
-            >{/if}<button onclick={() => (accountMenu = false)}
-            >{t('Close', 'Tutup')}</button
-          >
-        </div>{/if}
+        class="settings-button"
+        title={t('Settings', 'Pengaturan')}
+        aria-label={t('Settings', 'Pengaturan')}
+        onclick={() => settings.showModal()}><Icon name="settings" /></button
+      >
     </div>
-    <button
-      class="settings-button"
-      title={t('Settings', 'Pengaturan')}
-      onclick={() => settings.showModal()}
-      ><Icon name="settings" /><span>{t('Settings', 'Pengaturan')}</span
-      ></button
-    >
   </div>
 </aside>
 <div
@@ -1076,6 +1136,7 @@
         ></button>
         {#key financeRepo.db.name}<FinancePanel
             repository={financeRepo}
+            planningRepository={planningRepo}
             {writable}
             language={prefs.language}
             refreshToken={taskRefresh}
@@ -1091,15 +1152,19 @@
           onbusy={(value) => (taskBusy = value)}
         />{/key}
     </div>
-  {:else if view === 'finance'}<div class="finance-page">
-      {#key financeRepo.db.name}<FinancePanel
+  {:else if view === 'finance'}
+    {#await import('$lib/FinanceDetail.svelte') then module}
+      {#key financeRepo.db.name}<svelte:component
+          this={module.default}
           repository={financeRepo}
+          planning={planningRepo}
           {writable}
           language={prefs.language}
           refreshToken={taskRefresh}
-          onbusy={(value) => (financeBusy = value)}
+          onfinancebusy={(value) => (financeBusy = value)}
+          onplanbusy={(value) => (planningBusy = value)}
         />{/key}
-    </div>
+    {:catch issue}<p role="alert">{issue.message}</p>{/await}
   {:else}<section class="placeholder">
       <Icon name={view} />
       <h1>
@@ -1249,8 +1314,8 @@
   {#if backup}<div class="import-review">
       <p>
         {t(
-          `Import ${backup.notes.length} notes, ${backup.tasks?.length || 0} tasks and ${backup.transactions?.length || 0} transactions as new copies? Existing data stays unchanged.`,
-          `Impor ${backup.notes.length} catatan, ${backup.tasks?.length || 0} tugas dan ${backup.transactions?.length || 0} transaksi sebagai salinan baru? Data lama tetap ada.`,
+          `Import ${backup.notes.length} notes, ${backup.tasks?.length || 0} tasks and ${backup.transactions?.length || 0} transactions as new copies, plus ${backup.planning?.items.length || 0} budgets? Existing budgets and opening balances are preserved.`,
+          `Impor ${backup.notes.length} catatan, ${backup.tasks?.length || 0} tugas dan ${backup.transactions?.length || 0} transaksi sebagai salinan baru, serta ${backup.planning?.items.length || 0} anggaran? Anggaran dan saldo awal yang sudah ada tetap dipertahankan.`,
         )}
       </p>
       <button class="primary" disabled={!writable} onclick={restore}
@@ -1323,8 +1388,8 @@
   <h2>{t('Choose your workspace', 'Pilih workspace kamu')}</h2>
   <p>
     {t(
-      `You have ${guestCount} local notes, tasks and transactions. Open your account workspace, or copy this data to your account. Nothing is uploaded without your choice.`,
-      `Ada ${guestCount} catatan, tugas dan transaksi lokal. Buka workspace akun, atau salin data ini ke akunmu. Tidak ada data yang diunggah tanpa pilihanmu.`,
+      `You have ${guestCount} local notes, tasks, transactions and plan months. Open your account workspace, or copy this data to your account. Nothing is uploaded without your choice.`,
+      `Ada ${guestCount} catatan, tugas, transaksi dan bulan rencana lokal. Buka workspace akun, atau salin data ini ke akunmu. Tidak ada data yang diunggah tanpa pilihanmu.`,
     )}
   </p>
   <button disabled={switching} onclick={() => migration.close()}

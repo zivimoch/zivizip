@@ -17,6 +17,8 @@ All endpoints use the frontend origin. Mutations require an allowed `Origin` and
 | `PUT /api/tasks`                  | Owner                | Replace task workspace at revision |
 | `GET /api/finance`                | Owner                | Transaction snapshot and revision  |
 | `PUT /api/finance`                | Owner                | Replace transactions at revision   |
+| `GET /api/finance/plans`          | Owner                | Financial plans and revision       |
+| `PUT /api/finance/plans`          | Owner                | Replace plans at revision          |
 | `POST /api/registration-interest` | Public, rate-limited | Submit email and message           |
 | `GET /api/registration-interest`  | Owner                | Latest 200 submissions             |
 
@@ -79,3 +81,11 @@ Backup version 4 adds active and archived tasks to version 3 media/notes. Versio
 `PUT /api/finance` replaces the snapshot only at the supplied revision, increments that revision and emits an SSE invalidation. Stale revisions return `409`; malformed transactions return `400`. Rejections leave the previous snapshot intact. The session and mutation-origin requirements match Tasks. No guest ledger is uploaded on login without the explicit workspace-copy choice.
 
 Limits: 10,000 transactions, 2 MB serialized items, unique alphanumeric/hyphen IDs up to 64 characters, nonempty descriptions up to 150 UTF-16 units, nonempty categories up to 60 units, valid dates and amounts from 1 through 1 trillion IDR. Combined absolute amounts cannot exceed JavaScript's safe-integer range. Account writes require connectivity; cached transactions are read-only offline.
+
+## Financial planning
+
+`GET /api/finance/plans` returns `{ revision, months, items }`. Month records contain `month` (`YYYY-MM`) and signed integer `opening`. Budget items contain `id`, `month`, `category`, `group` (`income`, `recurring`, `monthly`), integer `amount`, `note`, `enabled` and `automatic`.
+
+`PUT` accepts the same shape, replaces the snapshot atomically at the supplied revision and emits an SSE invalidation. Stale revisions return `409`; malformed data or duplicate month/type/category budgets return `400`. Category matching trims whitespace and ignores case. Income and expense may use the same category, but recurring and monthly expenses cannot have separate budgets for the same category in one month.
+
+Limits: 2,400 months, 10,000 budgets and 2 MB serialized snapshot; category names up to 60 UTF-16 units, notes up to 2,000, each budget from 0 through 1 trillion IDR, and opening balances within ±1 trillion IDR. Automatic entries must be zero-budget monthly expenses. Every persisted budget references an existing month record. These endpoints store plans only; realization is computed from `/api/finance` transactions. Guest plans are never uploaded without the explicit workspace-copy choice.

@@ -68,7 +68,7 @@ it('preserves guest transactions in backups and rejects stale or malformed impor
   await source.write(initial, [item('source')]);
   await expect(source.write(initial, [])).rejects.toThrow('another tab');
   const backup = await exportWorkspace(source.db);
-  expect(backup.version).toBe(5);
+  expect(backup.version).toBe(6);
   await importWorkspace(target.db, backup);
   const imported = (await target.list()).items;
   expect(imported[0]).toMatchObject({ title: 'source', amount: 35000 });

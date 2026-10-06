@@ -49,3 +49,7 @@ Images are resized to a maximum edge of 1,600 pixels and stored separately as We
 The compiled Docker preview contains 314,393 bytes of JavaScript/CSS across 18 files, totaling 114,342 bytes (111.7 KiB) when each file is gzip-compressed. The measurement includes the existing editors and uses the same exclusions as earlier baselines. Tasks adds no third-party UI or drag library.
 
 Reordering writes once after a completed drag, not on pointer movement. The current task API transfers a full revisioned snapshot, bounded to 10,000 items and 2 MB. Large-list interaction latency, request cost near the limit and physical-device memory have not been measured.
+
+## Finance planning baseline — 2026-10-06
+
+The compiled production preview contains 378,629 bytes of JavaScript/CSS across 19 files, totaling 133,563 bytes (130.4 KiB) when each file is gzip-compressed. This includes lazy editor and planning chunks, with the same exclusions as earlier baselines. It is not an initial network-transfer measurement, RAM benchmark or latency result.

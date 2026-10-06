@@ -253,6 +253,8 @@ test('moving an image upward keeps it stationary when typing below it, and backu
     'text-overflow',
     'ellipsis',
   );
+  await page.locator('.sidebar').hover();
+  await page.locator('.sidebar').hover();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   const downloaded = page.waitForEvent('download');
   await page
@@ -261,7 +263,7 @@ test('moving an image upward keeps it stationary when typing below it, and backu
   const data = JSON.parse(
     fs.readFileSync((await (await downloaded).path())!, 'utf8'),
   );
-  expect(data.version).toBe(5);
+  expect(data.version).toBe(6);
   expect(data.media).toHaveLength(1);
   expect(data.notes[0].rich.images).toHaveLength(1);
   await page.getByRole('button', { name: 'Close settings' }).click();

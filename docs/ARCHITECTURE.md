@@ -72,8 +72,18 @@ The snapshot is bounded to 10,000 tasks and 2 MB. Updates currently send the ful
 
 ## Finance ledger
 
-Finance uses its own repository, SQLite snapshot table and authenticated endpoints within the local API process. Transactions carry an explicit income/expense type, integer IDR amount, category and calendar date. Monthly totals and date/category groups are derived in the browser. Budgets and automatic task links are not part of this ledger milestone.
+Finance uses its own repository, SQLite snapshot table and authenticated endpoints within the local API process. Transactions carry an explicit income/expense type, integer IDR amount, category and calendar date. Monthly totals and date/category groups are derived in the browser. Budget realization is derived from the ledger; automatic task links remain a separate feature.
 
 Writes use a single snapshot revision with atomic conflict checks. Guest tabs use BroadcastChannel; account sessions use the existing SSE invalidation channel. Background reads keep controls stable and never replace newer cached revisions. Modal fields survive a rejected write so users can reload and retry. Offline account data comes only from the separate account cache. Logout clears that cache, while explicit guest copying uses stable transaction IDs to avoid duplication on retry.
 
 Snapshots are bounded to 10,000 transactions and 2 MB; full-history pagination and operation-level updates remain future scaling work. Guest imports are atomic across workspace stores. Account imports span several API calls and can complete partially; they are not one cross-domain transaction.
+
+## Financial planning
+
+Detail → Finance loads its planning UI on demand. Income, recurring expenses and monthly expense budgets are stored separately from actual transactions, using their own revisioned snapshot in IndexedDB or the `finance_planning` SQLite table. Tabs and selected months are local view preferences. The permanent Analysis tab summarizes actual transactions; months are created explicitly, without seeded records.
+
+Budgets match transactions by month, case-insensitive trimmed category, and income/expense type. Unexpected expense categories are derived as zero-budget monthly rows; they are persisted only when the user changes a note, order, inclusion or budget. Removing their transactions removes these automatic rows from view. A positive budget converts the row into an ordinary plan. There is no second copy of actual spending to reconcile.
+
+Excluding a category affects planned/projected totals and card counters, but never removes actual spending from the ledger or analysis. Copying a month preserves income/recurring expectations, resets monthly expectations to zero, and leaves actual transactions and opening balances untouched. Existing destination budgets take precedence.
+
+Workspace backup v6 includes plan months, opening balances, ordered category budgets, notes and inclusion state. Imports accept versions 1–6. Existing month/type/category budgets and opening balances are preserved when merging plans; imported notes, tasks and transactions still receive new IDs. Guest copy is explicit and plan retries do not duplicate categories. Account writes use the same authentication, stale-revision rejection, SSE and offline-cache boundaries as transactions.

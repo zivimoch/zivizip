@@ -132,6 +132,7 @@ test('automatic lists continue, alternate nested markers, exit and survive reloa
   expect(add.y + add.height).toBeLessThanOrEqual(
     breadcrumb.y + breadcrumb.height,
   );
+  await page.locator('.sidebar').hover();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Close settings' }).click();
   await page.reload();

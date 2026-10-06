@@ -4,7 +4,7 @@ This document describes the target interaction model. The [verification scope](.
 
 ## Workspace and navigation
 
-- Desktop sidebar starts as an icon rail and expands on hover or keyboard focus. Detail starts collapsed. Space between the logo and Main matches the navigation rhythm.
+- Desktop sidebar starts as an icon rail and expands on hover or keyboard focus. Detail starts collapsed. Space between the logo and Main matches the navigation rhythm. Open Detail submenu icons align with Main and Goals when the rail collapses; indentation and the hierarchy line appear only while expanded.
 - Mobile sidebar fills the screen width and has a back/close control. Main opens without an authentication redirect.
 - Desktop Main places Notes on the left and Tasks/Finance on the right. Default width is 75%/25%, subject to minimum widths. Both dividers are draggable, persist their positions, and reset on double-click.
 - Mobile uses section navigation, a compact 48px header, and reduced spacing beneath tabs. Note tabs remain compact: 46px desktop, 49px mobile in the prototype.
@@ -73,10 +73,10 @@ This document describes the target interaction model. The [verification scope](.
 ## Finance transactions
 
 - Main shows income, expenses and balance for the selected month above a scrollable ledger. Toggle grouping by date/category; dates sort newest first. The month and grouping choice persist within the browser workspace.
-- Add through the header `+`; clicking a transaction opens its edit modal. Autofocus the description. Fields are explicit income/expense type, description, positive integer IDR amount, searchable/free-input category and date. Category suggestions come from existing transactions.
+- Add through the header `+`; clicking a transaction opens its edit modal. Autofocus the description. Fields are explicit income/expense type, description, positive integer IDR amount, searchable/free-input category and date. Category suggestions come from existing transactions and planned categories.
 - Saving switches to the transaction's month. Confirm deletion and recalculate totals. Actual transactions remain independent of planned budgets and task amounts.
 - Guest transactions stay editable offline; account transactions synchronize and are read-only offline. Revisions reject conflicting writes while retaining form values for reload/retry. Login requires explicit consent to copy guest transactions, with stable copy identifiers to avoid duplicate retries.
-- Workspace backups include transactions. Import validates them and creates new IDs without replacing existing data. Monthly planning follows the transaction implementation.
+- Workspace backups include transactions. Import validates them and creates new IDs without replacing existing data. Version 6 backups also include monthly plans.
 
 ## Finance planning
 
@@ -101,6 +101,7 @@ This document describes the target interaction model. The [verification scope](.
 - Create months explicitly from Analysis. Copy any source month's plans, preserving income/recurring expected amounts and setting one-time expense expectations to zero.
 - Never copy transactions, realization state or opening balance. Skip duplicate budgets and preserve existing destination plans and transactions. Automatic zero-budget expense rows are not copied.
 - Omit the generic Monthly Plan heading, introductory/projection paragraphs, and month picker/copy controls inside month detail.
+- Plan tabs and active month persist per browser workspace. Guest plans are editable offline; account plans use revision checks and a read-only offline cache. Version 6 backups include budgets, notes, inclusion state and opening balances; plan imports preserve existing month/type/category budgets.
 - Demonstration data may populate only an unused month and must preserve existing records. Use fictitious categories/transactions rather than personal financial data.
 
 ## Goals

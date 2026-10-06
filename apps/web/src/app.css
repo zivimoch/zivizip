@@ -58,72 +58,149 @@ small {
   padding: 24px 10px;
   background: #091216;
   border-right: 1px solid var(--line);
-  z-index: 20;
+  z-index: 110;
   overflow: hidden;
-  transition: width 0.16s;
+  transition: width 0.18s ease;
   display: flex;
   flex-direction: column;
 }
 .sidebar:hover,
-.sidebar:has(button:focus-visible) {
-  width: 238px;
-  box-shadow: 20px 0 40px #0003;
+.sidebar:has(:focus-visible),
+.sidebar:has(.account-menu) {
+  width: 240px;
+  box-shadow: 12px 0 30px #0005;
+}
+.sidebar-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 .brand {
   height: 40px;
   display: flex;
   align-items: center;
-  gap: 24px;
-  padding-left: 8px;
+  gap: 12px;
+  padding: 0 8px;
+  color: white;
+  text-decoration: none;
   white-space: nowrap;
+  letter-spacing: -1px;
 }
 .brand-mark {
   font-size: 40px;
-  font-weight: 900;
+  font-weight: 800;
   font-style: italic;
   color: var(--accent);
   line-height: 1;
 }
 .brand b {
-  font-size: 25px;
+  font-size: 27px;
+  font-weight: 750;
+}
+.sidebar .workspace-label {
+  display: none;
+  height: 12px;
+  margin: 33px 12px 17px;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 1.6px;
+  white-space: nowrap;
 }
 .sidebar nav {
   margin-top: 10px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
 }
 .sidebar button {
   display: flex;
   align-items: center;
-  gap: 23px;
+  gap: 15px;
   width: 100%;
-  min-height: 48px;
+  min-height: 49px;
   border: 0;
+  border-radius: 7px;
   background: transparent;
   text-align: left;
   white-space: nowrap;
-  padding: 13px 15px;
+  padding: 14px 15px;
+  margin-bottom: 5px;
+  flex-shrink: 0;
 }
 .sidebar button.active {
   color: var(--accent);
   background: linear-gradient(90deg, #003a44a0, #00323a55);
 }
 .sidebar button:hover {
-  background: #193139;
+  color: var(--accent);
 }
 .sidebar .chevron {
   margin-left: auto;
+  color: var(--muted);
 }
 .sidebar .detail {
-  border-left: 1px solid #36505c;
-  margin-left: 25px;
+  margin-left: 0;
+  padding-left: 0;
+  border: 0;
 }
 .sidebar .detail button {
-  padding-left: 12px;
+  padding: 12px 15px;
+  min-height: 45px;
+  font-size: 13px;
 }
-.sidebar .settings-button {
-  margin-top: auto;
+.sidebar:is(:hover, :has(:focus-visible), :has(.account-menu), .expanded)
+  .workspace-label {
+  display: block;
+}
+.sidebar:is(:hover, :has(:focus-visible), :has(.account-menu), .expanded) nav {
+  margin-top: 0;
+}
+.sidebar:is(:hover, :has(:focus-visible), :has(.account-menu), .expanded)
+  .detail {
+  margin-left: 29px;
+  padding-left: 5px;
+  border-left: 1px solid var(--line);
 }
 .sidebar .hide-menu {
   display: none;
+}
+.sidebar-profile {
+  display: flex;
+  align-items: center;
+  width: 219px;
+  gap: 4px;
+}
+.sidebar-profile .account-control {
+  flex: 1;
+  min-width: 0;
+}
+.sidebar .settings-button {
+  width: 36px;
+  min-height: 36px;
+  padding: 7px;
+  margin: 0;
+  border-radius: 4px;
+}
+.sidebar .account-button {
+  min-height: 36px;
+  padding: 0 7px;
+  margin: 0;
+  gap: 12px;
+}
+.profile-name {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.profile-name small {
+  display: block;
+  font-size: 10px;
+  margin-top: 4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar {
+    transition: none;
+  }
 }
 .workspace {
   margin-left: 72px;
@@ -499,12 +576,20 @@ dialog p {
   .sidebar.expanded {
     display: flex;
     width: 100%;
+    padding: 24px;
     box-shadow: none;
   }
+  .sidebar-profile {
+    width: 100%;
+  }
   .sidebar .hide-menu {
-    display: block;
-    width: auto;
-    margin-left: auto;
+    display: inline-flex;
+    justify-content: center;
+    width: 38px;
+    min-height: 38px;
+    height: 38px;
+    padding: 0;
+    margin: 0 0 0 auto;
   }
   .workspace,
   .workspace.main {
@@ -563,21 +648,22 @@ dialog p {
   }
 }
 
-.sidebar:not(:hover):not(:has(button:focus-visible)):not(.expanded)
+.sidebar:not(:hover):not(:has(:focus-visible)):not(:has(.account-menu)):not(
+    .expanded
+  )
   button
   > span,
-.sidebar:not(:hover):not(:has(button:focus-visible)):not(.expanded) .brand b {
+.sidebar:not(:hover):not(:has(:focus-visible)):not(:has(.account-menu)):not(
+    .expanded
+  )
+  .brand
+  b {
   visibility: hidden;
 }
 
 .sidebar-footer {
   margin-top: auto;
-}
-.sidebar .settings-button {
-  margin-top: 0;
-}
-.sidebar:has(.account-menu) {
-  width: 238px;
+  flex-shrink: 0;
 }
 .sidebar:has(.account-menu) button > span {
   visibility: visible !important;
@@ -666,15 +752,9 @@ body,
 .right-pane {
   background: var(--bg);
 }
-.sidebar button {
-  margin-bottom: 5px;
-}
 .sidebar-footer {
   border-top: 1px solid var(--line);
-  padding-top: 10px;
-}
-.sidebar .account-button {
-  padding: 6px 7px;
+  padding-top: 16px;
 }
 .sidebar .account-button .avatar {
   display: grid;
@@ -686,7 +766,9 @@ body,
   background: #202e35;
   font-size: 16px;
 }
-.sidebar:not(:hover):not(:has(button:focus-visible)):not(.expanded)
+.sidebar:not(:hover):not(:has(:focus-visible)):not(:has(.account-menu)):not(
+    .expanded
+  )
   .account-button
   .avatar {
   visibility: visible;
@@ -699,15 +781,6 @@ body,
   clip-path: inset(50%);
   padding: 0;
   border: 0;
-}
-.sidebar:hover .account-status,
-.sidebar.expanded .account-status {
-  position: static;
-  width: auto;
-  height: auto;
-  clip-path: none;
-  padding: 8px;
-  font-size: 11px;
 }
 .tabs {
   padding-left: 7px;

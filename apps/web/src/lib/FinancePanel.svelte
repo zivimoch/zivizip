@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
   import Icon from './Icon.svelte';
+  import type { PlanningRepository } from './planning';
   import {
     FinanceRepository,
     emptyFinance,
@@ -15,6 +16,11 @@
   export let language: 'en' | 'id';
   export let refreshToken = 0;
   export let onbusy: (value: boolean) => void = () => {};
+  export let ondata: (items: Transaction[]) => void = () => {};
+  export let categoryOptions: string[] = [];
+  export let selectedMonth = '';
+  export let planningRepository: PlanningRepository | undefined = undefined;
+  let plannedCategories: string[] = [];
   let state = emptyFinance(),
     initialized = false,
     busy = false,
@@ -51,9 +57,15 @@
       Object.create(null) as Record<string, Transaction[]>,
     ),
   );
-  $: categories = [...new Set(state.items.map((item) => item.category))].sort(
-    (a, b) => a.localeCompare(b),
-  );
+  $: ondata(state.items);
+  $: if (selectedMonth) month = selectedMonth;
+  $: categories = [
+    ...new Set([
+      ...categoryOptions,
+      ...plannedCategories,
+      ...state.items.map((item) => item.category),
+    ]),
+  ].sort((a, b) => a.localeCompare(b));
   $: if (initialized && refreshToken !== seenRefresh) {
     seenRefresh = refreshToken;
     void refresh();
@@ -91,6 +103,7 @@
     if (initial) setBusy(true);
     try {
       const next = await target.list(writable);
+      const plans = await planningRepository?.list(writable);
       if (
         alive &&
         epoch === readEpoch &&
@@ -99,6 +112,7 @@
         revision === state.revision
       ) {
         if (initial || next.revision !== state.revision) state = next;
+        if (plans) plannedCategories = plans.items.map((plan) => plan.category);
         message = '';
       }
     } catch (error) {
@@ -116,15 +130,23 @@
       .put({ key: 'finance-view', value: { month, grouped } })
       .catch((error) => (message = error.message));
   }
-  async function open(item?: Transaction) {
+  export function selectMonth(value: string) {
+    month = value;
+    remember();
+  }
+  export async function openTransaction(
+    item?: Transaction,
+    defaults?: Partial<Transaction>,
+  ) {
     if (!writable || busy || !initialized) return;
     readEpoch++;
     editing = item?.id || null;
-    type = item?.type || 'expense';
-    title = item?.title || '';
-    category = item?.category || '';
-    date = item?.date || dateInMonth(month);
-    amount = item ? String(item.amount) : '';
+    const values = item || defaults;
+    type = values?.type || 'expense';
+    title = values?.title || '';
+    category = values?.category || '';
+    date = values?.date || dateInMonth(month);
+    amount = values?.amount ? String(values.amount) : '';
     deleting = false;
     formOpen = true;
     message = '';
@@ -194,7 +216,11 @@
         | { month?: string; grouped?: boolean }
         | undefined;
       if (!alive) return;
-      if (view?.month && /^\d{4}-(0[1-9]|1[0-2])$/.test(view.month))
+      if (
+        !selectedMonth &&
+        view?.month &&
+        /^\d{4}-(0[1-9]|1[0-2])$/.test(view.month)
+      )
         month = view.month;
       grouped = view?.grouped === true;
       await refresh();
@@ -218,7 +244,7 @@
       aria-label={t('Add transaction', 'Tambah transaksi')}
       title={t('Add transaction', 'Tambah transaksi')}
       disabled={!writable || busy || !initialized}
-      onclick={() => open()}><Icon name="plus" /></button
+      onclick={() => openTransaction()}><Icon name="plus" /></button
     >
   </div>
   <div class="finance-toolbar">
@@ -281,7 +307,7 @@
             `Edit transaksi ${item.title}`,
           )}
           aria-disabled={!writable || busy}
-          onclick={() => open(item)}
+          onclick={() => openTransaction(item)}
         >
           <span
             class="transaction-category"
