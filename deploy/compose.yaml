@@ -1,0 +1,57 @@
+name: zivizip-production
+
+services:
+  web:
+    image: ${ZIVIZIP_WEB_IMAGE:?Set a versioned frontend image}
+    restart: unless-stopped
+    init: true
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      ingress:
+        aliases: [zivizip-web]
+    security_opt: [no-new-privileges:true]
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: '3'
+    healthcheck:
+      test: [CMD-SHELL, 'wget -q -O /dev/null http://127.0.0.1/healthz']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  notes:
+    image: ${ZIVIZIP_API_IMAGE:?Set a versioned API image}
+    restart: unless-stopped
+    init: true
+    environment:
+      OWNER_FILE: /run/secrets/owner
+      DATABASE_PATH: /data/notes.sqlite
+      ALLOWED_ORIGINS: https://${ZIVIZIP_DOMAIN:?Set the production domain}
+      COOKIE_SECURE: 'true'
+    volumes:
+      - notes-data:/data
+    secrets: [owner]
+    networks:
+      ingress:
+        aliases: [zivizip-api]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: '3'
+
+secrets:
+  owner:
+    file: ${ZIVIZIP_OWNER_FILE:?Set the private owner credential path}
+volumes:
+  notes-data:
+networks:
+  ingress:
+    external: true
+    name: zivizip-ingress

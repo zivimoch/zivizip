@@ -2,7 +2,7 @@
 
 A personal workspace for notes, tasks, finances, and goals.
 
-Zivizip opens directly into your workspace. Guest data stays in your browser; the owner account stores notes, tasks and transactions on the server and synchronizes changes across sessions.
+Zivizip opens directly into your workspace. Guest data stays in your browser; the owner account stores notes, tasks, transactions and financial plans on the server and synchronizes changes across sessions.
 
 ## Features
 
@@ -12,12 +12,13 @@ Zivizip opens directly into your workspace. Guest data stays in your browser; th
 - Automatic bullets and nested numbering with alternating numeric/alphabetic levels.
 - Tasks with due dates, related amounts, group reordering, completion and archives. Drag note list items into Tasks without changing the source.
 - Income and expense transactions with category suggestions, monthly totals, date/category grouping and revision-checked editing.
+- Monthly planning with category budgets, linked actuals, remaining-budget bars, monthly copying and analysis.
 - Guest editing offline, with versioned JSON backup and import.
 - Owner login with persistent sessions and a separate read-only offline cache.
 - Explicit copying of the guest workspace into the account; local originals are preserved.
 - Installable PWA shell, responsive layout, and English/Indonesian interface.
 
-Monthly financial planning and Goals remain interaction prototypes. Related task amounts do not create financial transactions yet. Public account registration and push notifications are not available yet.
+Goals remains an interaction prototype. Related task amounts do not create financial transactions yet. Public account registration and push notifications are not available yet.
 
 ## Quick start
 
@@ -68,4 +69,4 @@ See [Contributing](CONTRIBUTING.md) for formatting, checks, and browser tests.
 - [Verification](docs/VERIFICATION.md)
 - [Performance measurements](docs/PERFORMANCE.md)
 
-The Compose configuration is for local use. HTTPS deployment, Kubernetes manifests, and the delivery pipeline are not included. `docker compose down` preserves server data; adding `-v` deletes the database volume.
+The root Compose configuration is for local use. See [Production deployment](docs/DEPLOYMENT.md) for isolated application and HTTPS gateway configurations. Kubernetes manifests and Jenkins delivery automation are not yet included. `docker compose down` preserves server data; adding `-v` deletes the database volume.

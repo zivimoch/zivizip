@@ -1,0 +1,18 @@
+{$ZIVIZIP_DOMAIN} {
+	encode zstd gzip
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		X-Frame-Options DENY
+		-Server
+	}
+	handle /api/* {
+		reverse_proxy zivizip-api:8080 {
+			header_up X-Real-IP {remote_host}
+			flush_interval -1
+		}
+	}
+	handle {
+		reverse_proxy zivizip-web:80
+	}
+}
