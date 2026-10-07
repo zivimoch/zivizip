@@ -34,6 +34,7 @@
   let error = '';
   let notice = '';
   let view = 'main';
+  let mobileSection = 'notes';
   let details = false;
   let mobileMenu = false;
   let dialog: HTMLDialogElement;
@@ -764,6 +765,7 @@
   }
   function navigate(next: string) {
     view = next;
+    if (next === 'main') mobileSection = 'notes';
     mobileMenu = false;
   }
   function startResize(e: PointerEvent, axis: 'width' | 'height') {
@@ -977,6 +979,7 @@
 <div
   class="workspace"
   class:main={view === 'main'}
+  data-mobile-section={mobileSection}
   bind:this={workspace}
   style={`--notes:${prefs.width}%;--tasks:${prefs.height}%`}
 >
@@ -1187,8 +1190,14 @@
 </div>
 <nav class="bottom-nav">
   {#each ['notes', 'tasks', 'finance'] as item}<button
-      class:active={view === item}
-      onclick={() => navigate(item)}
+      class:active={view === 'main' && mobileSection === item}
+      aria-current={view === 'main' && mobileSection === item
+        ? 'page'
+        : undefined}
+      onclick={() => {
+        navigate('main');
+        mobileSection = item;
+      }}
       ><Icon name={item === 'notes' ? 'note' : item} />{item === 'notes'
         ? 'Notes'
         : item === 'tasks'

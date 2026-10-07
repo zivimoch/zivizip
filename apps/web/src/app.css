@@ -601,6 +601,20 @@ dialog p {
   .workspace.main .divider {
     display: none;
   }
+  .workspace.main:not([data-mobile-section='notes']) > .notes-pane {
+    display: none;
+  }
+  .workspace.main:not([data-mobile-section='notes']) > .right-pane {
+    display: flex;
+  }
+  .workspace.main[data-mobile-section='tasks'] .finance-panel,
+  .workspace.main[data-mobile-section='finance'] .tasks-slot {
+    display: none;
+  }
+  .workspace.main[data-mobile-section='tasks'] .tasks-slot {
+    flex: 1;
+    height: 100%;
+  }
   .tabs {
     height: 49px;
     min-height: 49px;

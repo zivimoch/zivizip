@@ -120,3 +120,5 @@ This document describes the target interaction model. The [verification scope](.
 - Normal browser/device restarts preserve login. Explicit logout, cookie deletion, expiry/revocation or credential changes can require authentication again.
 - Guest notes remain editable offline. Account cache is separate and read-only offline, and is cleared on logout. Copying guest notes to the account requires explicit choice.
 - Public pages may be indexed, but workspace contents must never be exposed for SEO.
+
+- Mobile bottom navigation selects the Notes, To do or Finance panel within Main. It does not open the note library or monthly financial planning; those remain accessible through Detail. Switching panels preserves the mounted note editor and panel state.
