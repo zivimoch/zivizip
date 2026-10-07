@@ -2,6 +2,7 @@
   import { onMount, tick } from 'svelte';
   import TextEditor from '$lib/TextEditor.svelte';
   import InstallApp from '$lib/InstallApp.svelte';
+  import NoteLibrary from '$lib/NoteLibrary.svelte';
   import TasksPanel from '$lib/TasksPanel.svelte';
   import { TasksRepository, readTaskState } from '$lib/tasks';
   import FinancePanel from '$lib/FinancePanel.svelte';
@@ -1002,7 +1003,16 @@
         ? t('Storage unavailable.', 'Penyimpanan tidak tersedia.')
         : t('Opening workspace…', 'Membuka workspace…')}
     </div>
-  {:else if view === 'main' || view === 'notes'}
+  {:else if view === 'notes'}
+    <NoteLibrary
+      {notes}
+      language={prefs.language}
+      onopen={(id) => {
+        openNote(id);
+        navigate('main');
+      }}
+    />
+  {:else if view === 'main'}
     <section class="notes-pane">
       <div class="tabs">
         {#each openNotes as note (note.id)}<div
@@ -1034,12 +1044,6 @@
           onclick={() => showNote()}><Icon name="plus" /></button
         >
       </div>
-      {#if view === 'notes'}<div class="note-library">
-          <h2>{t('Your notes', 'Catatanmu')}</h2>
-          {#each notes as n}<button onclick={() => openNote(n.id)}
-              ><Icon name={n.icon} />{n.name}<small>{n.category}</small></button
-            >{/each}
-        </div>{/if}
       {#if current}<div class="breadcrumb">
           <span class="breadcrumb-path"
             >{current.category}<span>/</span>{current.name}</span

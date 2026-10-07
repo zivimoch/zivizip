@@ -420,25 +420,6 @@ small {
   width: 35px;
   height: 35px;
 }
-.note-library {
-  max-height: 210px;
-  overflow: auto;
-  padding: 16px 32px;
-  border-bottom: 1px solid var(--line);
-}
-.note-library h2 {
-  font-size: 14px;
-}
-.note-library button {
-  display: inline-flex;
-  gap: 10px;
-  align-items: center;
-  margin: 0 6px 6px 0;
-  font-size: 13px;
-}
-.note-library small {
-  margin-left: 8px;
-}
 .error,
 .notice {
   position: fixed;
@@ -653,9 +634,6 @@ dialog p {
     left: 12px;
     bottom: 70px;
     max-width: 94vw;
-  }
-  .note-library {
-    padding: 12px 20px;
   }
   .brand {
     padding-left: 8px;

@@ -124,3 +124,5 @@ This document describes the target interaction model. The [verification scope](.
 - Mobile bottom navigation selects the Notes, To do or Finance panel within Main. It does not open the note library or monthly financial planning; those remain accessible through Detail. Switching panels preserves the mounted note editor and panel state.
 
 - A top-right PWA install action appears when the browser offers installation and disappears after installation or in standalone mode. iOS provides manual Add to Home Screen guidance and an Already installed acknowledgement because browser tabs cannot reliably detect existing installations. Installation is distinct from workspace backup downloads.
+
+- Detail → Notes is a full-page card library with search by title, category and Text contents, and sorting by last update, creation date (newest/oldest) or name. Clicking a card opens that note immediately in Main, including on mobile. Draw JSON is not shown or searched as text.
