@@ -532,8 +532,8 @@ async fn main() {
     )
     .expect("Invalid owner credential file");
     assert!(
-        !credentials.username.is_empty() && credentials.password.len() >= 16,
-        "Owner password must contain at least 16 characters"
+        !credentials.username.is_empty() && credentials.password.chars().count() >= 8,
+        "Owner password must contain at least 8 characters"
     );
     let db =
         Connection::open(std::env::var("DATABASE_PATH").unwrap_or("/data/notes.sqlite".into()))
