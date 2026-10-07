@@ -48,3 +48,9 @@ Rich formatting beyond automatic lists, Goals, shared Tasks/Finance entry, Web P
 Workspace styling was compared with the prototype at 1864×1000 and 390×844 viewports. Tabs start at the workspace top; account status stays in the sidebar. Finance transactions were also checked at 1600×1000 and 390×844; the ledger and monthly planning have automated browser coverage. Planning checks cover category budgets, notes, inclusion, copying months, backups, and account synchronization. Sidebar checks cover expanded hierarchy and collapsed icon alignment.
 
 The October 6 production container build reused the successful Rust test layer; frontend diagnostics, 29 unit tests and all 34 browser scenarios were rerun. Deployment configuration passed Compose validation, Caddy validation and Nginx configuration checks.
+
+## HTTPS deployment verification — 2026-10-07
+
+Release `1934dfa` passed HTTPS certificate validation, HTTP-to-HTTPS redirection, API health, anonymous access rejection, owner login and Secure/HttpOnly/SameSite cookie checks. A temporary note was created, updated, read and deleted. Authenticated Notes, Tasks, Finance and planning reads and the SSE refresh stream passed.
+
+A fresh Chrome profile at a 390px viewport verified guest creation, persistence, service-worker registration, offline reload and offline editing on the production origin. An authenticated browser loaded the workspace. A consistent SQLite snapshot passed `quick_check` and was copied off the server. These checks do not establish physical-device performance, load capacity, scheduled backup coverage or automated CI/CD.
