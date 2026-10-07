@@ -122,3 +122,5 @@ This document describes the target interaction model. The [verification scope](.
 - Public pages may be indexed, but workspace contents must never be exposed for SEO.
 
 - Mobile bottom navigation selects the Notes, To do or Finance panel within Main. It does not open the note library or monthly financial planning; those remain accessible through Detail. Switching panels preserves the mounted note editor and panel state.
+
+- A top-right PWA install action appears when the browser offers installation and disappears after installation or in standalone mode. iOS provides manual Add to Home Screen guidance and an Already installed acknowledgement because browser tabs cannot reliably detect existing installations. Installation is distinct from workspace backup downloads.

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
   import TextEditor from '$lib/TextEditor.svelte';
+  import InstallApp from '$lib/InstallApp.svelte';
   import TasksPanel from '$lib/TasksPanel.svelte';
   import { TasksRepository, readTaskState } from '$lib/tasks';
   import FinancePanel from '$lib/FinancePanel.svelte';
@@ -834,6 +835,7 @@
     content="Capture thoughts and organize your day in a private workspace."
   /><meta name="robots" content="noindex,nofollow" /></svelte:head
 >
+<InstallApp language={prefs.language} />
 <header class="mobile-header">
   <button aria-label="Open menu" onclick={() => (mobileMenu = true)}
     ><Icon name="menu" /></button

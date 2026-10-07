@@ -1,6 +1,7 @@
 <script lang="ts">
   export let name = 'note';
   const paths: Record<string, string> = {
+    download: 'M12 3v12m-5-5 5 5 5-5 M4 16v5h16v-5',
     eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12 M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0',
     'eye-off':
       'm3 3 18 18 M10 5a12 12 0 0 1 12 7s-1 2-3 4 M6 6a20 20 0 0 0-4 6s4 7 10 7c2 0 4-1 5-2 M10 10a3 3 0 0 0 4 4',
