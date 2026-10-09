@@ -54,3 +54,7 @@ The October 6 production container build reused the successful Rust test layer; 
 Release `1934dfa` passed HTTPS certificate validation, HTTP-to-HTTPS redirection, API health, anonymous access rejection, owner login and Secure/HttpOnly/SameSite cookie checks. A temporary note was created, updated, read and deleted. Authenticated Notes, Tasks, Finance and planning reads and the SSE refresh stream passed.
 
 A fresh Chrome profile at a 390px viewport verified guest creation, persistence, service-worker registration, offline reload and offline editing on the production origin. An authenticated browser loaded the workspace. A consistent SQLite snapshot passed `quick_check` and was copied off the server. These checks do not establish physical-device performance, load capacity, scheduled backup coverage or automated CI/CD.
+
+## Finance interaction update — 2026-10-09
+
+Frontend diagnostics passed without errors or warnings; 32 frontend unit tests and 9 Rust tests passed. The final targeted browser run passed 13 Finance, planning and Tasks scenarios. Nine image/list editor scenarios also passed after link rendering changed. Coverage includes optional transaction descriptions, field-width suggestions, display currency formatting, daily totals, equal-height planning cards and safe clickable web links. Mobile checks use simulated Chrome viewports and touch events, not physical devices.

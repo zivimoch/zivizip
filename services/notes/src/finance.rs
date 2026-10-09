@@ -36,7 +36,6 @@ fn validate(state: &FinanceState) -> Result<()> {
                     .all(|b| b.is_ascii_alphanumeric() || b == b'-')
                 || !ids.insert(&item.id)
                 || !["income", "expense"].contains(&item.kind.as_str())
-                || item.title.trim().is_empty()
                 || item.title.encode_utf16().count() > 150
                 || item.category.trim().is_empty()
                 || item.category.encode_utf16().count() > 60
@@ -106,6 +105,16 @@ mod tests {
             amount: 35000,
             created_at: 1,
         }
+    }
+    #[test]
+    fn description_is_optional() {
+        let mut db = Connection::open_in_memory().unwrap();
+        super::super::schema(&db).unwrap();
+        let mut state = read(&db).unwrap();
+        let mut transaction = item();
+        transaction.title.clear();
+        state.items.push(transaction);
+        assert!(write(&mut db, state).is_ok());
     }
     #[test]
     fn validates_transactions_and_keeps_rejected_updates_atomic() {

@@ -28,7 +28,6 @@ export function validateTransactions(items: Transaction[]): void {
       ids.has(item.id) ||
       !['income', 'expense'].includes(item.type) ||
       typeof item.title !== 'string' ||
-      !item.title.trim() ||
       item.title.length > 150 ||
       typeof item.category !== 'string' ||
       !item.category.trim() ||

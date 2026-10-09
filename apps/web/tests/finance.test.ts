@@ -107,3 +107,19 @@ it('retains newer acknowledged account transactions when a delayed read arrives'
   expect((await read).revision).toBe(2);
   expect((await repo.list(false)).items).toHaveLength(2);
 });
+
+it('allows an omitted description while retaining required category and amount', () => {
+  expect(() =>
+    validateTransactions([
+      {
+        id: 'optional',
+        type: 'expense',
+        title: '',
+        category: 'Food',
+        date: '2026-10-09',
+        amount: 12000,
+        createdAt: 1,
+      },
+    ]),
+  ).not.toThrow();
+});

@@ -126,3 +126,9 @@ This document describes the target interaction model. The [verification scope](.
 - A top-right PWA install action appears when the browser offers installation and disappears after installation or in standalone mode. iOS provides manual Add to Home Screen guidance and an Already installed acknowledgement because browser tabs cannot reliably detect existing installations. Installation is distinct from workspace backup downloads.
 
 - Detail → Notes is a full-page card library with search by title, category and Text contents, and sorting by last update, creation date (newest/oldest) or name. Clicking a card opens that note immediately in Main, including on mobile. Draw JSON is not shown or searched as text.
+
+- Detail Finance uses compact cards and rows, with readable light text; only excluded items are gray. Per-item remaining amounts are omitted while card-level remaining/deficit meters remain. Category and transaction-description suggestions use searchable field-width dropdowns; descriptions come from existing transactions. Transaction type uses Income/Expense radio choices, and Tasks/Finance share the same add-button styling.
+
+- Finance entry order is Date, Type, Category, Amount, optional Description. Date groups show both income and expense totals; empty descriptions display the category as the ledger label. Planning cards have equal heights with independently scrolling item lists.
+- Money fields format whole currency units while typing. Workspace display currency defaults to IDR, with USD/EUR/SGD/MYR/JPY available in Settings; switching currency changes presentation, not stored amounts or exchange rates.
+- Scrollbars are thin with transparent tracks and unobtrusive thumbs revealed on hover/focus. HTTP(S) links in Text notes and Tasks open in a new tab, appear white with dotted underlines, and do not activate task editing or dragging.

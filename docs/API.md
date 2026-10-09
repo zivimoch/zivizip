@@ -70,17 +70,17 @@ Removing an image removes its document reference. Unreferenced attachment bytes 
 
 `PUT /api/tasks` accepts the same shape with the last-read revision. One transaction validates and replaces the snapshot, increments the revision and emits an SSE invalidation. A stale revision returns `409` without changing server data. Client drafts remain available for reload/retry. This differs from Notes conflict copies: no duplicate tasks are created automatically.
 
-Limits: 10,000 tasks, 2 MB serialized items, unique alphanumeric/hyphen IDs up to 64 characters, nonempty titles up to 150 UTF-16 units, valid calendar dates and integer amounts from zero through 1 trillion IDR. Authentication and mutation-origin rules apply to both endpoints. Existing account-local tasks are migrated before their browser cache is replaced; guest tasks are only copied with explicit consent.
+Limits: 10,000 tasks, 2 MB serialized items, unique alphanumeric/hyphen IDs up to 64 characters, nonempty titles up to 150 UTF-16 units, valid calendar dates and integer amounts from zero through 1 trillion whole currency units. Authentication and mutation-origin rules apply to both endpoints. Existing account-local tasks are migrated before their browser cache is replaced; guest tasks are only copied with explicit consent.
 
 Backup version 4 adds active and archived tasks to version 3 media/notes. Version 5 additionally includes transactions. Import accepts versions 1–5 and assigns new IDs to imported records. Server imports across Notes, media, Tasks and Finance can complete partially if a request fails; they are not one atomic transaction.
 
 ## Finance
 
-`GET /api/finance` returns `{ "revision": 0, "items": [] }` for an empty ledger. Each transaction contains `id`, `type` (`income` or `expense`), `title`, `category`, `date` (`YYYY-MM-DD`), `amount` (positive integer IDR), and `createdAt` (milliseconds). Type is explicit and is not inferred from category names. Client month/group filters do not change stored data.
+`GET /api/finance` returns `{ "revision": 0, "items": [] }` for an empty ledger. Each transaction contains `id`, `type` (`income` or `expense`), `title`, `category`, `date` (`YYYY-MM-DD`), `amount` (positive integer whole currency units), and `createdAt` (milliseconds). Type is explicit and is not inferred from category names. Client month/group filters do not change stored data.
 
 `PUT /api/finance` replaces the snapshot only at the supplied revision, increments that revision and emits an SSE invalidation. Stale revisions return `409`; malformed transactions return `400`. Rejections leave the previous snapshot intact. The session and mutation-origin requirements match Tasks. No guest ledger is uploaded on login without the explicit workspace-copy choice.
 
-Limits: 10,000 transactions, 2 MB serialized items, unique alphanumeric/hyphen IDs up to 64 characters, nonempty descriptions up to 150 UTF-16 units, nonempty categories up to 60 units, valid dates and amounts from 1 through 1 trillion IDR. Combined absolute amounts cannot exceed JavaScript's safe-integer range. Account writes require connectivity; cached transactions are read-only offline.
+Limits: 10,000 transactions, 2 MB serialized items, unique alphanumeric/hyphen IDs up to 64 characters, nonempty descriptions up to 150 UTF-16 units, nonempty categories up to 60 units, valid dates and amounts from 1 through 1 trillion whole currency units. Combined absolute amounts cannot exceed JavaScript's safe-integer range. Account writes require connectivity; cached transactions are read-only offline.
 
 ## Financial planning
 
@@ -88,4 +88,6 @@ Limits: 10,000 transactions, 2 MB serialized items, unique alphanumeric/hyphen I
 
 `PUT` accepts the same shape, replaces the snapshot atomically at the supplied revision and emits an SSE invalidation. Stale revisions return `409`; malformed data or duplicate month/type/category budgets return `400`. Category matching trims whitespace and ignores case. Income and expense may use the same category, but recurring and monthly expenses cannot have separate budgets for the same category in one month.
 
-Limits: 2,400 months, 10,000 budgets and 2 MB serialized snapshot; category names up to 60 UTF-16 units, notes up to 2,000, each budget from 0 through 1 trillion IDR, and opening balances within ±1 trillion IDR. Automatic entries must be zero-budget monthly expenses. Every persisted budget references an existing month record. These endpoints store plans only; realization is computed from `/api/finance` transactions. Guest plans are never uploaded without the explicit workspace-copy choice.
+Limits: 2,400 months, 10,000 budgets and 2 MB serialized snapshot; category names up to 60 UTF-16 units, notes up to 2,000, each budget from 0 through 1 trillion whole currency units, and opening balances within ±1 trillion whole currency units. Automatic entries must be zero-budget monthly expenses. Every persisted budget references an existing month record. These endpoints store plans only; realization is computed from `/api/finance` transactions. Guest plans are never uploaded without the explicit workspace-copy choice.
+
+Transaction descriptions (`title`) may be empty; category and a positive whole-unit amount remain required. Currency selection is a browser workspace display preference and does not convert stored amounts.

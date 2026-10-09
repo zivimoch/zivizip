@@ -23,12 +23,15 @@ async function add(
   await expect(page.getByLabel('Description', { exact: true })).toBeFocused();
   await page.getByLabel('Description', { exact: true }).fill(title);
   await page
-    .getByRole('combobox', { name: 'Type', exact: true })
-    .selectOption(type);
+    .getByRole('radio', {
+      name: type === 'income' ? 'Income' : 'Expense',
+      exact: true,
+    })
+    .check();
   await page.getByLabel('Amount (IDR)', { exact: true }).fill(amount);
   await page
     .getByRole('dialog')
-    .getByLabel('Category', { exact: true })
+    .getByRole('combobox', { name: 'Category', exact: true })
     .fill(category);
   await page.getByLabel('Date', { exact: true }).fill(date);
   await page.getByRole('button', { name: 'Save', exact: true }).click();
@@ -66,7 +69,9 @@ test('guest transactions filter, group, edit, delete, survive offline and round-
     'Food',
   ]);
   await row(page, 'Lunch').click();
-  await expect(page.locator('#transaction-categories option')).toHaveCount(2);
+  await page.getByRole('combobox', { name: 'Category', exact: true }).fill('');
+  await expect(page.getByRole('option')).toHaveCount(2);
+  await page.getByRole('option', { name: 'Food', exact: true }).click();
   await page.getByLabel('Amount (IDR)', { exact: true }).fill('40000');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(row(page, 'Lunch')).toContainText('40.000');
@@ -255,7 +260,7 @@ test('account transactions synchronize with conflict protection, offline reading
     );
     await expect(
       second.getByLabel('Amount (IDR)', { exact: true }),
-    ).toHaveValue('40000');
+    ).toHaveValue(/40\.000/);
     await second
       .getByRole('button', { name: 'Reload list', exact: true })
       .click();

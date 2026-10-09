@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { displayCurrency, formatMoney } from './currency';
+  import LinkedText from './LinkedText.svelte';
+  import MoneyField from './MoneyField.svelte';
   import { onMount, tick } from 'svelte';
   import Icon from './Icon.svelte';
   import {
@@ -229,7 +232,7 @@
   function pointerDown(event: PointerEvent, task: Task) {
     if (
       event.button !== 0 ||
-      (event.target as Element).closest('button') ||
+      (event.target as Element).closest('button,a') ||
       busy
     )
       return;
@@ -376,12 +379,7 @@
     listDropReady = false;
     listDropOver = false;
   }
-  const money = (n: number) =>
-    new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      maximumFractionDigits: 0,
-    }).format(n);
+  $: money = (n: number) => formatMoney(n, $displayCurrency);
   const dateLabel = (value: string) =>
     new Intl.DateTimeFormat(language === 'en' ? 'en-GB' : 'id-ID', {
       day: 'numeric',
@@ -471,7 +469,7 @@
           ></button
         >{/if}
       <button
-        class="task-add"
+        class="task-add section-add"
         aria-label={t('Add task', 'Tambah tugas')}
         disabled={!writable || busy || !initialized}
         onclick={() => open()}><Icon name="plus" /></button
@@ -517,7 +515,7 @@
           if (
             !suppressDouble &&
             !formOpen &&
-            !(e.target as Element).closest('button')
+            !(e.target as Element).closest('button,a')
           )
             void open(task);
         }}
@@ -541,9 +539,8 @@
           >
         </div>
         <div class="task-copy" role="gridcell">
-          <span class="task-title">{task.title}</span>{#if task.date}<div
-              class="task-date"
-            >
+          <span class="task-title"><LinkedText text={task.title} /></span
+          >{#if task.date}<div class="task-date">
               <Icon name="calendar" /><time datetime={task.date}
                 >{dateLabel(task.date)}</time
               >
@@ -629,7 +626,7 @@
           bind:this={titleInput}
           bind:value={title}
           required
-          maxlength="150"
+          maxlength={150}
           disabled={busy}
         /></label
       >
@@ -642,17 +639,9 @@
       >
       <label
         >{t(
-          'Related amount (IDR, optional)',
-          'Nominal terkait (Rp, opsional)',
-        )}<input
-          type="number"
-          min="0"
-          max="1000000000000"
-          step="1"
-          value={amount}
-          oninput={(e) => (amount = e.currentTarget.value)}
-          disabled={busy}
-        /></label
+          `Related amount (${$displayCurrency}, optional)`,
+          `Nominal terkait (${$displayCurrency}, opsional)`,
+        )}<MoneyField bind:value={amount} min={0} disabled={busy} /></label
       >
       {#if editing}<button
           class="danger"
@@ -724,11 +713,6 @@
     font-size: 11px;
     white-space: nowrap;
     background: #0c181e;
-  }
-  .task-actions .task-add {
-    width: 32px;
-    height: 32px;
-    padding: 4px;
   }
   .task-progress {
     display: flex;

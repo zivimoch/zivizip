@@ -1,3 +1,4 @@
+import { linkify } from '../links';
 import {
   fromText,
   plainText,
@@ -101,8 +102,10 @@ export function mountText(host: HTMLElement, options: Options) {
         p.style.minHeight = p.style.lineHeight = height + 'px';
       }
     }
-    if (text) p.textContent = text;
-    else p.append(document.createElement('br'));
+    if (text) {
+      p.textContent = text;
+      linkify(p);
+    } else p.append(document.createElement('br'));
     return p;
   }
   function spacer(id: string) {
@@ -623,6 +626,15 @@ export function mountText(host: HTMLElement, options: Options) {
       all = false;
     }
   });
+  editor.addEventListener('click', (event) => {
+    const link = (event.target as Element).closest<HTMLAnchorElement>(
+      'a.content-link',
+    );
+    if (link) {
+      event.preventDefault();
+      window.open(link.href, '_blank', 'noopener,noreferrer');
+    }
+  });
   editor.addEventListener('input', (e) => {
     const selection = range();
     if (selection?.collapsed && !(e as InputEvent).isComposing) {
@@ -650,6 +662,10 @@ export function mountText(host: HTMLElement, options: Options) {
     if (!(e as InputEvent).isComposing) {
       try {
         persist(before);
+        for (const paragraph of editor.querySelectorAll<HTMLElement>(
+          '.text-paragraph',
+        ))
+          linkify(paragraph);
       } catch (e) {
         opts.error(e);
       }

@@ -1,4 +1,9 @@
 <script lang="ts">
+  import {
+    currencies,
+    displayCurrency,
+    supportedCurrency,
+  } from '$lib/currency';
   import { onMount, tick } from 'svelte';
   import TextEditor from '$lib/TextEditor.svelte';
   import InstallApp from '$lib/InstallApp.svelte';
@@ -35,6 +40,7 @@
   let ready = false;
   let error = '';
   let notice = '';
+  $: displayCurrency.set(supportedCurrency(prefs.currency));
   let view = 'main';
   let mobileSection = 'notes';
   let details = false;
@@ -1303,6 +1309,24 @@
       ></select
     ></label
   >
+  <label
+    >{t('Currency', 'Mata uang')}<select
+      value={prefs.currency || 'IDR'}
+      onchange={(event) => {
+        prefs.currency = event.currentTarget.value;
+        remember();
+      }}
+      >{#each Object.keys(currencies) as code}<option value={code}
+          >{code}</option
+        >{/each}</select
+    ></label
+  >
+  <p>
+    {t(
+      'Display format only; existing amounts are not converted. Amounts use whole currency units.',
+      'Hanya format tampilan; nilai yang sudah ada tidak dikonversi. Nominal menggunakan satuan mata uang bulat.',
+    )}
+  </p>
   <div class="settings-actions">
     <button onclick={download}>{t('Download backup', 'Unduh cadangan')}</button
     ><label class="file-button"

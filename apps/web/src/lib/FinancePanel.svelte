@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { displayCurrency, formatMoney } from './currency';
+  import MoneyField from './MoneyField.svelte';
+  import SuggestionField from './SuggestionField.svelte';
   import { onMount, tick } from 'svelte';
   import Icon from './Icon.svelte';
   import type { PlanningRepository } from './planning';
@@ -45,6 +48,9 @@
     language === 'en'
       ? (en: string, _id: string) => en
       : (_en: string, id: string) => id;
+  $: descriptions = [
+    ...new Set(state.items.map((item) => item.title).filter(Boolean)),
+  ];
   $: rows = monthlyTransactions(state.items, month);
   $: summary = totals(rows);
   $: groups = Object.entries(
@@ -70,16 +76,11 @@
     seenRefresh = refreshToken;
     void refresh();
   }
-  const money = (n: number) =>
-    new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      maximumFractionDigits: 0,
-    }).format(n);
-  const shortMoney = (n: number) =>
+  $: money = (n: number) => formatMoney(n, $displayCurrency);
+  $: shortMoney = (n: number) =>
     new Intl.NumberFormat(language === 'en' ? 'en' : 'id', {
       style: 'currency',
-      currency: 'IDR',
+      currency: $displayCurrency,
       currencyDisplay: 'narrowSymbol',
       notation: 'compact',
       maximumFractionDigits: 2,
@@ -180,7 +181,7 @@
     }
   }
   async function submit() {
-    if (!title.trim() || !category.trim() || !date) return;
+    if (!category.trim() || !date) return;
     const previous = state.items.find((item) => item.id === editing);
     if (editing && !previous) {
       message = t(
@@ -240,7 +241,7 @@
   <div class="finance-heading">
     <h2>Finance<span>.</span></h2>
     <button
-      class="finance-add"
+      class="finance-add section-add"
       aria-label={t('Add transaction', 'Tambah transaksi')}
       title={t('Add transaction', 'Tambah transaksi')}
       disabled={!writable || busy || !initialized}
@@ -297,14 +298,21 @@
     </div>{/if}
   <div class="transactions">
     {#each groups as [key, items] (key)}
-      <div class="transaction-heading">{grouped ? key : dateLabel(key)}</div>
+      <div class="transaction-heading">
+        <span>{grouped ? key : dateLabel(key)}</span
+        >{#if !grouped}{@const daily = totals(items)}<span class="daily-totals"
+            ><span class="income">+{money(daily.income)}</span><span
+              class="expense">−{money(daily.expense)}</span
+            ></span
+          >{/if}
+      </div>
       {#each items as item (item.id)}
         <button
           class="finance-transaction"
           data-transaction={item.id}
           aria-label={t(
-            `Edit transaction ${item.title}`,
-            `Edit transaksi ${item.title}`,
+            `Edit transaction ${item.title || item.category}`,
+            `Edit transaksi ${item.title || item.category}`,
           )}
           aria-disabled={!writable || busy}
           onclick={() => openTransaction(item)}
@@ -314,7 +322,9 @@
             title={grouped ? dateLabel(item.date) : item.category}
             >{grouped ? dateLabel(item.date) : item.category}</span
           >
-          <span class="transaction-name" title={item.title}>{item.title}</span>
+          <span class="transaction-name" title={item.title || item.category}
+            >{item.title || item.category}</span
+          >
           <span class="transaction-amount" class:income={item.type === 'income'}
             >{item.type === 'income' ? '+' : '−'}{money(item.amount)}</span
           >
@@ -332,6 +342,7 @@
 </section>
 
 <dialog
+  class="finance-dialog"
   bind:this={modal}
   oncancel={(event) => {
     event.preventDefault();
@@ -367,52 +378,62 @@
       </p>
     {:else}
       <label
-        >{t('Type', 'Jenis')}<select bind:value={type} disabled={busy}
-          ><option value="expense">{t('Expense', 'Pengeluaran')}</option><option
-            value="income">{t('Income', 'Pemasukan')}</option
-          ></select
-        ></label
-      >
-      <label
-        >{t('Description', 'Keterangan')}<input
-          bind:this={titleInput}
-          bind:value={title}
-          required
-          maxlength="150"
-          disabled={busy}
-        /></label
-      >
-      <label
-        >{t('Amount (IDR)', 'Nominal (Rp)')}<input
-          type="number"
-          min="1"
-          max="1000000000000"
-          step="1"
-          required
-          value={amount}
-          oninput={(event) => (amount = event.currentTarget.value)}
-          disabled={busy}
-        /></label
-      >
-      <label
-        >{t('Category', 'Kategori')}<input
-          bind:value={category}
-          list="transaction-categories"
-          autocomplete="off"
-          required
-          maxlength="60"
-          disabled={busy}
-        /></label
-      >
-      <datalist id="transaction-categories"
-        >{#each categories as option}<option value={option}
-          ></option>{/each}</datalist
-      >
-      <label
         >{t('Date', 'Tanggal')}<input
           type="date"
           bind:value={date}
           required
+          disabled={busy}
+        /></label
+      >
+      <fieldset class="note-type-picker">
+        <legend>{t('Type', 'Jenis')}</legend>
+        <label
+          ><input
+            type="radio"
+            bind:group={type}
+            value="expense"
+            disabled={busy}
+          />{t('Expense', 'Pengeluaran')}</label
+        >
+        <label
+          ><input
+            type="radio"
+            bind:group={type}
+            value="income"
+            disabled={busy}
+          />{t('Income', 'Pemasukan')}</label
+        >
+      </fieldset>
+      <label
+        >{t('Category', 'Kategori')}<SuggestionField
+          id="transaction-category"
+          label={t('Category', 'Kategori')}
+          options={categories}
+          bind:value={category}
+          required
+          maxlength={60}
+          disabled={busy}
+        /></label
+      >
+      <label
+        >{t(
+          `Amount (${$displayCurrency})`,
+          `Nominal (${$displayCurrency})`,
+        )}<MoneyField
+          bind:value={amount}
+          min={1}
+          required
+          disabled={busy}
+        /></label
+      >
+      <label
+        >{t('Description', 'Keterangan')}<SuggestionField
+          id="transaction-description"
+          label={t('Description', 'Keterangan')}
+          options={descriptions}
+          bind:input={titleInput}
+          bind:value={title}
+          maxlength={150}
           disabled={busy}
         /></label
       >
@@ -480,13 +501,6 @@
   .income {
     color: var(--accent);
   }
-  .finance-add {
-    padding: 4px;
-    width: 32px;
-    height: 32px;
-    display: grid;
-    place-items: center;
-  }
   .finance-toolbar {
     display: flex;
     justify-content: space-between;
@@ -509,7 +523,7 @@
     font-size: 11px;
     background: transparent;
     border: 0;
-    color: #bbc7cd;
+    color: #eef5f7;
     max-width: 160px;
     min-width: 0;
     padding: 0;
@@ -529,7 +543,7 @@
     min-width: 0;
   }
   .balance-card small {
-    font-size: 9px;
+    font-size: 11px;
     display: flex;
     justify-content: space-between;
     gap: 4px;
@@ -553,9 +567,19 @@
     min-height: 0;
     padding-bottom: 12px;
   }
+  .daily-totals {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 5px;
+    font-size: 12px;
+  }
+  .daily-totals .expense {
+    color: #ff745c;
+  }
   .transaction-heading {
     font-size: 11px;
-    color: #b8c6cc;
+    color: #eef5f7;
     margin: 5px 0 9px;
   }
   .transaction-heading:not(:first-child) {
@@ -572,7 +596,7 @@
     padding: 8px 0;
     width: 100%;
     text-align: left;
-    font-size: 12px;
+    font-size: 14px;
   }
   .finance-transaction:hover {
     background: #00394033;
@@ -585,7 +609,7 @@
     border-radius: 20px;
     background: #19262e;
     padding: 3px 8px;
-    font-size: 9px;
+    font-size: 11px;
     min-width: 61px;
     max-width: 33%;
     overflow: hidden;
@@ -607,7 +631,7 @@
   .finance-empty {
     padding: 24px 10px;
     text-align: center;
-    color: var(--muted);
+    color: #eef5f7;
     font-size: 13px;
     line-height: 1.8;
   }
@@ -622,10 +646,6 @@
   @media (max-width: 700px) {
     .finance-panel {
       padding: 18px;
-    }
-    .finance-add {
-      width: 40px;
-      height: 40px;
     }
     .finance-toolbar button,
     .finance-toolbar input {

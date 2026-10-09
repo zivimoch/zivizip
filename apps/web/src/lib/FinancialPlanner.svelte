@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { displayCurrency, formatMoney } from './currency';
+  import MoneyField from './MoneyField.svelte';
+  import SuggestionField from './SuggestionField.svelte';
   import { onMount, tick } from 'svelte';
   import Icon from './Icon.svelte';
   import { localMonth, dateInMonth, totals, type Transaction } from './finance';
@@ -116,12 +119,7 @@
     seenRefresh = refreshToken;
     void refresh();
   }
-  const money = (value: number) =>
-    new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      maximumFractionDigits: 0,
-    }).format(value);
+  $: money = (value: number) => formatMoney(value, $displayCurrency);
   const monthLabel = (month: string) =>
     new Intl.DateTimeFormat(language === 'en' ? 'en-GB' : 'id-ID', {
       month: 'long',
@@ -743,18 +741,7 @@
                           )}{actualAmount(plan, transactions) > plan.amount
                             ? ' !'
                             : ''}</button
-                        >{#if planType(plan) === 'expense'}<small
-                            class:deficit={actualAmount(plan, transactions) >
-                              plan.amount}
-                            >{actualAmount(plan, transactions) > plan.amount
-                              ? t('Deficit', 'Defisit')
-                              : t('Left', 'Sisa')}
-                            {money(
-                              Math.abs(
-                                plan.amount - actualAmount(plan, transactions),
-                              ),
-                            )}</small
-                          >{/if}</td
+                        ></td
                       >
                     </tr>{:else}<tr
                       ><td colspan="2" class="empty-plan"
@@ -772,29 +759,27 @@
               }}
             >
               <label
-                >{t('Category', 'Kategori')}<input
+                >{t('Category', 'Kategori')}<SuggestionField
+                  id={`plan-category-${card.key}`}
+                  label={t('Category', 'Kategori')}
+                  options={categories}
                   bind:value={inline[card.key].category}
-                  list="plan-category-options"
-                  autocomplete="off"
                   placeholder={t(
                     'Search or add category',
                     'Cari atau tambah kategori',
                   )}
                   required
-                  maxlength="60"
+                  maxlength={60}
                   disabled={!writable || busy}
                 /></label
               ><label
-                >{t('Amount (IDR)', 'Nominal (Rp)')}<input
-                  type="number"
-                  value={inline[card.key].amount}
-                  oninput={(event) =>
-                    (inline[card.key].amount = event.currentTarget.value)}
-                  min="0"
-                  max="1000000000000"
-                  step="1"
+                >{t(
+                  `Amount (${$displayCurrency})`,
+                  `Nominal (${$displayCurrency})`,
+                )}<MoneyField
+                  bind:value={inline[card.key].amount}
+                  min={0}
                   required
-                  placeholder="0"
                   disabled={!writable || busy}
                 /></label
               ><button class="primary" disabled={!writable || busy}
@@ -803,15 +788,12 @@
             </form>
           </section>{/each}
       </div>
-      <datalist id="plan-category-options"
-        >{#each categories as option}<option value={option}
-          ></option>{/each}</datalist
-      >
     {/if}
   </div>
 </section>
 
 <dialog
+  class="finance-dialog"
   bind:this={modal}
   oncancel={(event) => {
     event.preventDefault();
@@ -921,12 +903,14 @@
       </p>
     {:else}
       {#if mode === 'budget'}<label
-          >{t('Category', 'Kategori')}<input
-            bind:this={focusInput}
+          >{t('Category', 'Kategori')}<SuggestionField
+            id="edit-plan-category"
+            label={t('Category', 'Kategori')}
+            options={categories}
+            bind:input={focusInput}
             bind:value={category}
-            list="plan-category-options"
             required
-            maxlength="60"
+            maxlength={60}
             disabled={busy}
           /></label
         ><label
@@ -937,13 +921,12 @@
           ></label
         >{/if}
       <label
-        >{t('Amount (IDR)', 'Nominal (Rp)')}<input
-          type="number"
-          value={amount}
-          oninput={(event) => (amount = event.currentTarget.value)}
-          min={mode === 'opening' ? '-1000000000000' : '0'}
-          max="1000000000000"
-          step="1"
+        >{t(
+          `Amount (${$displayCurrency})`,
+          `Nominal (${$displayCurrency})`,
+        )}<MoneyField
+          bind:value={amount}
+          min={mode === 'opening' ? -1000000000000 : 0}
           required
           disabled={busy}
         /></label
@@ -1034,7 +1017,7 @@
     box-shadow: inset 0 -3px var(--accent);
   }
   .planning-content {
-    padding: 24px;
+    padding: 12px;
   }
   h1 {
     margin: 8px 0 24px;
@@ -1052,7 +1035,7 @@
     margin-bottom: 10px;
   }
   .plan-heading p {
-    color: var(--muted);
+    color: #eef5f7;
     line-height: 1.5;
   }
   .chart-legend span {
@@ -1104,10 +1087,10 @@
     grid-template-columns: repeat(4, minmax(140px, 1fr));
     gap: 12px;
     overflow-x: auto;
-    margin: 28px 0 20px;
+    margin: 14px 0 12px;
   }
   .summary-card {
-    padding: 16px 12px;
+    padding: 10px;
     background: linear-gradient(140deg, #12222a, #0a151a);
     border: 1px solid #233039;
     border-radius: 7px;
@@ -1118,7 +1101,7 @@
   .summary-card strong {
     display: block;
     color: var(--accent);
-    font-size: 20px;
+    font-size: 18px;
     margin-top: 8px;
     white-space: nowrap;
   }
@@ -1128,17 +1111,18 @@
     border: 0;
     padding: 12px 0 0;
     font-size: 11px;
-    color: var(--muted);
+    color: #eef5f7;
   }
   .plan-columns {
     display: grid;
     grid-template-columns: repeat(3, minmax(275px, 1fr));
-    gap: 16px;
+    gap: 10px;
     overflow-x: auto;
     padding-bottom: 16px;
-    align-items: start;
+    align-items: stretch;
   }
   .plan-group {
+    height: 640px;
     background: #111b20;
     border: 1px solid #233039;
     border-radius: 10px;
@@ -1147,18 +1131,18 @@
     flex-direction: column;
   }
   .plan-group h2 {
-    padding: 16px;
+    padding: 12px;
     margin: 0;
-    font-size: 20px;
+    font-size: 18px;
     letter-spacing: -0.5px;
   }
   .plan-realized {
-    margin: 0 16px 16px;
-    color: var(--muted);
+    margin: 0 12px 8px;
+    color: #eef5f7;
     font-size: 14px;
   }
   .budget-meter {
-    padding: 0 16px 16px;
+    padding: 0 12px 10px;
     color: var(--accent);
   }
   .budget-meter > div:first-child {
@@ -1177,7 +1161,7 @@
     height: 10px;
     border: 1px solid currentColor;
     border-radius: 3px;
-    margin: 12px 0;
+    margin: 7px 0;
     padding: 2px;
   }
   .battery i {
@@ -1193,7 +1177,9 @@
     color: #ff777f !important;
   }
   .plan-items-scroll {
-    max-height: 420px;
+    flex: 1;
+    min-height: 0;
+
     overflow-y: auto;
     overscroll-behavior-y: contain;
     scrollbar-gutter: stable;
@@ -1210,11 +1196,11 @@
     background: #111b20;
     font-size: 14px;
     font-weight: 400;
-    color: var(--muted);
+    color: #eef5f7;
   }
   td,
   th {
-    padding: 12px 10px;
+    padding: 7px 10px;
     border-bottom: 1px solid var(--line);
     text-align: left;
     vertical-align: top;
@@ -1231,11 +1217,7 @@
     font-size: 15px;
     overflow-wrap: anywhere;
   }
-  td small {
-    display: block;
-    font-size: 13px;
-    margin-top: 5px;
-  }
+
   [data-plan-row] {
     cursor: grab;
     user-select: none;
@@ -1247,7 +1229,10 @@
     touch-action: none;
   }
   [data-plan-row].excluded {
-    opacity: 0.55;
+    color: #89979f;
+  }
+  [data-plan-row].excluded :is(button, strong, small) {
+    color: #89979f !important;
   }
   .plan-category,
   .plan-note,
@@ -1269,13 +1254,13 @@
     display: flex;
     align-items: flex-start;
     gap: 3px;
-    margin-top: 9px;
+    margin-top: 3px;
   }
   .plan-state {
     flex: 0 0 24px;
     width: 24px;
     height: 28px;
-    color: #80939d;
+    color: #eef5f7;
     display: grid;
     place-items: center;
   }
@@ -1284,7 +1269,7 @@
     height: 17px;
   }
   .plan-note {
-    color: var(--muted);
+    color: #eef5f7;
     font-size: 13px;
     min-width: 0;
     text-align: left;
@@ -1300,26 +1285,26 @@
   }
   .plan-inline-form {
     margin-top: auto;
-    padding: 16px;
+    padding: 12px;
     display: grid;
-    gap: 10px;
+    gap: 7px;
     border-top: 1px solid #233039;
   }
   .plan-inline-form label {
     display: grid;
     margin: 0;
-    gap: 7px;
+    gap: 4px;
     font-size: 13px;
-    color: var(--muted);
+    color: #eef5f7;
   }
-  .plan-inline-form input {
+  .plan-inline-form :global(input) {
     width: 100%;
     min-width: 0;
     padding: 10px;
   }
   .empty-plan {
     text-align: center;
-    color: var(--muted);
+    color: #eef5f7;
     padding: 30px 10px;
     font-size: 13px;
   }
@@ -1369,6 +1354,8 @@
       font-size: 17px;
     }
     .plan-items-scroll {
+      flex: 1;
+      min-height: 0;
       max-height: 360px;
     }
     .plan-note,

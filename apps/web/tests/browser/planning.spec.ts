@@ -90,6 +90,16 @@ test('monthly planning matches transactions, supports row controls and copies on
   await addBudget(page, 'recurring', 'Rent', '1000000');
   await addBudget(page, 'recurring', 'Transport', '300000');
   await addBudget(page, 'monthly', 'Books', '200000');
+  const heights = await page
+    .locator('.plan-group')
+    .evaluateAll((cards) =>
+      cards.map((card) => card.getBoundingClientRect().height),
+    );
+  expect(Math.max(...heights) - Math.min(...heights)).toBeLessThan(1);
+  await page.screenshot({
+    path: '/tmp/zivizip-finance-compact.png',
+    fullPage: true,
+  });
   await expect(page.locator('[data-plan-summary="planned"]')).toContainText(
     '5.000.000',
   );
@@ -98,7 +108,9 @@ test('monthly planning matches transactions, supports row controls and copies on
     '89% remaining',
   );
   await addTransaction(page, 'Health', '75000');
-  await expect(row(page, 'Health')).toContainText('Deficit');
+  await expect(row(page, 'Health').locator('.plan-actual')).toHaveClass(
+    /deficit/,
+  );
   await expect(card(page, 'monthly').locator('.plan-realized')).toHaveText(
     '1 of 2 items realized',
   );
@@ -235,10 +247,8 @@ test('planning cards work on a narrow touch viewport with inline forms and categ
   await page
     .getByRole('button', { name: 'Continue as guest', exact: true })
     .tap();
-  await page
-    .locator('.bottom-nav')
-    .getByRole('button', { name: 'Finance', exact: true })
-    .tap();
+  await page.getByRole('button', { name: 'Open menu', exact: true }).tap();
+  await detail(page);
   await createMonth(page, '2026-10');
   await addBudget(page, 'income', 'Salary', '8000000');
   await addBudget(page, 'recurring', 'Food', '1000000');
@@ -353,7 +363,7 @@ test('account plans synchronize, retain conflicting form edits and remain read-o
     await expect(dialog(second)).toContainText('changed on another device');
     await expect(
       dialog(second).getByLabel('Amount (IDR)', { exact: true }),
-    ).toHaveValue('700000');
+    ).toHaveValue(/700\.000/);
     await dialog(second)
       .getByRole('button', { name: 'Reload plans', exact: true })
       .click();

@@ -43,6 +43,7 @@ export interface Preferences {
   active: string | null;
   counter: number;
   language: 'en' | 'id';
+  currency?: string;
   width: number;
   height: number;
 }
@@ -63,6 +64,7 @@ export const defaults: Preferences = {
   active: null,
   counter: 0,
   language: 'en',
+  currency: 'IDR',
   width: 75,
   height: 49,
 };
