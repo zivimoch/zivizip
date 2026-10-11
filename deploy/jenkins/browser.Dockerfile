@@ -1,0 +1,10 @@
+FROM node:22-bookworm
+WORKDIR /app
+RUN corepack enable && corepack prepare pnpm@10.28.2 --activate
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/web/package.json apps/web/package.json
+RUN pnpm install --frozen-lockfile && pnpm --dir apps/web exec playwright install --with-deps chromium
+COPY apps/web apps/web
+RUN pnpm build
+WORKDIR /app/apps/web
+CMD ["pnpm", "exec", "playwright", "test", "tests/browser/install.spec.ts", "tests/browser/lists.spec.ts", "tests/browser/editor-tools.spec.ts", "--workers=1"]

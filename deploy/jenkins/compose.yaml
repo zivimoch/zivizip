@@ -1,0 +1,60 @@
+name: platform-jenkins
+services:
+  controller:
+    build:
+      context: .
+      dockerfile: controller.Dockerfile
+    restart: unless-stopped
+    ports: ['127.0.0.1:8081:8080']
+    environment:
+      JAVA_OPTS: -Djenkins.install.runSetupWizard=false
+    volumes:
+      - home:/var/jenkins_home
+      - bootstrap:/bootstrap
+      - ./secrets/admin_password:/run/secrets/admin_password:ro
+    networks: [control]
+    logging: { driver: local }
+  builder:
+    image: docker:dind
+    privileged: true
+    restart: unless-stopped
+    environment:
+      DOCKER_TLS_CERTDIR: /certs
+    volumes:
+      - docker-data:/var/lib/docker
+      - certs:/certs/client
+    networks:
+      build:
+        aliases: [docker]
+    logging: { driver: local }
+  agent:
+    build:
+      context: .
+      dockerfile: agent.Dockerfile
+    restart: unless-stopped
+    depends_on: [controller, builder]
+    entrypoint: [/bin/sh, -c]
+    command:
+      - 'until test -s /bootstrap/agent-secret; do sleep 2; done; exec java -jar /usr/share/jenkins/agent.jar -url http://controller:8080/ -name zivizip-builder -secret @/bootstrap/agent-secret -webSocket -workDir /home/jenkins/agent'
+    environment:
+      DOCKER_HOST: tcp://docker:2376
+      DEPLOY_HOST: ${DEPLOY_HOST:?Set the deployment SSH host}
+      DOCKER_TLS_VERIFY: '1'
+      DOCKER_CERT_PATH: /certs/client
+    volumes:
+      - agent-work:/home/jenkins/agent
+      - bootstrap:/bootstrap:ro
+      - certs:/certs/client:ro
+      - ./secrets/deploy_key:/run/secrets/deploy_key:ro
+      - ./secrets/known_hosts:/run/secrets/known_hosts:ro
+    networks: [control, build]
+    logging: { driver: local }
+volumes:
+  home:
+  bootstrap:
+  docker-data:
+  certs:
+  agent-work:
+networks:
+  control:
+  build:

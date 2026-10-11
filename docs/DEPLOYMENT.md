@@ -36,4 +36,4 @@ Use SQLite's online backup API or stop the API cleanly before copying its comple
 
 Before each update, record image digests and take a verified database backup. Roll back image references only when the previous version supports the current schema; otherwise restore the matching backup into an isolated volume before switching traffic. Never use `docker compose down -v` for routine updates.
 
-Jenkins/GitHub delivery, scheduled backups and external monitoring require their own verified setup. These templates do not claim that those services are installed.
+Jenkins/GitHub delivery is configured separately; see [CI/CD](CI-CD.md). Scheduled backups and external monitoring require their own setup. Application Compose templates do not install shared infrastructure.
