@@ -7,6 +7,7 @@
   import { onMount, tick } from 'svelte';
   import TextEditor from '$lib/TextEditor.svelte';
   import InstallApp from '$lib/InstallApp.svelte';
+  import ShareSettings from '$lib/ShareSettings.svelte';
   import NoteLibrary from '$lib/NoteLibrary.svelte';
   import TasksPanel from '$lib/TasksPanel.svelte';
   import { TasksRepository, readTaskState } from '$lib/tasks';
@@ -914,6 +915,7 @@
       </div>{/if}
   </nav>
   <div class="sidebar-footer">
+    <div id="desktop-install-slot"></div>
     <div class="sidebar-profile">
       <div class="account-control">
         {#if account}<div class="account-status">
@@ -1270,7 +1272,10 @@
     ><datalist id="categories"
       >{#each categories as c}<option value={c}></option>{/each}</datalist
     >
-    <p class="muted">Text</p>
+    {#if editing && account}{#key editing}<ShareSettings
+          id={editing}
+          language={prefs.language}
+        />{/key}{/if}
     <footer>
       {#if editing}<button type="button" class="danger" onclick={removeNote}
           >{t('Delete', 'Hapus')}</button

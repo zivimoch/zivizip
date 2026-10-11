@@ -91,3 +91,11 @@ Limits: 10,000 transactions, 2 MB serialized items, unique alphanumeric/hyphen I
 Limits: 2,400 months, 10,000 budgets and 2 MB serialized snapshot; category names up to 60 UTF-16 units, notes up to 2,000, each budget from 0 through 1 trillion whole currency units, and opening balances within ±1 trillion whole currency units. Automatic entries must be zero-budget monthly expenses. Every persisted budget references an existing month record. These endpoints store plans only; realization is computed from `/api/finance` transactions. Guest plans are never uploaded without the explicit workspace-copy choice.
 
 Transaction descriptions (`title`) may be empty; category and a positive whole-unit amount remain required. Currency selection is a browser workspace display preference and does not convert stored amounts.
+
+## Shared notes
+
+Owners manage a note's capability link with `GET`, `PUT` (`{"editable":false}`) and `DELETE /api/notes/{id}/share`. Creating a link is explicit; reading its configuration does not publish the note. Revocation invalidates the old token. Only server notes support sharing.
+
+`GET /api/shared/{token}` returns the permitted note and its `editable` flag without an account session. `PUT` accepts content changes only when editing is enabled; owner metadata is preserved, and stale revisions return 409 rather than overwriting newer content. Clients retain unsaved changes on conflict. Shared image reads and uploads use `/api/shared/{token}/media/{asset}` and are restricted to the note or uploads made through that link. Links have upload and request limits. These endpoints do not grant workspace, task or finance access.
+
+Shared pages carry `noindex,nofollow` and use a URL fragment for the capability token. API responses remain `no-store`. Treat the link as a credential: anyone holding it has its configured access until revoked.

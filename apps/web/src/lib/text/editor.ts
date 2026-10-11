@@ -1,4 +1,5 @@
 import { linkify } from '../links';
+import { readRuns, renderRuns } from './format';
 import {
   fromText,
   plainText,
@@ -80,8 +81,88 @@ export function mountText(host: HTMLElement, options: Options) {
     savedRange = range();
     file.click();
   };
-  tools.append(add, file);
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.textContent = '⌄ ' + t('Tools', 'Alat');
+  toggle.setAttribute('aria-expanded', 'false');
+  const bar = document.createElement('div');
+  bar.className = 'text-format-bar';
+  bar.hidden = true;
+  bar.setAttribute('role', 'toolbar');
+  bar.setAttribute('aria-label', t('Text tools', 'Alat teks'));
+  toggle.onclick = () => {
+    bar.hidden = !bar.hidden;
+    toggle.textContent = (bar.hidden ? '⌄ ' : '⌃ ') + t('Tools', 'Alat');
+    toggle.setAttribute('aria-expanded', String(!bar.hidden));
+  };
+  function command(label: string, action: () => void) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = label;
+    button.onpointerdown = (e) => e.preventDefault();
+    button.onclick = () => {
+      if (opts.writable) action();
+    };
+    bar.append(button);
+    return button;
+  }
+  function format(command: string, value?: string) {
+    if (!opts.writable) return;
+    if (savedRange && !range()) {
+      getSelection()?.removeAllRanges();
+      getSelection()?.addRange(savedRange);
+    }
+    editor.focus();
+    const previous = accepted;
+    document.execCommand(command, false, value);
+    for (const font of editor.querySelectorAll<HTMLElement>('font[size]')) {
+      font.style.fontSize =
+        (value && command === 'fontSize' ? size.value : '15') + 'px';
+      font.removeAttribute('size');
+    }
+    persist(previous);
+    paint();
+  }
+  const color = document.createElement('input');
+  color.type = 'color';
+  color.value = '#eef5f7';
+  color.setAttribute('aria-label', t('Font color', 'Warna teks'));
+  color.onpointerdown = () => {
+    savedRange = range();
+  };
+  color.oninput = () => format('foreColor', color.value);
+  const size = document.createElement('select');
+  size.setAttribute('aria-label', t('Font size', 'Ukuran teks'));
+  for (const n of [10, 12, 14, 15, 16, 18, 20, 24, 32, 48, 72])
+    size.add(new Option(String(n), String(n)));
+  size.value = '15';
+  size.onpointerdown = () => {
+    savedRange = range();
+  };
+  size.onchange = () => format('fontSize', '7');
+  bar.append(color, size);
+  command(t('Bold', 'Tebal'), () => format('bold'));
+  command(t('Italic', 'Miring'), () => format('italic'));
+  command(t('Underline', 'Garis bawah'), () => format('underline'));
+  command(t('Divider', 'Garis pemisah'), () => {
+    const previous = accepted;
+    const next = splitAtCaret();
+    if (next) {
+      const divider = paragraph();
+      divider.dataset.rule = 'true';
+      divider.classList.add('text-divider');
+      next.before(divider);
+      caret(next);
+      persist(previous);
+      paint();
+    }
+  });
+  command('Undo', () => undo(false));
+  command('Redo', () => undo(true));
+  bar.append(add, file);
+  tools.append(toggle);
   (opts.toolbar || host).append(tools);
+  host.before(bar);
   host.append(layer, editor, controls, status);
   const positions = new Map<string, { x: number; y: number }>();
   let savedRange: Range | null = null;
@@ -93,7 +174,11 @@ export function mountText(host: HTMLElement, options: Options) {
       ? sel.getRangeAt(0).cloneRange()
       : null;
   }
-  function paragraph(text = '', height?: number) {
+  function paragraph(
+    text = '',
+    height?: number,
+    block?: Extract<Block, { type: 'paragraph' }>,
+  ) {
     const p = document.createElement('div');
     p.className = 'text-paragraph';
     if (height !== undefined) {
@@ -106,7 +191,21 @@ export function mountText(host: HTMLElement, options: Options) {
       p.textContent = text;
       linkify(p);
     } else p.append(document.createElement('br'));
+    if (block?.runs) {
+      renderRuns(p, block.runs);
+      linkify(p);
+    }
+    if (block?.rule) {
+      p.dataset.rule = 'true';
+      p.classList.add('text-divider');
+    }
+    indent(p);
     return p;
+  }
+  function indent(p: HTMLElement) {
+    const item = listItem(p.textContent || '');
+    p.style.paddingLeft = item ? `${24 * (item.depth + 1)}px` : '';
+    p.style.textIndent = item ? `-${item.prefix.length}ch` : '';
   }
   function spacer(id: string) {
     const p = document.createElement('div');
@@ -119,7 +218,7 @@ export function mountText(host: HTMLElement, options: Options) {
   function render() {
     editor.replaceChildren(
       ...doc.blocks.map((b) =>
-        b.type === 'paragraph' ? paragraph(b.text, b.height) : spacer(b.id),
+        b.type === 'paragraph' ? paragraph(b.text, b.height, b) : spacer(b.id),
       ),
     );
     if (!editor.childNodes.length) editor.append(paragraph());
@@ -160,17 +259,22 @@ export function mountText(host: HTMLElement, options: Options) {
         blocks.push({ type: 'image', id: node.dataset.imageAnchor });
         return;
       }
-      const text =
-        node instanceof HTMLElement ? node.innerText : node.textContent || '';
-      const lines = text === '\n' ? [''] : text.split('\n');
-      for (const text of lines)
-        blocks.push({
-          type: 'paragraph',
-          text,
-          ...(node instanceof HTMLElement && node.dataset.height && !text
-            ? { height: Number(node.dataset.height) }
-            : {}),
-        });
+      const runs =
+        node instanceof HTMLElement
+          ? readRuns(node)
+          : [{ text: node.textContent || '' }];
+      const text = runs.map((r) => r.text).join('');
+      blocks.push({
+        type: 'paragraph',
+        text,
+        ...(runs.some((r) => Object.keys(r).length > 1) ? { runs } : {}),
+        ...(node instanceof HTMLElement && node.dataset.rule
+          ? { rule: true }
+          : {}),
+        ...(node instanceof HTMLElement && node.dataset.height && !text
+          ? { height: Number(node.dataset.height) }
+          : {}),
+      });
     });
     doc.blocks = blocks.length ? blocks : [{ type: 'paragraph', text: '' }];
   }
@@ -178,7 +282,7 @@ export function mountText(host: HTMLElement, options: Options) {
     read();
     validateDocument(doc);
     const next = JSON.stringify(doc);
-    if (next === previous) return;
+    if (next === previous || next === accepted) return;
     history.push(previous);
     while (
       history.length > 80 ||
@@ -190,7 +294,14 @@ export function mountText(host: HTMLElement, options: Options) {
     opts.change(
       plainText(doc),
       doc.images.length ||
-        doc.blocks.some((b) => b.type === 'paragraph' && b.height !== undefined)
+        doc.blocks.some(
+          (b) =>
+            b.type === 'paragraph' &&
+            (b.height !== undefined ||
+              b.runs ||
+              b.rule ||
+              b.text.includes('\n')),
+        )
         ? structuredClone(doc)
         : undefined,
     );
@@ -200,7 +311,14 @@ export function mountText(host: HTMLElement, options: Options) {
     opts.change(
       plainText(doc),
       doc.images.length ||
-        doc.blocks.some((b) => b.type === 'paragraph' && b.height !== undefined)
+        doc.blocks.some(
+          (b) =>
+            b.type === 'paragraph' &&
+            (b.height !== undefined ||
+              b.runs ||
+              b.rule ||
+              b.text.includes('\n')),
+        )
         ? structuredClone(doc)
         : undefined,
     );
@@ -261,6 +379,8 @@ export function mountText(host: HTMLElement, options: Options) {
     right.setStart(r.endContainer, r.endOffset);
     const a = paragraph(left.toString()),
       b = paragraph(right.toString());
+    if (left.toString()) a.replaceChildren(left.cloneContents());
+    if (right.toString()) b.replaceChildren(right.cloneContents());
     const nodes = [
       ...(!imageId || left.toString() ? [a] : []),
       ...(imageId ? [spacer(imageId)] : []),
@@ -307,12 +427,49 @@ export function mountText(host: HTMLElement, options: Options) {
     const next = splitAtCaret();
     if (item && next) {
       const prefix = listPrefix(item.kind, item.depth, item.value + 1);
-      setParagraphText(next, prefix + (next.textContent || ''), prefix.length);
+      if (next.innerHTML === '<br>') next.replaceChildren();
+      const marker = document.createTextNode(prefix);
+      next.prepend(marker);
+      caret(marker, prefix.length);
     }
     paint();
     for (const k of keep) k.im.dy += k.y - (positions.get(k.im.id)?.y ?? k.y);
     persist(previous);
     paint();
+  }
+  function lineBreak() {
+    const r = range();
+    if (!r) return;
+    const previous = accepted;
+    r.deleteContents();
+    const node = document.createElement('br');
+    r.insertNode(node);
+    if (
+      !node.nextSibling ||
+      (node.nextSibling.nodeType === Node.TEXT_NODE &&
+        !node.nextSibling.textContent)
+    ) {
+      node.parentNode!.appendChild(document.createElement('br'));
+    }
+    editor.focus();
+    r.setStartAfter(node);
+    r.collapse(true);
+    getSelection()?.removeAllRanges();
+    getSelection()?.addRange(r);
+    persist(previous);
+    paint();
+  }
+  function undo(forward: boolean) {
+    const from = forward ? redo : history,
+      to = forward ? history : redo;
+    if (!from.length) return;
+    to.push(accepted);
+    doc = JSON.parse(from.pop()!);
+    active = null;
+    all = false;
+    render();
+    emit();
+    endCaret();
   }
   function indentList(backward: boolean) {
     const r = range();
@@ -355,6 +512,8 @@ export function mountText(host: HTMLElement, options: Options) {
     return false;
   }
   function paint() {
+    for (const p of editor.querySelectorAll<HTMLElement>('.text-paragraph'))
+      indent(p);
     if (dead) return;
     const rect = editor.getBoundingClientRect();
     const retained = new Set(doc.images.map((im) => im.asset));
@@ -600,6 +759,11 @@ export function mountText(host: HTMLElement, options: Options) {
       enterParagraph();
       return;
     }
+    if ((e as InputEvent).inputType === 'insertLineBreak') {
+      e.preventDefault();
+      lineBreak();
+      return;
+    }
     before = accepted;
     stationary = [];
     const r = range();
@@ -664,8 +828,10 @@ export function mountText(host: HTMLElement, options: Options) {
         persist(before);
         for (const paragraph of editor.querySelectorAll<HTMLElement>(
           '.text-paragraph',
-        ))
+        )) {
           linkify(paragraph);
+          indent(paragraph);
+        }
       } catch (e) {
         opts.error(e);
       }
@@ -737,7 +903,8 @@ export function mountText(host: HTMLElement, options: Options) {
     }
     if (e.key === 'Enter' && !cmd) {
       e.preventDefault();
-      enterParagraph();
+      if (e.shiftKey) lineBreak();
+      else enterParagraph();
       return;
     }
     if (
@@ -921,6 +1088,7 @@ export function mountText(host: HTMLElement, options: Options) {
       resizeObserver.disconnect();
       for (const url of urls.values()) URL.revokeObjectURL(url);
       tools.remove();
+      bar.remove();
       host.replaceChildren();
       opts.busy(false);
     },

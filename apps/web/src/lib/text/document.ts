@@ -8,8 +8,22 @@ export interface TextImage {
   angle: number;
   flow?: number;
 }
+export interface TextRun {
+  text: string;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  color?: string;
+  size?: number;
+}
 export type Block =
-  | { type: 'paragraph'; text: string; height?: number }
+  | {
+      type: 'paragraph';
+      text: string;
+      height?: number;
+      runs?: TextRun[];
+      rule?: boolean;
+    }
   | { type: 'image'; id: string };
 export interface TextDocument {
   version: 1;
@@ -71,6 +85,30 @@ export function validateDocument(doc: TextDocument): void {
       )
         throw Error('Invalid paragraph spacing');
       if (typeof b.text !== 'string') throw Error('Invalid paragraph');
+      if (b.rule !== undefined && typeof b.rule !== 'boolean')
+        throw Error('Invalid divider');
+      if (b.runs !== undefined) {
+        if (
+          !Array.isArray(b.runs) ||
+          b.runs.length > 20000 ||
+          b.runs.map((r) => r.text).join('') !== b.text
+        )
+          throw Error('Invalid text formatting');
+        for (const r of b.runs) {
+          if (
+            typeof r.text !== 'string' ||
+            ['bold', 'italic', 'underline'].some(
+              (k) =>
+                r[k as 'bold'] !== undefined &&
+                typeof r[k as 'bold'] !== 'boolean',
+            ) ||
+            (r.color !== undefined && !/^#[0-9a-f]{6}$/i.test(r.color)) ||
+            (r.size !== undefined &&
+              (!Number.isInteger(r.size) || r.size < 8 || r.size > 72))
+          )
+            throw Error('Invalid text formatting');
+        }
+      }
     } else {
       if (!ids.has(b.id) || anchors.has(b.id))
         throw Error('Invalid image anchor');

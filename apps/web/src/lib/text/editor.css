@@ -177,10 +177,36 @@
   touch-action: none;
 }
 
-.text-image-tools button::before {
-  content: '+';
-  margin-right: 9px;
-  font-size: 15px;
+.text-format-bar:not([hidden]) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  flex-shrink: 0;
+  padding: 6px clamp(25px, 3.5vw, 58px) 12px;
+}
+.text-format-bar button,
+.text-format-bar select {
+  white-space: nowrap;
+  min-height: 32px;
+  font-size: 12px;
+  padding: 4px 8px;
+}
+.text-format-bar input[type='color'] {
+  width: 32px;
+  height: 32px;
+  padding: 2px;
+  flex-shrink: 0;
+}
+.text-format-bar select {
+  width: 64px;
+  flex: 0 0 64px;
+}
+.text-format-bar button {
+  flex-shrink: 0;
+}
+.text-divider {
+  border-bottom: 1px solid var(--line);
 }
 
 .text-image-tools button {

@@ -14,10 +14,29 @@ pub enum Block {
         text: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         height: Option<f64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        runs: Option<Vec<Run>>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rule: Option<bool>,
     },
     Image {
         id: String,
     },
+}
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct Run {
+    text: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    bold: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    italic: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    underline: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    color: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    size: Option<u8>,
 }
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(deny_unknown_fields)]
@@ -77,9 +96,26 @@ pub fn valid(doc: &Document, body: &str) -> bool {
     let mut paragraphs = Vec::new();
     for block in &doc.blocks {
         match block {
-            Block::Paragraph { text, height } => {
+            Block::Paragraph {
+                text, height, runs, ..
+            } => {
                 if height.is_some_and(|v| !v.is_finite() || v <= 0. || v > 40.) {
                     return false;
+                }
+                if let Some(runs) = runs {
+                    if runs.len() > 20000
+                        || runs.iter().map(|r| r.text.as_str()).collect::<String>() != *text
+                        || runs.iter().any(|r| {
+                            r.size.is_some_and(|s| !(8..=72).contains(&s))
+                                || r.color.as_ref().is_some_and(|c| {
+                                    c.len() != 7
+                                        || !c.starts_with('#')
+                                        || !c[1..].bytes().all(|b| b.is_ascii_hexdigit())
+                                })
+                        })
+                    {
+                        return false;
+                    }
                 }
                 paragraphs.push(text.as_str());
             }
@@ -102,6 +138,8 @@ mod tests {
             blocks: vec![Block::Paragraph {
                 text: "Hello".into(),
                 height: None,
+                runs: None,
+                rule: None,
             }],
             images: vec![],
         };

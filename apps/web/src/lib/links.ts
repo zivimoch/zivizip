@@ -38,18 +38,26 @@ export function linkify(element: HTMLElement) {
     range.setEnd(selection.anchorNode, selection.anchorOffset);
     offset = range.toString().length;
   }
-  element.replaceChildren(
-    ...parts.map((part) => {
-      if (!part.href) return document.createTextNode(part.text);
-      const a = document.createElement('a');
-      a.href = part.href;
-      a.textContent = part.text;
-      a.className = 'content-link';
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      return a;
-    }),
-  );
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+  const nodes: Text[] = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode as Text);
+  for (const node of nodes) {
+    if (node.parentElement?.closest('a')) continue;
+    const fragments = linkParts(node.textContent || '');
+    if (!fragments.some((part) => part.href)) continue;
+    node.replaceWith(
+      ...fragments.map((part) => {
+        if (!part.href) return document.createTextNode(part.text);
+        const a = document.createElement('a');
+        a.href = part.href;
+        a.textContent = part.text;
+        a.className = 'content-link';
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        return a;
+      }),
+    );
+  }
   if (offset !== undefined && selection) {
     const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
     let node;

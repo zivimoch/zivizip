@@ -22,6 +22,16 @@ test('install action follows browser availability and installation events', asyn
     exact: true,
   });
   await expect(install).toBeVisible();
+  await expect(
+    page.locator('#desktop-install-slot').getByRole('button'),
+  ).toBeVisible();
+  const desktopInstall = await install.boundingBox();
+  const account = await page
+    .getByRole('button', { name: 'Account', exact: true })
+    .boundingBox();
+  expect(desktopInstall!.y + desktopInstall!.height).toBeLessThanOrEqual(
+    account!.y,
+  );
   await page.setViewportSize({ width: 390, height: 844 });
   const box = await install.boundingBox();
   expect(box!.y).toBeLessThan(48);

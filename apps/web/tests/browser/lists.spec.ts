@@ -125,7 +125,7 @@ test('automatic lists continue, alternate nested markers, exit and survive reloa
   await expect(page.locator('.text-paragraph').last()).toBeEmpty();
 
   const add = (await page
-    .getByRole('button', { name: 'Add image', exact: true })
+    .getByRole('button', { name: /Tools/ })
     .boundingBox())!;
   const breadcrumb = (await page.locator('.breadcrumb').boundingBox())!;
   expect(add.y).toBeGreaterThanOrEqual(breadcrumb.y);

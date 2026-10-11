@@ -132,3 +132,11 @@ This document describes the target interaction model. The [verification scope](.
 - Finance entry order is Date, Type, Category, Amount, optional Description. Date groups show both income and expense totals; empty descriptions display the category as the ledger label. Planning cards have equal heights with independently scrolling item lists.
 - Money fields format whole currency units while typing. Workspace display currency defaults to IDR, with USD/EUR/SGD/MYR/JPY available in Settings; switching currency changes presentation, not stored amounts or exchange rates.
 - Scrollbars are thin with transparent tracks and unobtrusive thumbs revealed on hover/focus. HTTP(S) links in Text notes and Tasks open in a new tab, appear white with dotted underlines, and do not activate task editing or dragging.
+
+## Notes editing and sharing
+
+- Desktop installation is offered above the account menu in the sidebar; mobile retains the header action. Installed/standalone clients do not show the action.
+- Text Notes start with a collapsed Tools toggle beside the breadcrumb. The expanded row provides color, size, bold, italic, underline, divider, undo, redo and image insertion.
+- List markers followed by a space convert automatically. Lists use hanging indentation; Enter continues or exits an empty item, Shift+Enter inserts a line within the current item, and Tab/Shift+Tab change nesting.
+- Only account notes can create share links. Anyone holding a link can read the note without login. Editing is opt-in and enforced by the API. Owners can revoke the link. Guest workspaces are never uploaded as part of sharing.
+- Shared-note edits preserve owner metadata and reject stale revisions without overwriting either editor's unsaved content. Shared pages do not expose the rest of the account workspace.

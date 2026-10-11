@@ -1,6 +1,7 @@
 mod draw;
 mod finance;
 mod planning;
+mod sharing;
 mod tasks;
 mod text;
 use argon2::{password_hash::SaltString, Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
@@ -521,6 +522,8 @@ fn schema(db: &Connection) -> rusqlite::Result<()> {
  INSERT OR IGNORE INTO finance_workspace VALUES(1,'{\"revision\":0,\"items\":[]}');
  INSERT OR IGNORE INTO task_workspace VALUES(1,'{\"revision\":0,\"items\":[]}');
  CREATE TABLE IF NOT EXISTS notes(id TEXT PRIMARY KEY,revision INTEGER NOT NULL,created_at INTEGER NOT NULL,data TEXT NOT NULL);
+ CREATE TABLE IF NOT EXISTS note_shares(note_id TEXT PRIMARY KEY,token TEXT UNIQUE NOT NULL,editable INTEGER NOT NULL);
+ CREATE TABLE IF NOT EXISTS shared_uploads(token TEXT NOT NULL,asset TEXT NOT NULL,PRIMARY KEY(token,asset));
  CREATE TABLE IF NOT EXISTS interests(id INTEGER PRIMARY KEY,email TEXT NOT NULL,message TEXT NOT NULL,created_at INTEGER NOT NULL);
  PRAGMA user_version=1;")
 }
@@ -599,6 +602,17 @@ async fn main() {
             get(planning::list).put(planning::update),
         )
         .route("/api/notes/{id}", put(update).delete(remove))
+        .route(
+            "/api/notes/{id}/share",
+            get(sharing::settings)
+                .put(sharing::configure)
+                .delete(sharing::revoke),
+        )
+        .route("/api/shared/{token}", get(sharing::read).put(sharing::edit))
+        .route(
+            "/api/shared/{token}/media/{id}",
+            get(sharing::media).put(sharing::upload),
+        )
         .route("/api/media/{id}", get(get_media).put(put_media))
         .route("/api/events", get(events))
         .route("/api/registration-interest", post(interest).get(interests))

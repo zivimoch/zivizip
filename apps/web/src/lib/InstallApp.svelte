@@ -13,6 +13,25 @@
   let help: HTMLDialogElement;
   let message = '';
   const t = (en: string, id: string) => (language === 'id' ? id : en);
+  function place(node: HTMLElement) {
+    const marker = document.createComment('Install action');
+    node.after(marker);
+    const mobile = matchMedia('(max-width: 800px)');
+    const move = () => {
+      const slot = document.getElementById('desktop-install-slot');
+      if (!mobile.matches && slot) slot.append(node);
+      else marker.before(node);
+    };
+    queueMicrotask(move);
+    mobile.addEventListener('change', move);
+    return {
+      destroy() {
+        mobile.removeEventListener('change', move);
+        marker.remove();
+        node.remove();
+      },
+    };
+  }
   function markInstalled() {
     installed = true;
     pending = null;
@@ -86,13 +105,13 @@
 </script>
 
 {#if !installed && (pending || ios || busy)}
-  <div class="pwa-install">
+  <div class="pwa-install" use:place>
     <button
       onclick={install}
       disabled={busy}
       aria-label={t('Install Zivizip', 'Pasang Zivizip')}
     >
-      <Icon name="download" />{t('Install app', 'Pasang aplikasi')}
+      <Icon name="download" /><span>{t('Install app', 'Pasang aplikasi')}</span>
     </button>
   </div>
 {/if}
@@ -121,22 +140,20 @@
 
 <style>
   .pwa-install {
-    height: 40px;
     display: flex;
-    justify-content: flex-end;
     align-items: center;
-    padding: 0 12px;
+    margin-bottom: 8px;
   }
   .pwa-install button {
     display: inline-flex;
     align-items: center;
     gap: 7px;
-    padding: 6px 10px;
+    padding: 12px 16px;
+    border: 0;
+    background: transparent;
+    white-space: nowrap;
     font-size: 12px;
     color: var(--accent);
-  }
-  :global(body:has(.pwa-install) .workspace) {
-    height: calc(100dvh - 40px);
   }
   .actions {
     display: flex;
@@ -150,6 +167,7 @@
       top: 4px;
       height: 40px;
       padding: 0;
+      margin: 0;
       z-index: 101;
     }
     .pwa-install button {
