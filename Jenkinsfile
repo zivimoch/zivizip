@@ -44,6 +44,7 @@ pipeline {
                     set +e
                     docker start -a "$browser"
                     result=$?
+                    rm -rf ./browser-results
                     docker cp "$browser":/app/apps/web/test-results ./browser-results
                     exit "$result"
                 '''

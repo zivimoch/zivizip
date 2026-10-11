@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import fs from 'node:fs';
 async function create(page: Page, name = 'Image note') {
+  await page.mouse.move(650, 300);
   await page.getByRole('button', { name: 'New note', exact: true }).click();
   await page.getByLabel('Name', { exact: true }).fill(name);
   await page.getByRole('button', { name: 'Create', exact: true }).click();
