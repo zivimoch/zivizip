@@ -25,3 +25,11 @@ The dashboard listens only on the VPS loopback interface at port 8081. Open an S
 The Compose project and credentials are managed separately from application releases. Persist controller home, agent workspace and build cache. Back up controller home and the private configuration separately; never publish their contents. Do not expose the dashboard or Docker daemon directly to the internet.
 
 The browser stage covers installation, lists, formatting, media, guest persistence, offline behavior and account sharing. It starts a disposable API container with generated test credentials on a dedicated build network. Neither credentials nor data come from production; test containers are removed when the stage exits, including on failure. Browser failure artifacts are retained by Jenkins. This is not a load test or a substitute for production monitoring.
+
+## Environments
+
+- Development runs locally with its own configuration and database.
+- CI creates a temporary application and database for automated tests. It is removed after the run and is not a staging deployment.
+- Production serves the live application and persistent user data.
+
+A persistent staging environment is not configured. A future staging gate should use separate secrets, sessions and storage, then promote the same tested image to production after approval. Branch names identify code history; they do not create or isolate runtime environments.

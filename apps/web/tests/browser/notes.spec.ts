@@ -1,4 +1,29 @@
 import { test, expect } from '@playwright/test';
+test('editing waits until the initial workspace has been resolved', async ({
+  page,
+}) => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  await page.route('**/api/session', async (route) => {
+    await gate;
+    await route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'Login required' }),
+    });
+  });
+  await page.goto('/');
+  await expect(
+    page.getByRole('button', { name: 'New note', exact: true }),
+  ).toHaveCount(0);
+  release();
+  await page
+    .getByRole('button', { name: 'Continue as guest', exact: true })
+    .click();
+  await expect(
+    page.getByRole('button', { name: 'New note', exact: true }),
+  ).toBeEnabled();
+});
 test('guest note persists, closing only hides it, backup downloads', async ({
   page,
 }) => {

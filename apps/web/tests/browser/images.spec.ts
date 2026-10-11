@@ -282,7 +282,11 @@ test('account images upload once, synchronize privately and remain cached offlin
   test.skip(!fs.existsSync(path), 'Local owner account required');
   const credentials = JSON.parse(fs.readFileSync(path, 'utf8')),
     headers = { Origin: 'http://127.0.0.1:4174', 'X-Zivizip': '1' };
-  await context.request.post('/api/session', { headers, data: credentials });
+  expect(
+    (
+      await context.request.post('/api/session', { headers, data: credentials })
+    ).ok(),
+  ).toBe(true);
   let id = '',
     uploads = 0;
   page.on('request', (r) => {
@@ -290,7 +294,7 @@ test('account images upload once, synchronize privately and remain cached offlin
   });
   const other = await browser.newContext();
   try {
-    await page.goto('/');
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
     await create(page, `Image Sync ${Date.now()}`);
     await page.getByRole('textbox', { name: 'Note content' }).click();
     await paste(page);
@@ -341,7 +345,9 @@ test('account images upload once, synchronize privately and remain cached offlin
     ).toBe(401);
     await other.addCookies(await context.cookies());
     const second = await other.newPage();
-    await second.goto('http://127.0.0.1:4174');
+    await second.goto('http://127.0.0.1:4174', {
+      waitUntil: 'domcontentloaded',
+    });
     await second.getByRole('button', { name: 'Detail', exact: true }).click();
     await second
       .locator('.sidebar')

@@ -101,7 +101,7 @@
   let alive = true;
   let workspaceEpoch = 0;
   const redirectedNotes = new Map<string, string>();
-  $: writable = !switching && (!account || (online && verified));
+  $: writable = ready && !switching && (!account || (online && verified));
   $: current = notes.find((n) => n.id === prefs.active);
   $: openNotes = prefs.open
     .map((id) => notes.find((n) => n.id === id))
