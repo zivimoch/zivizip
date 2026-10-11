@@ -1,7 +1,7 @@
 <script lang="ts">
   import '../../app.css';
   import { onMount } from 'svelte';
-  import { api } from '$lib/account';
+  import { api, ApiError } from '$lib/account';
   import type { Note } from '$lib/storage';
   import type { TextDocument } from '$lib/text/document';
   import TextEditor from '$lib/TextEditor.svelte';
@@ -15,7 +15,11 @@
     busy = false;
   let language: 'en' | 'id' = 'en';
   let toolbar: HTMLElement;
-  const t = (en: string, id: string) => (language === 'id' ? id : en);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let version = 0,
+    blocked = false,
+    active = true;
+  const t = (en: string, id: string) => ({ en, id })[language];
   function fail(e: unknown) {
     error = e instanceof Error ? e.message : String(e);
   }
@@ -38,31 +42,65 @@
     if (/^[a-f0-9]{64}$/.test(token)) void load();
     else error = 'Invalid share link';
     const warn = (e: BeforeUnloadEvent) => {
-      if (dirty) {
+      if (dirty || busy) {
         e.preventDefault();
         e.returnValue = '';
       }
     };
     window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
+    const reconnect = () => schedule();
+    window.addEventListener('online', reconnect);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+      window.removeEventListener('beforeunload', warn);
+      window.removeEventListener('online', reconnect);
+    };
   });
+  function schedule(delay = 600) {
+    clearTimeout(timer);
+    if (active && dirty && editable && !blocked)
+      timer = setTimeout(save, delay);
+  }
+  function setBusy(value: boolean) {
+    busy = value;
+    if (!busy) schedule();
+  }
   function change(body: string, rich?: TextDocument) {
-    if (note) {
+    if (note && editable) {
       note = { ...note, body, rich };
+      version++;
       dirty = true;
+      schedule();
     }
   }
   async function save() {
-    if (!note || !editable || saving) return;
+    if (!active || !note || !editable || !dirty || saving || busy || blocked)
+      return;
+    const sentVersion = version;
+    const draft = note;
     saving = true;
     error = '';
     try {
-      note = await api<Note>(`/shared/${token}`, 'PUT', note);
-      dirty = false;
+      const saved = await api<Note>(`/shared/${token}`, 'PUT', draft);
+      if (!active) return;
+      // A response acknowledges only the submitted version, not newer typing.
+      note =
+        version === sentVersion
+          ? saved
+          : { ...note, revision: saved.revision, updatedAt: saved.updatedAt };
+      dirty = version !== sentVersion;
     } catch (e) {
+      if (!active) return;
+      blocked =
+        e instanceof ApiError &&
+        e.status >= 400 &&
+        e.status < 500 &&
+        e.status !== 429;
       fail(e);
     } finally {
       saving = false;
+      schedule(error ? 3000 : 600);
     }
   }
   async function put(blob: Blob) {
@@ -95,17 +133,16 @@
 >
 <main class="shared-note">
   <header>
-    <a href="/">zivizip</a><select aria-label="Language" bind:value={language}
-      ><option value="en">English</option><option value="id">Indonesia</option
-      ></select
-    ><span
+    <a href="/">zivizip</a><span
       >{editable
         ? t('Editing allowed', 'Boleh mengedit')
         : t('Read only', 'Hanya baca')}</span
-    >{#if editable}<button disabled={!dirty || saving || busy} onclick={save}
-        >{saving
-          ? t('Saving…', 'Menyimpan…')
-          : t('Save changes', 'Simpan perubahan')}</button
+    >{#if editable}<span role="status"
+        >{error
+          ? t('Not saved', 'Belum tersimpan')
+          : saving || busy || dirty
+            ? t('Saving…', 'Menyimpan…')
+            : t('Saved', 'Tersimpan')}</span
       >{/if}
   </header>
   {#if error}<p role="alert">{error}</p>{/if}
@@ -117,23 +154,23 @@
     {#if note.kind === 'draw'}<DrawEditor
         body={note.body}
         name={note.name}
-        writable={editable && !saving}
+        writable={editable}
         {language}
         onchange={(body) => change(body)}
         onviewport={() => {}}
-        onbusy={(value) => (busy = value)}
+        onbusy={setBusy}
         onerror={fail}
       />
     {:else}<TextEditor
         body={note.body}
         rich={note.rich}
         {toolbar}
-        writable={editable && !saving}
+        writable={editable}
         {language}
         onchange={change}
         onput={put}
         onget={get}
-        onbusy={(value) => (busy = value)}
+        onbusy={setBusy}
         onerror={fail}
       />{/if}
   {/if}

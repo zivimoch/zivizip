@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
+import { emptyScene } from '../../src/lib/draw/scene';
 
 test('owner shares a note, guests edit only when allowed, and revocation blocks access', async ({
   page,
@@ -68,10 +69,15 @@ test('owner shares a note, guests edit only when allowed, and revocation blocks 
       );
     });
     await expect(page.locator('.text-image img')).toBeVisible();
-    await page.getByRole('button', { name: 'Save changes' }).click();
+    await expect(page.getByRole('combobox', { name: 'Language' })).toHaveCount(
+      0,
+    );
     await expect(
       page.getByRole('button', { name: 'Save changes' }),
-    ).toBeDisabled();
+    ).toHaveCount(0);
+    await expect(page.locator('header').getByRole('status')).toHaveText(
+      'Saved',
+    );
     const notes = await (await request.get('/api/notes')).json();
     note = notes.find((n: { id: string }) => n.id === note.id);
     expect(note.body.trim()).toBe('Guest contribution');
@@ -82,7 +88,128 @@ test('owner shares a note, guests edit only when allowed, and revocation blocks 
       'Shared note not found',
     );
   } finally {
+    const latest = await (await request.get('/api/notes')).json();
+    note = latest.find((n: { id: string }) => n.id === note.id) || note;
     await request.delete(`/api/notes/${note.id}`, { headers, data: note });
     await request.delete('/api/session', { headers });
   }
+});
+
+test('shared autosave retains typing during a pending save and uses the acknowledged revision', async ({
+  page,
+}) => {
+  const token = 'a'.repeat(64);
+  let note = {
+    id: crypto.randomUUID(),
+    name: 'Shared',
+    category: 'General',
+    icon: 'note',
+    kind: 'text',
+    body: 'Original',
+    revision: 1,
+    createdAt: 1,
+    updatedAt: 1,
+  };
+  const writes: any[] = [];
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  await page.route(`**/api/shared/${token}`, async (route) => {
+    if (route.request().method() === 'GET')
+      return route.fulfill({ json: { note, editable: true } });
+    const sent = route.request().postDataJSON();
+    writes.push(sent);
+    if (writes.length === 1) await gate;
+    expect(sent.revision).toBe(note.revision);
+    note = { ...sent, revision: note.revision + 1 };
+    await route.fulfill({ json: note });
+  });
+  await page.goto(`/shared/#${token}`);
+  const editor = page.getByRole('textbox', { name: 'Note content' });
+  await editor.fill('First edit');
+  await expect.poll(() => writes.length).toBe(1);
+  await expect(editor).toHaveAttribute('contenteditable', 'true');
+  await editor.fill('Newer edit while saving');
+  release();
+  await expect(page.locator('header').getByRole('status')).toHaveText('Saved');
+  expect(writes).toHaveLength(2);
+  expect(note.body).toBe('Newer edit while saving');
+  await expect(editor).toHaveText(note.body);
+});
+
+test('shared autosave retries a temporary failure but preserves the draft on conflict', async ({
+  page,
+}) => {
+  const token = 'b'.repeat(64);
+  const note = {
+    id: crypto.randomUUID(),
+    name: 'Shared',
+    category: 'General',
+    icon: 'note',
+    kind: 'text',
+    body: 'Original',
+    revision: 1,
+    createdAt: 1,
+    updatedAt: 1,
+  };
+  let attempts = 0;
+  await page.route(`**/api/shared/${token}`, async (route) => {
+    if (route.request().method() === 'GET')
+      return route.fulfill({ json: { note, editable: true } });
+    attempts++;
+    await route.fulfill({
+      status: attempts === 1 ? 503 : 409,
+      json: {
+        error:
+          attempts === 1 ? 'Temporarily unavailable' : 'Note changed elsewhere',
+      },
+    });
+  });
+  await page.goto(`/shared/#${token}`);
+  const editor = page.getByRole('textbox', { name: 'Note content' });
+  await editor.fill('Keep this draft');
+  await expect(page.getByRole('alert')).toHaveText('Temporarily unavailable');
+  await expect(page.getByRole('alert')).toContainText('Note changed elsewhere');
+  await expect(editor).toHaveText('Keep this draft');
+  await editor.fill('Still keep this draft');
+  await page.waitForTimeout(3300);
+  expect(attempts).toBe(2);
+  await expect(page.locator('header').getByRole('status')).toHaveText(
+    'Not saved',
+  );
+});
+
+test('shared Draw edits autosave and survive reload on a mobile viewport', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const token = 'c'.repeat(64);
+  let note = {
+    id: crypto.randomUUID(),
+    name: 'Drawing',
+    category: 'General',
+    icon: 'draw',
+    kind: 'draw',
+    body: JSON.stringify(emptyScene()),
+    revision: 1,
+    createdAt: 1,
+    updatedAt: 1,
+  };
+  await page.route(`**/api/shared/${token}`, async (route) => {
+    if (route.request().method() === 'GET')
+      return route.fulfill({ json: { note, editable: true } });
+    note = { ...route.request().postDataJSON(), revision: note.revision + 1 };
+    await route.fulfill({ json: note });
+  });
+  await page.goto(`/shared/#${token}`);
+  await page.getByRole('button', { name: 'Rectangle', exact: true }).click();
+  const box = (await page.locator('.drawing').boundingBox())!;
+  await page.mouse.move(box.x + 40, box.y + 80);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 180, box.y + 180, { steps: 5 });
+  await page.mouse.up();
+  await expect(page.locator('[data-shape]')).toHaveCount(1);
+  await expect.poll(() => note.revision).toBe(2);
+  await expect(page.locator('header').getByRole('status')).toHaveText('Saved');
+  await page.reload();
+  await expect(page.locator('[data-shape]')).toHaveCount(1);
 });
