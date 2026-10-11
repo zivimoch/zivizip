@@ -36,7 +36,7 @@ pipeline {
                     printf '{"username":"ci-owner","password":"%s"}' "$password" > "$credential"
                     chmod 644 "$credential"
                     docker network create "$network"
-                    docker create --name "$api" --network "$network" --network-alias notes -e OWNER_FILE=/tmp/owner.json -e DATABASE_PATH=/data/notes.sqlite -e ALLOWED_ORIGINS=http://127.0.0.1:4174 zivizip-api:$RELEASE
+                    docker create --name "$api" --network "$network" --network-alias notes -e OWNER_FILE=/tmp/owner.json -e DATABASE_PATH=/data/notes.sqlite -e ALLOWED_ORIGINS=http://127.0.0.1:4174 -e COOKIE_SECURE=false zivizip-api:$RELEASE
                     docker cp "$credential" "$api":/tmp/owner.json
                     docker start "$api"
                     docker create --name "$browser" --network "$network" zivizip-browser:$RELEASE
