@@ -84,11 +84,9 @@
     try {
       const saved = await api<Note>(`/shared/${token}`, 'PUT', draft);
       if (!active) return;
-      // A response acknowledges only the submitted version, not newer typing.
-      note =
-        version === sentVersion
-          ? saved
-          : { ...note, revision: saved.revision, updatedAt: saved.updatedAt };
+      // The server acknowledges this draft; it does not replace the live editor.
+      // Re-serialized rich text can reset selection and undo even when unchanged.
+      note = { ...note, revision: saved.revision, updatedAt: saved.updatedAt };
       dirty = version !== sentVersion;
     } catch (e) {
       if (!active) return;

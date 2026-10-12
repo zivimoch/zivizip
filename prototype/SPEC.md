@@ -141,3 +141,4 @@ This document describes the target interaction model. The [verification scope](.
 - Only account notes can create share links. Anyone holding a link can read the note without login. Editing is opt-in and enforced by the API. Owners can revoke the link. Guest workspaces are never uploaded as part of sharing.
 - Shared-note edits preserve owner metadata and reject stale revisions without overwriting either editor's unsaved content. Shared pages do not expose the rest of the account workspace.
 - Shared pages have no language dropdown or manual Save button. Text and Draw edits save automatically after a short pause, without interrupting editing. A status indicates pending, saved or failed writes; temporary connection failures retry, while revision conflicts preserve the local draft and stop automatic writes.
+- Autosave acknowledgements preserve the live editor's caret, selection and undo history, including formatted paragraphs and nested lists.

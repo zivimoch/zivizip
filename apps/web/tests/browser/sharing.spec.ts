@@ -2,6 +2,67 @@ import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 import { emptyScene } from '../../src/lib/draw/scene';
 
+test('shared save acknowledgements preserve the caret and undo history in formatted text', async ({
+  page,
+}) => {
+  const token = 'd'.repeat(64);
+  let note = {
+    id: crypto.randomUUID(),
+    name: 'Caret regression',
+    category: 'General',
+    icon: 'note',
+    kind: 'text',
+    body: 'Alpha beta\n1. List item',
+    revision: 1,
+    createdAt: 1,
+    updatedAt: 1,
+    rich: {
+      version: 1,
+      blocks: [
+        {
+          type: 'paragraph',
+          text: 'Alpha beta',
+          runs: [{ text: 'Alpha beta', bold: true }],
+        },
+        { type: 'paragraph', text: '1. List item' },
+      ],
+      images: [],
+    },
+  };
+  await page.route(`**/api/shared/${token}`, async (route) => {
+    if (route.request().method() === 'GET')
+      return route.fulfill({ json: { note, editable: true } });
+    const sent = route.request().postDataJSON();
+    // The Rust API serializes run text before optional formatting fields.
+    for (const block of sent.rich.blocks)
+      if (block.runs)
+        block.runs = block.runs.map((run: any) => ({
+          text: run.text,
+          bold: run.bold,
+        }));
+    note = { ...sent, revision: note.revision + 1 };
+    await route.fulfill({ json: note });
+  });
+  await page.goto(`/shared/#${token}`);
+  const first = page.locator('.text-paragraph').first();
+  await first.click();
+  await page.keyboard.press('Home');
+  for (let i = 0; i < 6; i++) await page.keyboard.press('ArrowRight');
+  await page.keyboard.type('one ');
+  await expect(page.locator('header').getByRole('status')).toHaveText('Saved');
+  await page.keyboard.type('two ');
+  await expect(page.locator('header').getByRole('status')).toHaveText('Saved');
+  await expect(first).toHaveText('Alpha one two beta');
+  for (let i = 0; i < 4; i++) await page.keyboard.press('Backspace');
+  await expect(page.locator('header').getByRole('status')).toHaveText('Saved');
+  await expect(first).toHaveText('Alpha one beta');
+  await page.keyboard.press('Control+z');
+  await expect(first).toHaveText('Alpha one tbeta');
+  await expect(page.locator('.text-paragraph').nth(1)).toHaveText(
+    '1. List item',
+  );
+});
+
 test('owner shares a note, guests edit only when allowed, and revocation blocks access', async ({
   page,
   request,
