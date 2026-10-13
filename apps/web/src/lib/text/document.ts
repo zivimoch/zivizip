@@ -30,6 +30,15 @@ export interface TextDocument {
   blocks: Block[];
   images: TextImage[];
 }
+// JSON object field order is not document content. API serializers may reorder it.
+export const documentSnapshot = (doc: TextDocument): string =>
+  JSON.stringify(doc, (_key, value) =>
+    value && typeof value === 'object' && !Array.isArray(value)
+      ? Object.fromEntries(
+          Object.entries(value).sort(([a], [b]) => a.localeCompare(b)),
+        )
+      : value,
+  );
 export const fromText = (body: string): TextDocument => ({
   version: 1,
   blocks: body.split('\n').map((text) => ({ type: 'paragraph', text })),

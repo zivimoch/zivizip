@@ -1,10 +1,29 @@
 import { expect, it } from 'vitest';
 import {
   fromText,
+  documentSnapshot,
   plainText,
   validateDocument,
   type TextDocument,
 } from '../src/lib/text/document';
+it('compares text documents independently of API object field order', () => {
+  const doc = fromText('First\nLast');
+  const reordered: TextDocument = {
+    images: [],
+    blocks: doc.blocks.map((b) => ({
+      text: 'text' in b ? b.text : '',
+      type: 'paragraph',
+    })),
+    version: 1,
+  };
+  expect(documentSnapshot(reordered)).toBe(documentSnapshot(doc));
+  expect(documentSnapshot(fromText('First\nChanged'))).not.toBe(
+    documentSnapshot(doc),
+  );
+  expect(documentSnapshot(fromText('Last\nFirst'))).not.toBe(
+    documentSnapshot(doc),
+  );
+});
 it('preserves paragraphs and validates image references without accepting HTML', () => {
   expect(plainText(fromText('First\n\nLast'))).toBe('First\n\nLast');
   const doc: TextDocument = {

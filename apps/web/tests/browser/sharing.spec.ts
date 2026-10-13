@@ -2,6 +2,60 @@ import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 import { emptyScene } from '../../src/lib/draw/scene';
 
+test('deleting unformatted shared text preserves the caret across paragraph merges', async ({
+  page,
+}) => {
+  const token = 'e'.repeat(64);
+  let note = {
+    id: crypto.randomUUID(),
+    name: 'Deletion regression',
+    category: 'General',
+    icon: 'note',
+    kind: 'text',
+    body: 'First line\n1. Second line\nLast words',
+    revision: 1,
+    createdAt: 1,
+    updatedAt: 1,
+    // Shared GET returns object keys in serde_json::Value order.
+    rich: {
+      blocks: [
+        { text: 'First line', type: 'paragraph' },
+        { text: '1. Second line', type: 'paragraph' },
+        { text: 'Last words', type: 'paragraph' },
+      ],
+      images: [],
+      version: 1,
+    },
+  };
+  await page.route(`**/api/shared/${token}`, async (route) => {
+    if (route.request().method() === 'GET')
+      return route.fulfill({ json: { note, editable: true } });
+    note = { ...route.request().postDataJSON(), revision: note.revision + 1 };
+    await route.fulfill({ json: note });
+  });
+  await page.goto(`/shared/#${token}`);
+  await page.locator('.text-paragraph').last().click();
+  await page.keyboard.press('End');
+  await page.keyboard.press('Backspace');
+  await page.keyboard.press('Backspace');
+  await page.keyboard.type('XY');
+  await expect(page.locator('.text-paragraph').last()).toHaveText('Last worXY');
+  await expect(page.locator('header').getByRole('status')).toHaveText('Saved');
+  await page.keyboard.press('Home');
+  await page.keyboard.press('Backspace');
+  await page.keyboard.type(' joined ');
+  await expect(page.locator('.text-paragraph').last()).toHaveText(
+    '1. Second line joined Last worXY',
+  );
+  await page.keyboard.press('Delete');
+  await expect(page.locator('.text-paragraph').last()).toHaveText(
+    '1. Second line joined ast worXY',
+  );
+  await expect(page.locator('.text-paragraph').first()).toHaveText(
+    'First line',
+  );
+});
+
 test('shared save acknowledgements preserve the caret and undo history in formatted text', async ({
   page,
 }) => {

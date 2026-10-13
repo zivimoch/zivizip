@@ -2,6 +2,7 @@ import { linkify } from '../links';
 import { readRuns, renderRuns } from './format';
 import {
   fromText,
+  documentSnapshot,
   plainText,
   validateDocument,
   type TextDocument,
@@ -27,7 +28,7 @@ export function mountText(host: HTMLElement, options: Options) {
   let opts = options,
     doc = structuredClone(opts.rich || fromText(opts.body));
   validateDocument(doc);
-  let accepted = JSON.stringify(doc),
+  let accepted = documentSnapshot(doc),
     active: string | null = null,
     all = false,
     dead = false,
@@ -281,7 +282,7 @@ export function mountText(host: HTMLElement, options: Options) {
   function persist(previous = accepted) {
     read();
     validateDocument(doc);
-    const next = JSON.stringify(doc);
+    const next = documentSnapshot(doc);
     if (next === previous || next === accepted) return;
     history.push(previous);
     while (
@@ -307,7 +308,7 @@ export function mountText(host: HTMLElement, options: Options) {
     );
   }
   function emit() {
-    accepted = JSON.stringify(doc);
+    accepted = documentSnapshot(doc);
     opts.change(
       plainText(doc),
       doc.images.length ||
@@ -1072,7 +1073,7 @@ export function mountText(host: HTMLElement, options: Options) {
       editor.contentEditable = String(opts.writable && !uploading);
       editor.setAttribute('aria-readonly', String(!opts.writable));
       add.disabled = !opts.writable || uploading;
-      const nextDoc = JSON.stringify(next.rich || fromText(next.body));
+      const nextDoc = documentSnapshot(next.rich || fromText(next.body));
       if (nextDoc !== accepted && !gesture && !uploading) {
         doc = JSON.parse(nextDoc);
         validateDocument(doc);
