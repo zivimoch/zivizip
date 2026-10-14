@@ -138,6 +138,7 @@ This document describes the target interaction model. The [verification scope](.
 - Desktop installation is offered above the account menu in the sidebar; mobile retains the header action. Installed/standalone clients do not show the action.
 - Text Notes start with a collapsed Tools toggle beside the breadcrumb. The expanded row provides color, size, bold, italic, underline, divider, undo, redo and image insertion.
 - List markers followed by a space convert automatically. Lists use hanging indentation; Enter continues or exits an empty item, Shift+Enter inserts a line within the current item, and Tab/Shift+Tab change nesting.
+- Continuation and wrapped lines align with the first content character after the list marker, using its rendered width rather than inserted whitespace or a fixed character-width estimate.
 - Only account notes can create share links. Anyone holding a link can read the note without login. Editing is opt-in and enforced by the API. Owners can revoke the link. Guest workspaces are never uploaded as part of sharing.
 - Shared-note edits preserve owner metadata and reject stale revisions without overwriting either editor's unsaved content. Shared pages do not expose the rest of the account workspace.
 - Shared pages have no language dropdown or manual Save button. Text and Draw edits save automatically after a short pause, without interrupting editing. A status indicates pending, saved or failed writes; temporary connection failures retry, while revision conflicts preserve the local draft and stop automatic writes.

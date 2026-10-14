@@ -122,6 +122,7 @@ export function mountText(host: HTMLElement, options: Options) {
       font.removeAttribute('size');
     }
     persist(previous);
+    indentAll();
     paint();
   }
   const color = document.createElement('input');
@@ -205,8 +206,36 @@ export function mountText(host: HTMLElement, options: Options) {
   }
   function indent(p: HTMLElement) {
     const item = listItem(p.textContent || '');
-    p.style.paddingLeft = item ? `${24 * (item.depth + 1)}px` : '';
-    p.style.textIndent = item ? `-${item.prefix.length}ch` : '';
+    if (!item) {
+      p.style.paddingLeft = p.style.textIndent = '';
+      return;
+    }
+    if (!p.isConnected) return;
+    // Measure the rendered marker, including its font formatting, not a ch estimate.
+    const width = (count: number) => {
+      if (!count) return 0;
+      const range = document.createRange();
+      range.selectNodeContents(p);
+      const walker = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
+      let node: Node | null;
+      while ((node = walker.nextNode())) {
+        const length = node.textContent?.length || 0;
+        if (count <= length) {
+          range.setEnd(node, count);
+          return range.getBoundingClientRect().width;
+        }
+        count -= length;
+      }
+      return 0;
+    };
+    const prefix = width(item.prefix.length);
+    const whitespace = width(item.prefix.match(/^[ \t]*/)?.[0].length || 0);
+    p.style.paddingLeft = `${24 * item.depth + prefix - whitespace}px`;
+    p.style.textIndent = `${-prefix}px`;
+  }
+  function indentAll() {
+    for (const p of editor.querySelectorAll<HTMLElement>('.text-paragraph'))
+      indent(p);
   }
   function spacer(id: string) {
     const p = document.createElement('div');
@@ -223,6 +252,7 @@ export function mountText(host: HTMLElement, options: Options) {
       ),
     );
     if (!editor.childNodes.length) editor.append(paragraph());
+    indentAll();
     paint();
   }
   editor.addEventListener('dragstart', (event) => {
@@ -476,12 +506,18 @@ export function mountText(host: HTMLElement, options: Options) {
     const r = range();
     if (!r) return false;
     const p = targetParagraph(r),
-      item = listItem(p.textContent || '');
+      item = listItem(
+        readRuns(p)
+          .map((run) => run.text)
+          .join(''),
+      );
     if (!item) return false;
     const prefix = r.cloneRange();
     prefix.selectNodeContents(p);
     prefix.setEnd(r.startContainer, r.startOffset);
-    const offset = prefix.toString().length;
+    const offset =
+      prefix.toString().length +
+      prefix.cloneContents().querySelectorAll('br').length;
     const preceding = [...editor.children]
       .slice(0, [...editor.children].indexOf(p))
       .map((el) => el.textContent || '');
@@ -493,6 +529,7 @@ export function mountText(host: HTMLElement, options: Options) {
       Math.max(next.length, offset + next.length - item.prefix.length),
     );
     persist(previous);
+    indent(p);
     paint();
     return true;
   }
@@ -1061,7 +1098,10 @@ export function mountText(host: HTMLElement, options: Options) {
     },
     { signal: abort.signal },
   );
-  const resizeObserver = new ResizeObserver(paint);
+  const resizeObserver = new ResizeObserver(() => {
+    indentAll();
+    paint();
+  });
   resizeObserver.observe(editor);
   render();
   editor.contentEditable = String(opts.writable);
