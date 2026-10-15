@@ -118,7 +118,7 @@ test('task modal, date bands, group dragging, completion, archive and deletion f
   await expect(page.locator('.task-progress')).toContainText(
     '0 of 3 completed',
   );
-  await page.getByRole('button', { name: 'View archive (1)' }).click();
+  await page.getByRole('button', { name: 'Archived tasks' }).click();
   await page.getByRole('button', { name: 'Restore Alpha' }).click();
   await page.getByRole('button', { name: 'Back to active tasks' }).click();
   await row(page, 'Beta').dblclick();

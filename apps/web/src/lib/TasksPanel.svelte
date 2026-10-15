@@ -462,6 +462,21 @@
             >{t('Archive completed', 'Arsipkan selesai')}</span
           ></button
         >{/if}
+      {#if archived || state.items.some((task) => task.archived)}
+        <button
+          class="archive-button"
+          aria-label={archived
+            ? t('Back to active tasks', 'Kembali ke tugas aktif')
+            : t('Archived tasks', 'Tugas diarsipkan')}
+          title={archived
+            ? t('Back to active tasks', 'Kembali ke tugas aktif')
+            : t('Archived tasks', 'Tugas diarsipkan')}
+          onclick={() => {
+            archived = !archived;
+            selected = new Set();
+          }}><Icon name={archived ? 'tasks' : 'folder'} /></button
+        >
+      {/if}
       <button
         class="task-add section-add"
         aria-label={t('Add task', 'Tambah tugas')}
@@ -552,19 +567,6 @@
               )}
       </p>{/each}
   </div>
-  <button
-    class="task-archive-link"
-    onclick={() => {
-      archived = !archived;
-      selected = new Set();
-    }}
-    >{archived
-      ? t('← Back to active tasks', '← Kembali ke tugas aktif')
-      : t(
-          `View archive (${state.items.filter((t) => t.archived).length})`,
-          `Lihat arsip (${state.items.filter((t) => t.archived).length})`,
-        )}</button
-  >
 </section>
 <dialog
   bind:this={modal}
@@ -804,14 +806,6 @@
   .task-date :global(svg) {
     width: 14px;
     height: 14px;
-  }
-  .task-archive-link {
-    align-self: flex-start;
-    font-size: 11px;
-    color: var(--muted);
-    border: 0;
-    background: none;
-    padding: 14px 0 0;
   }
   .task-empty {
     color: var(--muted);

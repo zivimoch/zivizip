@@ -85,7 +85,7 @@ This document describes the target interaction model. The [verification scope](.
 - Plan rows display category, not a separate title. Each card has category search/free input, amount and Save at the bottom. Reject duplicate category/type/month budgets without clearing the form.
 - Match realization by month, normalized category and income/expense type. Sum partial transactions and recalculate after transaction edits/deletes. Plans need no due or realization date.
 - Projected balance uses the greater of budget or actual spending per category and includes unexpected expenses. Current balance uses recorded transactions. Disabled plan categories follow the exclusion rules below.
-- A recorded expense without a matching recurring/monthly expense budget appears automatically in monthly expenses with zero budget. Aggregate matching transactions and avoid duplicates. Remove automatic rows when their source transactions disappear; assigning a positive budget makes a normal plan. Do not display an Unplanned badge.
+- A recorded expense without a matching recurring/monthly expense budget appears automatically in monthly expenses with budget equal to its actual total. Aggregate matching transactions and avoid duplicates. Remove automatic rows when their source transactions disappear; assigning a positive budget makes a normal plan. Do not display an Unplanned badge.
 - Each card shows fully realized category count / total categories. A positive actual total reaching budget counts as realized; zero-budget categories with actual spending count too. Partial realization does not.
 - Rows support drag reordering, Shift-click group selection, outside-click deselection and persistent order. Double-click/F2 edits and offers Delete.
 - Clicking a category opens its matching transactions with dates, total and empty state. Transactions can be edited; double-click retains budget editing. Drag/Shift interactions must not open dialogs.
@@ -99,7 +99,7 @@ This document describes the target interaction model. The [verification scope](.
 - A permanent, nonclosable Analysis tab shows monthly income/expense charts and opens month tabs. It uses a distinct teal background and extra right padding.
 - Month tabs are content-sized, with calendar icons and adjacent close buttons. Closing does not delete plans. Labels and detail headings use localized month plus two-digit year, such as January 26.
 - Create months explicitly from Analysis. Copy any source month's plans, preserving income/recurring expected amounts and setting one-time expense expectations to zero.
-- Never copy transactions, realization state or opening balance. Skip duplicate budgets and preserve existing destination plans and transactions. Automatic zero-budget expense rows are not copied.
+- Never copy transactions, realization state or opening balance. Skip duplicate budgets and preserve existing destination plans and transactions. Automatic expense rows are not copied.
 - Omit the generic Monthly Plan heading, introductory/projection paragraphs, and month picker/copy controls inside month detail.
 - Plan tabs and active month persist per browser workspace. Guest plans are editable offline; account plans use revision checks and a read-only offline cache. Version 6 backups include budgets, notes, inclusion state and opening balances; plan imports preserve existing month/type/category budgets.
 - Demonstration data may populate only an unused month and must preserve existing records. Use fictitious categories/transactions rather than personal financial data.
@@ -150,4 +150,6 @@ This document describes the target interaction model. The [verification scope](.
 
 - Desktop panel dividers drag to either edge to fully collapse a panel and retain their saved size. Double-click restores defaults. The bottom control on the vertical divider hides/restores the right pane. The right control on the horizontal divider cycles Finance hidden, both visible, Tasks hidden, both visible. Mobile navigation remains independent of desktop collapse state.
 - Text Tools uses consistent outline icons for its toggle and every formatting action, with accessible labels.
-- Unexpected expense categories populate the monthly expense card directly from recorded transactions, even without a pre-created plan. Matching is case-insensitive and does not duplicate recurring categories; automatic categories have zero planned budget until edited.
+- Unexpected expense categories populate the monthly expense card directly from recorded transactions, even without a pre-created plan. Matching is case-insensitive and does not duplicate recurring categories; automatic monthly budgets track the category’s actual total, including subsequent transaction edits; explicit nonzero budgets remain unchanged.
+
+- Tasks has no archive footer; an icon in the header opens existing archived tasks. Panel collapse buttons use compact 14 × 22px / 22 × 14px controls.

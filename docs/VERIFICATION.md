@@ -66,3 +66,7 @@ Frontend diagnostics, 33 unit tests and the production build passed. Twenty targ
 ## Collapsible workspace panels and text tools — 2026-10-15
 
 Frontend diagnostics, 33 unit tests and the production build passed. Sixteen targeted browser scenarios passed, followed by four focused checks after adding persisted expanded dimensions. Coverage includes the four-state panel cycle, dragging to collapsed edges, restoring custom dimensions after reload, mobile navigation, toolbar icons and formatting, and unexpected expense categories appearing without a pre-created monthly plan. Automatic categories aggregate case-insensitive matches and survive reload. Desktop screenshots and a 390px mobile viewport were inspected; physical-device testing remains separate.
+
+## Automatic monthly budgets — 2026-10-15
+
+Frontend diagnostics, 35 unit tests and the production build passed. All eleven targeted browser scenarios passed across planning, Tasks and panel controls after correcting persistence of derived budget values. Automatic monthly budgets follow category actuals; explicit nonzero budgets remain unchanged. Derived amounts are normalized before persistence, preserving the API contract and keeping notes, exclusion and reordering compatible. Regression coverage includes transaction edits/removal and empty manually planned categories. Tasks archive access remains in the header, with no footer consuming list space.

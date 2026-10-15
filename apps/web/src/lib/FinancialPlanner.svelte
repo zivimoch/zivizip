@@ -185,7 +185,12 @@
     setBusy(true);
     message = '';
     try {
-      const saved = await repository.write(state, data);
+      const saved = await repository.write(state, {
+        ...data,
+        items: data.items.map((plan) =>
+          plan.automatic ? { ...plan, amount: 0 } : plan,
+        ),
+      });
       if (alive) {
         state = saved;
         broadcast();

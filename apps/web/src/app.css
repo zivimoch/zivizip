@@ -993,20 +993,20 @@ a.content-link {
   border-radius: 5px;
 }
 .panel-toggle svg {
-  width: 14px;
-  height: 14px;
+  width: 11px;
+  height: 11px;
 }
 .vertical .panel-toggle {
   bottom: 8px;
   right: 0;
-  width: 20px;
-  height: 30px;
+  width: 14px;
+  height: 22px;
 }
 .horizontal .panel-toggle {
   right: 8px;
   bottom: 0;
-  width: 30px;
-  height: 20px;
+  width: 22px;
+  height: 14px;
 }
 .finance-slot {
   min-height: 0;

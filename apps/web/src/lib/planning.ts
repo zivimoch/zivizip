@@ -146,7 +146,13 @@ export function monthBudgets(
     });
     known.add(key);
   }
-  return rows;
+  return rows.map((plan) =>
+    plan.group === 'monthly' &&
+    (plan.automatic ||
+      (plan.amount === 0 && actualAmount(plan, transactions) > 0))
+      ? { ...plan, amount: actualAmount(plan, transactions), automatic: true }
+      : plan,
+  );
 }
 export function monthSummary(
   data: PlanningData,

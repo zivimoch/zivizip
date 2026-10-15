@@ -77,12 +77,12 @@ it('matches monthly categories case-insensitively and accounts for partial, exce
   expect(rows[3]).toMatchObject({
     category: 'Health',
     automatic: true,
-    amount: 0,
+    amount: 75,
     group: 'monthly',
   });
   expect(monthSummary(plans, tx, '2026-10')).toEqual({
     opening: 100,
-    planned: 600,
+    planned: 525,
     projected: 425,
     current: 575,
   });
@@ -91,12 +91,12 @@ it('matches monthly categories case-insensitively and accounts for partial, exce
       rows.filter((row) => row.group === 'monthly'),
       tx,
     ),
-  ).toMatchObject({ count: 2, realized: 1, used: 125, left: 75 });
+  ).toMatchObject({ count: 2, realized: 1, used: 125, left: 150 });
   expect(monthBudgets(plans, [], '2026-11')).toEqual([]);
   plans.items[1].enabled = false;
   expect(monthSummary(plans, tx, '2026-10')).toEqual({
     opening: 100,
-    planned: 900,
+    planned: 825,
     projected: 825,
     current: 575,
   });
@@ -203,4 +203,47 @@ it('does not let delayed server reads replace newer acknowledged plans', async (
   release(new Response(JSON.stringify(old)));
   expect((await read).items[0].amount).toBe(1500);
   expect((await repo.list(false)).revision).toBe(2);
+});
+
+it('automatic monthly budgets follow ledger edits without replacing explicit budgets', () => {
+  const plans = data();
+  plans.items.push({
+    ...budget('Health', 'monthly', 0),
+    automatic: true,
+    note: 'Keep this note',
+  });
+  let tx = [
+    transaction('health', 'expense', 75),
+    transaction('HEALTH', 'expense', 25),
+    transaction('Travel', 'expense', 400),
+  ];
+  let rows = monthBudgets(plans, tx, '2026-10');
+  expect(rows.find((p) => p.category === 'Health')).toMatchObject({
+    amount: 100,
+    note: 'Keep this note',
+    automatic: true,
+  });
+  expect(rows.find((p) => p.category === 'Travel')?.amount).toBe(200);
+  plans.items = rows;
+  tx = [transaction('health', 'expense', 50)];
+  expect(
+    monthBudgets(plans, tx, '2026-10').find((p) => p.category === 'Health')
+      ?.amount,
+  ).toBe(50);
+  expect(
+    monthBudgets(plans, [], '2026-10').some((p) => p.category === 'Health'),
+  ).toBe(false);
+});
+
+it('keeps an empty manually planned monthly category until spending occurs', () => {
+  const plans = data();
+  plans.items.push(budget('Books', 'monthly', 0));
+  expect(
+    monthBudgets(plans, [], '2026-10').find((p) => p.category === 'Books'),
+  ).toMatchObject({ amount: 0, automatic: false });
+  expect(
+    monthBudgets(plans, [transaction('Books', 'expense', 40)], '2026-10').find(
+      (p) => p.category === 'Books',
+    ),
+  ).toMatchObject({ amount: 40, automatic: true });
 });

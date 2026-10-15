@@ -108,7 +108,7 @@ test('monthly planning matches transactions, supports row controls and copies on
     '89% remaining',
   );
   await addTransaction(page, 'Health', '75000');
-  await expect(row(page, 'Health').locator('.plan-actual')).toHaveClass(
+  await expect(row(page, 'Health').locator('.plan-actual')).not.toHaveClass(
     /deficit/,
   );
   await expect(card(page, 'monthly').locator('.plan-realized')).toHaveText(
@@ -126,7 +126,7 @@ test('monthly planning matches transactions, supports row controls and copies on
     .getByRole('button', { name: 'Exclude Food', exact: true })
     .click();
   await expect(page.locator('[data-plan-summary="planned"]')).toContainText(
-    '6.500.000',
+    '6.425.000',
   );
   await expect(page.locator('[data-plan-summary="remaining"]')).toContainText(
     '6.425.000',
@@ -424,7 +424,7 @@ test('monthly overview exposes negative remaining funds and over-budget variance
   await createMonth(page, '2026-10');
   await addBudget(page, 'income', 'salary', '1000000');
   await addBudget(page, 'recurring', 'rent', '800000');
-  await addTransaction(page, 'repairs', '400000');
+  await addTransaction(page, 'rent', '1200000');
   const overview = page.getByRole('region', { name: 'Monthly financial plan' });
   await expect(overview.locator('[data-plan-summary="planned"]')).toContainText(
     '200.000',
@@ -464,6 +464,35 @@ test('unplanned expenses populate a month without creating a plan first', async 
   await expect(
     row(page, 'Emergency repairs').locator('.plan-actual'),
   ).toContainText('300.000');
+  await expect(
+    row(page, 'Emergency repairs').locator('td').last().locator('strong'),
+  ).toContainText('300.000');
+  await expect(
+    row(page, 'Emergency repairs').locator('.plan-actual'),
+  ).not.toHaveClass(/deficit/);
+  await expect(card(page, 'monthly').locator('.budget-meter')).toContainText(
+    '0% remaining',
+  );
+  await row(page, 'Emergency repairs')
+    .getByRole('button', { name: 'Note', exact: true })
+    .click();
+  await dialog(page)
+    .getByLabel('Note', { exact: true })
+    .fill('Unexpected maintenance');
+  await dialog(page).getByLabel('Note', { exact: true }).press('Enter');
+  await expect(dialog(page)).toHaveCount(0);
+  await row(page, 'Emergency repairs')
+    .getByRole('button', { name: 'Exclude Emergency repairs', exact: true })
+    .click();
+  await expect(
+    row(page, 'Emergency repairs').getByRole('button', {
+      name: 'Include Emergency repairs',
+      exact: true,
+    }),
+  ).toBeVisible();
+  await row(page, 'Emergency repairs')
+    .getByRole('button', { name: 'Include Emergency repairs', exact: true })
+    .click();
   await page.reload();
   await detail(page);
   await expect(
