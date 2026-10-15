@@ -311,3 +311,50 @@ test('account transactions synchronize with conflict protection, offline reading
     await secondContext.close();
   }
 });
+
+test('finance header stays compact and free-text capitalization preserves category input', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await visit(page);
+  await page
+    .locator('.bottom-nav')
+    .getByRole('button', { name: 'Finance', exact: true })
+    .click();
+  const controls = await page.locator('.finance-heading').evaluate((el) => {
+    const boxes = [
+      ...el.querySelectorAll('h2, .finance-toolbar, .finance-add'),
+    ].map((e) => e.getBoundingClientRect());
+    return boxes.map((r) => ({
+      x: r.x,
+      y: r.y,
+      right: r.right,
+      bottom: r.bottom,
+    }));
+  });
+  for (let i = 1; i < controls.length; i++)
+    expect(controls[i].x).toBeGreaterThanOrEqual(controls[i - 1].right);
+  await page
+    .getByRole('button', { name: 'Add transaction', exact: true })
+    .click();
+  const description = page.getByLabel('Description', { exact: true });
+  await description.pressSequentially('train ticket');
+  await expect(description).toHaveValue('Train ticket');
+  await page
+    .getByRole('combobox', { name: 'Category', exact: true })
+    .fill('transport');
+  await expect(
+    page.getByRole('combobox', { name: 'Category', exact: true }),
+  ).toHaveValue('transport');
+  await page.getByLabel('Amount (IDR)', { exact: true }).fill('20000');
+  await page.getByLabel('Date', { exact: true }).fill('2026-10-01');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  const group = page.locator('.transaction-heading').first();
+  const totals = await group.locator('.daily-totals').boundingBox();
+  const heading = await group.boundingBox();
+  expect(totals!.x).toBeGreaterThan(heading!.x + heading!.width / 2);
+  expect(totals!.y).toBeGreaterThanOrEqual(heading!.y);
+  expect(totals!.y + totals!.height).toBeLessThanOrEqual(
+    heading!.y + heading!.height + 1,
+  );
+});

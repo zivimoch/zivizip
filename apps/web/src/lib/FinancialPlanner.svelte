@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { capitalizeField } from './capitalization';
   import { displayCurrency, formatMoney } from './currency';
   import MoneyField from './MoneyField.svelte';
   import SuggestionField from './SuggestionField.svelte';
@@ -9,7 +10,6 @@
     PlanningRepository,
     emptyPlanning,
     monthBudgets,
-    monthSummary,
     groupSummary,
     matchingTransactions,
     actualAmount,
@@ -44,8 +44,7 @@
     seenRefresh = refreshToken,
     readEpoch = 0;
   let root: HTMLElement, modal: HTMLDialogElement, focusInput: HTMLInputElement;
-  let mode: 'create' | 'budget' | 'delete' | 'note' | 'opening' | 'category' =
-      'create',
+  let mode: 'create' | 'budget' | 'delete' | 'note' | 'category' = 'create',
     formOpen = false;
   let editing: Budget | null = null,
     category = '',
@@ -78,7 +77,6 @@
       ? (en: string, _id: string) => en
       : (_en: string, id: string) => id;
   $: rows = draft || monthBudgets(state, transactions, active);
-  $: summary = monthSummary(state, transactions, active);
   $: groups = (['income', 'recurring', 'monthly'] as PlanGroup[]).map(
     (key) => ({
       key,
@@ -89,6 +87,20 @@
       ),
     }),
   );
+  $: plannedIncome = groups[0].stats.budget;
+  $: plannedRemaining =
+    plannedIncome - groups[1].stats.budget - groups[2].stats.budget;
+  $: projectedSpending = rows
+    .filter((plan) => plan.enabled && plan.group !== 'income')
+    .reduce(
+      (total, plan) =>
+        total + Math.max(plan.amount, actualAmount(plan, transactions)),
+      0,
+    );
+  $: remaining = plannedIncome - projectedSpending;
+  $: remainingPercent = plannedIncome
+    ? Math.round((remaining / plannedIncome) * 100)
+    : null;
   $: months = [
     ...new Set([
       ...state.months.map((entry) => entry.month),
@@ -216,8 +228,7 @@
     message = '';
     formOpen = true;
     category = plan?.category || '';
-    amount =
-      next === 'opening' ? String(summary.opening) : String(plan?.amount || 0);
+    amount = String(plan?.amount || 0);
     note = plan?.note || '';
     group = plan?.group || 'monthly';
     source = '';
@@ -271,14 +282,6 @@
       let data: PlanningData;
       if (mode === 'create') {
         data = copyMonth(state, source, destination);
-      } else if (mode === 'opening') {
-        data = {
-          ...withMonth(state.items),
-          months: [
-            ...state.months.filter((entry) => entry.month !== active),
-            { month: active, opening: Number(amount) },
-          ],
-        };
       } else {
         if (!editing || !rows.some((plan) => plan.id === editing!.id)) {
           message = t(
@@ -579,214 +582,271 @@
       </div>
     {:else}
       <h1 class="month-title">{monthLabel(active)}</h1>
-      <div class="plan-summary">
-        {#each [['opening', t('Opening balance', 'Saldo awal')], ['planned', t('Planned ending balance', 'Sisa sesuai rencana')], ['projected', t('Projected ending balance', 'Perkiraan sisa akhir')], ['current', t('Current balance', 'Saldo realisasi')]] as [key, label]}
-          <div class="summary-card">
-            <small>{label}</small><strong
-              data-plan-summary={key}
-              class:deficit={summary[key as keyof typeof summary] < 0}
-              >{money(summary[key as keyof typeof summary])}</strong
-            >{#if key === 'opening'}<button
-                disabled={!writable || busy}
-                onclick={() => show('opening')}>{t('Edit', 'Ubah')}</button
-              >{/if}
-          </div>
-        {/each}
-      </div>
       <div class="plan-columns">
-        {#each groups as card (card.key)}<section
-            class="plan-group"
-            aria-label={groupLabel(card.key)}
-            data-plan-group={card.key}
-          >
-            <h2>{groupLabel(card.key)}</h2>
-            <p class="plan-realized">
-              {t(
-                `${card.stats.realized} of ${card.stats.count} items realized`,
-                `${card.stats.realized} dari ${card.stats.count} item terealisasi`,
-              )}
-            </p>
-            <div
-              class="budget-meter"
-              class:deficit={card.key !== 'income' && card.stats.left < 0}
-              class:low={card.stats.percent < 20 && card.stats.left >= 0}
-            >
-              <div>
-                <strong
-                  >{money(
-                    card.key === 'income' ? card.stats.used : card.stats.left,
-                  )}</strong
-                ><span
-                  >{card.key === 'income'
-                    ? t('received', 'diterima')
-                    : card.stats.left < 0
-                      ? t('Deficit', 'Defisit')
-                      : t(
-                          `${card.stats.percent}% remaining`,
-                          `${card.stats.percent}% tersisa`,
-                        )}</span
-                >
-              </div>
-              <div
-                class="battery"
-                role="meter"
-                aria-label={groupLabel(card.key)}
-                aria-valuemin="0"
-                aria-valuemax="100"
-                aria-valuenow={percent(
-                  card.key === 'income'
-                    ? card.stats.budget
-                      ? (card.stats.used / card.stats.budget) * 100
-                      : 0
-                    : card.stats.percent,
+        {#each groups as card (card.key)}<div class="plan-column">
+            {#if card.key === 'income'}<section
+                class="monthly-overview"
+                aria-label={t(
+                  'Monthly financial plan',
+                  'Ringkasan rencana keuangan',
                 )}
               >
-                <i
-                  style:width={`${percent(card.key === 'income' ? (card.stats.budget ? (card.stats.used / card.stats.budget) * 100 : 0) : card.stats.percent)}%`}
-                ></i>
-              </div>
-              <small
-                >{t('Planned', 'Rencana')}: {money(card.stats.budget)} · {t(
-                  'Actual',
-                  'Realisasi',
-                )}: {money(card.stats.used)}</small
-              >
-            </div>
-            <div class="plan-items-scroll">
-              <table>
-                <thead
-                  ><tr
-                    ><th>{t('Category', 'Kategori')}</th><th
-                      >{t('Budget / Actual', 'Anggaran / Realisasi')}</th
-                    ></tr
-                  ></thead
-                ><tbody>
-                  {#each card.rows as plan (plan.id)}<tr
-                      data-plan-row={plan.id}
-                      class:selected={selected.has(plan.id)}
-                      class:excluded={!plan.enabled}
-                      tabindex="0"
-                      onpointerdown={(event) => pointerDown(event, plan)}
-                      onpointermove={pointerMove}
-                      onpointerup={pointerUp}
-                      onpointercancel={() => {
-                        drag = null;
-                        draft = null;
-                      }}
-                      onkeydown={(event) => rowKey(event, plan)}
+                <h2>
+                  {t('Financial plan', 'Rencana Keuangan Bulan')}
+                  {monthLabel(active)}
+                </h2>
+                <dl>
+                  <div>
+                    <dt>{t('Planned income', 'Rencana Pemasukan')}</dt>
+                    <dd data-plan-summary="income">{money(plannedIncome)}</dd>
+                  </div>
+                  <div>
+                    <dt>
+                      {t(
+                        'Planned recurring expenses',
+                        'Rencana Pengeluaran Rutin',
+                      )}
+                    </dt>
+                    <dd>{money(groups[1].stats.budget)}</dd>
+                  </div>
+                  <div>
+                    <dt>
+                      {t(
+                        'Planned monthly expenses',
+                        'Rencana Pengeluaran Bulan Ini',
+                      )}
+                    </dt>
+                    <dd>{money(groups[2].stats.budget)}</dd>
+                  </div>
+                  <div>
+                    <dt>{t('Planned remaining', 'Rencana Sisa Bulan Ini')}</dt>
+                    <dd
+                      data-plan-summary="planned"
+                      class:deficit={plannedRemaining < 0}
                     >
-                      <td
-                        ><button
-                          class="plan-category"
-                          onclick={(event) => {
-                            if (event.detail === 0) void show('category', plan);
-                          }}>{plan.category}</button
-                        >
-                        <div class="plan-item-controls">
-                          <button
-                            data-row-action
-                            class="plan-state"
-                            aria-pressed={plan.enabled}
-                            aria-label={t(
-                              `${plan.enabled ? 'Exclude' : 'Include'} ${plan.category}`,
-                              `${plan.enabled ? 'Kecualikan' : 'Sertakan'} ${plan.category}`,
-                            )}
-                            title={plan.enabled
-                              ? t(
-                                  'Included — click to exclude',
-                                  'Dihitung — klik untuk mengecualikan',
-                                )
-                              : t(
-                                  'Excluded — click to include',
-                                  'Tidak dihitung — klik untuk menyertakan',
-                                )}
-                            disabled={!writable || busy}
-                            onclick={() => toggle(plan)}
-                            ><Icon
-                              name={plan.enabled ? 'eye' : 'eye-off'}
-                            /></button
-                          ><button
-                            data-row-action
-                            class="plan-note"
-                            disabled={!writable || busy}
-                            onclick={() => show('note', plan)}
-                            >{plan.note || t('Note', 'Catatan')}</button
-                          >
-                        </div></td
-                      >
-                      <td
-                        ><strong>{money(plan.amount)}</strong><button
-                          data-row-action
-                          class="plan-actual"
-                          class:deficit={planType(plan) === 'expense' &&
-                            actualAmount(plan, transactions) > plan.amount}
-                          disabled={!writable || busy}
-                          aria-label={t(
-                            `Record transaction for ${plan.category}`,
-                            `Catat transaksi ${plan.category}`,
-                          )}
-                          onclick={() =>
-                            ontransaction(undefined, {
-                              type: planType(plan),
-                              title: plan.category,
-                              category: plan.category,
-                              amount: Math.max(
-                                1,
-                                plan.amount - actualAmount(plan, transactions),
-                              ),
-                              date: dateInMonth(active),
-                            })}
-                          >{money(
-                            actualAmount(plan, transactions),
-                          )}{actualAmount(plan, transactions) > plan.amount
-                            ? ' !'
-                            : ''}</button
-                        ></td
-                      >
-                    </tr>{:else}<tr
-                      ><td colspan="2" class="empty-plan"
-                        >{t('No plans yet', 'Belum ada rencana')}</td
-                      ></tr
-                    >{/each}
-                </tbody>
-              </table>
-            </div>
-            <form
-              class="plan-inline-form"
-              onsubmit={(event) => {
-                event.preventDefault();
-                void add(card.key);
-              }}
+                      {money(plannedRemaining)}
+                    </dd>
+                  </div>
+                </dl>
+                <div class="remaining-summary" class:deficit={remaining < 0}>
+                  <strong data-plan-summary="remaining"
+                    >{money(remaining)}</strong
+                  >
+                  <span
+                    >{remainingPercent === null ? '—' : `${remainingPercent}%`}
+                    {t('remaining', 'tersisa')}</span
+                  >
+                  <div class="battery">
+                    <i style:width={`${percent(remainingPercent ?? 0)}%`}></i>
+                  </div>
+                  <small
+                    >{t(
+                      'After planned and over-budget spending',
+                      'Setelah rencana dan pengeluaran di luar anggaran',
+                    )}</small
+                  >
+                </div>
+                {#if remaining < plannedRemaining}<p class="deficit">
+                    {t('Against plan', 'Selisih dari rencana')}:
+                    <strong>{money(remaining - plannedRemaining)}</strong>
+                  </p>{/if}
+              </section>{/if}
+            <section
+              class="plan-group"
+              aria-label={groupLabel(card.key)}
+              data-plan-group={card.key}
             >
-              <label
-                >{t('Category', 'Kategori')}<SuggestionField
-                  id={`plan-category-${card.key}`}
-                  label={t('Category', 'Kategori')}
-                  options={categories}
-                  bind:value={inline[card.key].category}
-                  placeholder={t(
-                    'Search or add category',
-                    'Cari atau tambah kategori',
-                  )}
-                  required
-                  maxlength={60}
-                  disabled={!writable || busy}
-                /></label
-              ><label
-                >{t(
-                  `Amount (${$displayCurrency})`,
-                  `Nominal (${$displayCurrency})`,
-                )}<MoneyField
-                  bind:value={inline[card.key].amount}
-                  min={0}
-                  required
-                  disabled={!writable || busy}
-                /></label
-              ><button class="primary" disabled={!writable || busy}
-                >{t('Save', 'Simpan')}</button
+              <h2>{groupLabel(card.key)}</h2>
+              <p class="plan-realized">
+                {t(
+                  `${card.stats.realized} of ${card.stats.count} items realized`,
+                  `${card.stats.realized} dari ${card.stats.count} item terealisasi`,
+                )}
+              </p>
+              <div
+                class="budget-meter"
+                class:deficit={card.key !== 'income' && card.stats.left < 0}
+                class:low={card.stats.percent < 20 && card.stats.left >= 0}
               >
-            </form>
-          </section>{/each}
+                <div>
+                  <strong
+                    >{money(
+                      card.key === 'income' ? card.stats.used : card.stats.left,
+                    )}</strong
+                  ><span
+                    >{card.key === 'income'
+                      ? t('received', 'diterima')
+                      : card.stats.left < 0
+                        ? t('Deficit', 'Defisit')
+                        : t(
+                            `${card.stats.percent}% remaining`,
+                            `${card.stats.percent}% tersisa`,
+                          )}</span
+                  >
+                </div>
+                <div
+                  class="battery"
+                  role="meter"
+                  aria-label={groupLabel(card.key)}
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                  aria-valuenow={percent(
+                    card.key === 'income'
+                      ? card.stats.budget
+                        ? (card.stats.used / card.stats.budget) * 100
+                        : 0
+                      : card.stats.percent,
+                  )}
+                >
+                  <i
+                    style:width={`${percent(card.key === 'income' ? (card.stats.budget ? (card.stats.used / card.stats.budget) * 100 : 0) : card.stats.percent)}%`}
+                  ></i>
+                </div>
+                <small
+                  >{t('Planned', 'Rencana')}: {money(card.stats.budget)} · {t(
+                    'Actual',
+                    'Realisasi',
+                  )}: {money(card.stats.used)}</small
+                >
+              </div>
+              <div class="plan-items-scroll">
+                <table>
+                  <thead
+                    ><tr
+                      ><th>{t('Category', 'Kategori')}</th><th
+                        >{t('Budget / Actual', 'Anggaran / Realisasi')}</th
+                      ></tr
+                    ></thead
+                  ><tbody>
+                    {#each card.rows as plan (plan.id)}<tr
+                        data-plan-row={plan.id}
+                        class:selected={selected.has(plan.id)}
+                        class:excluded={!plan.enabled}
+                        tabindex="0"
+                        onpointerdown={(event) => pointerDown(event, plan)}
+                        onpointermove={pointerMove}
+                        onpointerup={pointerUp}
+                        onpointercancel={() => {
+                          drag = null;
+                          draft = null;
+                        }}
+                        onkeydown={(event) => rowKey(event, plan)}
+                      >
+                        <td
+                          ><button
+                            class="plan-category"
+                            onclick={(event) => {
+                              if (event.detail === 0)
+                                void show('category', plan);
+                            }}>{plan.category}</button
+                          >
+                          <div class="plan-item-controls">
+                            <button
+                              data-row-action
+                              class="plan-state"
+                              aria-pressed={plan.enabled}
+                              aria-label={t(
+                                `${plan.enabled ? 'Exclude' : 'Include'} ${plan.category}`,
+                                `${plan.enabled ? 'Kecualikan' : 'Sertakan'} ${plan.category}`,
+                              )}
+                              title={plan.enabled
+                                ? t(
+                                    'Included — click to exclude',
+                                    'Dihitung — klik untuk mengecualikan',
+                                  )
+                                : t(
+                                    'Excluded — click to include',
+                                    'Tidak dihitung — klik untuk menyertakan',
+                                  )}
+                              disabled={!writable || busy}
+                              onclick={() => toggle(plan)}
+                              ><Icon
+                                name={plan.enabled ? 'eye' : 'eye-off'}
+                              /></button
+                            ><button
+                              data-row-action
+                              class="plan-note"
+                              disabled={!writable || busy}
+                              onclick={() => show('note', plan)}
+                              >{plan.note || t('Note', 'Catatan')}</button
+                            >
+                          </div></td
+                        >
+                        <td
+                          ><strong>{money(plan.amount)}</strong><button
+                            data-row-action
+                            class="plan-actual"
+                            class:deficit={planType(plan) === 'expense' &&
+                              actualAmount(plan, transactions) > plan.amount}
+                            disabled={!writable || busy}
+                            aria-label={t(
+                              `Record transaction for ${plan.category}`,
+                              `Catat transaksi ${plan.category}`,
+                            )}
+                            onclick={() =>
+                              ontransaction(undefined, {
+                                type: planType(plan),
+                                title: plan.category,
+                                category: plan.category,
+                                amount: Math.max(
+                                  1,
+                                  plan.amount -
+                                    actualAmount(plan, transactions),
+                                ),
+                                date: dateInMonth(active),
+                              })}
+                            >{money(
+                              actualAmount(plan, transactions),
+                            )}{actualAmount(plan, transactions) > plan.amount
+                              ? ' !'
+                              : ''}</button
+                          ></td
+                        >
+                      </tr>{:else}<tr
+                        ><td colspan="2" class="empty-plan"
+                          >{t('No plans yet', 'Belum ada rencana')}</td
+                        ></tr
+                      >{/each}
+                  </tbody>
+                </table>
+              </div>
+              <form
+                class="plan-inline-form"
+                onsubmit={(event) => {
+                  event.preventDefault();
+                  void add(card.key);
+                }}
+              >
+                <label
+                  >{t('Category', 'Kategori')}<SuggestionField
+                    id={`plan-category-${card.key}`}
+                    label={t('Category', 'Kategori')}
+                    options={categories}
+                    bind:value={inline[card.key].category}
+                    placeholder={t(
+                      'Search or add category',
+                      'Cari atau tambah kategori',
+                    )}
+                    required
+                    maxlength={60}
+                    disabled={!writable || busy}
+                  /></label
+                ><label
+                  >{t(
+                    `Amount (${$displayCurrency})`,
+                    `Nominal (${$displayCurrency})`,
+                  )}<MoneyField
+                    bind:value={inline[card.key].amount}
+                    min={0}
+                    required
+                    disabled={!writable || busy}
+                  /></label
+                ><button class="primary" disabled={!writable || busy}
+                  >{t('Save', 'Simpan')}</button
+                >
+              </form>
+            </section>
+          </div>{/each}
       </div>
     {/if}
   </div>
@@ -810,15 +870,13 @@
       <h2>
         {mode === 'create'
           ? t('Create monthly plan', 'Buat rencana bulanan')
-          : mode === 'opening'
-            ? t('Opening balance', 'Saldo awal')
-            : mode === 'note'
-              ? t('Category note', 'Catatan kategori')
-              : mode === 'category'
-                ? editing?.category
-                : mode === 'delete'
-                  ? t('Delete budget?', 'Hapus anggaran?')
-                  : t('Edit budget', 'Ubah anggaran')}
+          : mode === 'note'
+            ? t('Category note', 'Catatan kategori')
+            : mode === 'category'
+              ? editing?.category
+              : mode === 'delete'
+                ? t('Delete budget?', 'Hapus anggaran?')
+                : t('Edit budget', 'Ubah anggaran')}
       </h2>
       <button
         type="button"
@@ -881,6 +939,7 @@
     {:else if mode === 'note'}<p>{editing?.category}</p>
       <label
         >{t('Note', 'Catatan')}<input
+          use:capitalizeField
           bind:this={focusInput}
           bind:value={note}
           maxlength="2000"
@@ -926,7 +985,7 @@
           `Nominal (${$displayCurrency})`,
         )}<MoneyField
           bind:value={amount}
-          min={mode === 'opening' ? -1000000000000 : 0}
+          min={0}
           required
           disabled={busy}
         /></label
@@ -1082,37 +1141,6 @@
     gap: 10px;
     flex-wrap: wrap;
   }
-  .plan-summary {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(140px, 1fr));
-    gap: 12px;
-    overflow-x: auto;
-    margin: 14px 0 12px;
-  }
-  .summary-card {
-    padding: 10px;
-    background: linear-gradient(140deg, #12222a, #0a151a);
-    border: 1px solid #233039;
-    border-radius: 7px;
-  }
-  .summary-card small {
-    font-size: 11px;
-  }
-  .summary-card strong {
-    display: block;
-    color: var(--accent);
-    font-size: 18px;
-    margin-top: 8px;
-    white-space: nowrap;
-  }
-  .summary-card button {
-    display: block;
-    background: none;
-    border: 0;
-    padding: 12px 0 0;
-    font-size: 11px;
-    color: #eef5f7;
-  }
   .plan-columns {
     display: grid;
     grid-template-columns: repeat(3, minmax(275px, 1fr));
@@ -1121,8 +1149,56 @@
     padding-bottom: 16px;
     align-items: stretch;
   }
+  .plan-column {
+    height: max(740px, calc(100dvh - 145px));
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+  }
+  .monthly-overview {
+    flex: 0 0 auto;
+    padding: 14px;
+    border: 1px solid #233039;
+    border-radius: 10px;
+    background: #111b20;
+  }
+  .monthly-overview h2 {
+    font-size: 18px;
+    margin: 0 0 14px;
+  }
+  .monthly-overview dl {
+    margin: 0;
+    font-size: 13px;
+  }
+  .monthly-overview dl div {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 10px 0;
+  }
+  .monthly-overview dd {
+    margin: 0;
+    white-space: nowrap;
+  }
+  .monthly-overview p {
+    margin: 10px 0 0;
+    font-size: 13px;
+  }
+  .remaining-summary {
+    color: var(--accent);
+    margin-top: 14px;
+  }
+  .remaining-summary > span {
+    float: right;
+    font-size: 13px;
+  }
+  .remaining-summary small {
+    font-size: 11px;
+  }
   .plan-group {
-    height: 640px;
+    flex: 1;
+    min-height: 0;
     background: #111b20;
     border: 1px solid #233039;
     border-radius: 10px;
@@ -1347,16 +1423,9 @@
     .plan-columns {
       grid-template-columns: repeat(3, 275px);
     }
-    .plan-summary {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-    .summary-card strong {
-      font-size: 17px;
-    }
     .plan-items-scroll {
       flex: 1;
       min-height: 0;
-      max-height: 360px;
     }
     .plan-note,
     .plan-state {

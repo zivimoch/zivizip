@@ -34,13 +34,14 @@ async function visit(page: Page) {
     page.getByRole('button', { name: 'Add task', exact: true }),
   ).toBeEnabled();
 }
-async function add(page: Page, title: string, date = '', amount = '') {
+async function add(page: Page, title: string, date = '') {
   await page.getByRole('button', { name: 'Add task', exact: true }).click();
   await expect(page.getByLabel('What would you like to finish?')).toBeFocused();
   await page.getByLabel('What would you like to finish?').fill(title);
   if (date) await page.getByLabel('Due date (optional)').fill(date);
-  if (amount)
-    await page.getByLabel('Related amount (IDR, optional)').fill(amount);
+  await expect(page.getByLabel('Related amount (IDR, optional)')).toHaveCount(
+    0,
+  );
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.locator('.task-title', { hasText: title })).toBeVisible();
   await expect(
@@ -72,7 +73,7 @@ test('task modal, date bands, group dragging, completion, archive and deletion f
   await add(page, 'Alpha');
   await add(page, 'Beta');
   await add(page, 'Gamma');
-  await add(page, 'Deadline', '2026-10-10', '350000');
+  await add(page, 'Deadline', '2026-10-10');
   await expect(page.locator('.task-title')).toHaveText([
     'Deadline',
     'Alpha',
@@ -80,7 +81,7 @@ test('task modal, date bands, group dragging, completion, archive and deletion f
     'Gamma',
   ]);
   await expect(row(page, 'Deadline')).toContainText('10 Oct 2026');
-  await expect(row(page, 'Deadline')).toContainText('350.000');
+
   await row(page, 'Alpha').click();
   await row(page, 'Beta').click({ modifiers: ['Shift'] });
   await expect(page.locator('.task-row.selected')).toHaveCount(2);

@@ -240,6 +240,28 @@
 <section class="finance-panel" aria-label="Finance">
   <div class="finance-heading">
     <h2>Finance<span>.</span></h2>
+    <div class="finance-toolbar">
+      <button
+        onclick={() => {
+          grouped = !grouped;
+          remember();
+        }}
+        ><Icon name="list" />{grouped
+          ? t('By date', 'Per tanggal')
+          : t('By category', 'Per kategori')}</button
+      >
+      <input
+        type="month"
+        aria-label={t('Transaction month', 'Bulan transaksi')}
+        value={month}
+        onchange={(event) => {
+          if (event.currentTarget.value) {
+            month = event.currentTarget.value;
+            remember();
+          }
+        }}
+      />
+    </div>
     <button
       class="finance-add section-add"
       aria-label={t('Add transaction', 'Tambah transaksi')}
@@ -247,28 +269,6 @@
       disabled={!writable || busy || !initialized}
       onclick={() => openTransaction()}><Icon name="plus" /></button
     >
-  </div>
-  <div class="finance-toolbar">
-    <button
-      onclick={() => {
-        grouped = !grouped;
-        remember();
-      }}
-      ><Icon name="list" />{grouped
-        ? t('By date', 'Per tanggal')
-        : t('By category', 'Per kategori')}</button
-    >
-    <input
-      type="month"
-      aria-label={t('Transaction month', 'Bulan transaksi')}
-      value={month}
-      onchange={(event) => {
-        if (event.currentTarget.value) {
-          month = event.currentTarget.value;
-          remember();
-        }
-      }}
-    />
   </div>
   <div class="balance-grid">
     <div class="balance-card" title={money(summary.income)}>
@@ -429,6 +429,7 @@
       <label
         >{t('Description', 'Keterangan')}<SuggestionField
           id="transaction-description"
+          capitalize
           label={t('Description', 'Keterangan')}
           options={descriptions}
           bind:input={titleInput}
@@ -489,12 +490,12 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 10px;
+    gap: 6px;
     margin-bottom: 13px;
   }
   h2 {
     margin: 0;
-    font-size: 25px;
+    font-size: 22px;
     letter-spacing: -0.6px;
   }
   h2 span,
@@ -504,15 +505,16 @@
   .finance-toolbar {
     display: flex;
     justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 13px;
+    gap: 4px;
+    margin-left: auto;
+    min-width: 0;
   }
   .finance-toolbar button {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 11px;
-    padding: 8px 10px;
+    gap: 3px;
+    font-size: 10px;
+    padding: 6px 4px;
     white-space: nowrap;
   }
   .finance-toolbar :global(svg) {
@@ -524,7 +526,7 @@
     background: transparent;
     border: 0;
     color: #eef5f7;
-    max-width: 160px;
+    max-width: 115px;
     min-width: 0;
     padding: 0;
     width: auto;
@@ -570,14 +572,17 @@
   .daily-totals {
     display: flex;
     gap: 10px;
-    flex-wrap: wrap;
-    margin-top: 5px;
-    font-size: 12px;
+    margin-left: auto;
+    justify-content: flex-end;
+    font-size: 11px;
   }
   .daily-totals .expense {
     color: #ff745c;
   }
   .transaction-heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     font-size: 11px;
     color: #eef5f7;
     margin: 5px 0 9px;

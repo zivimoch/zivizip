@@ -91,7 +91,7 @@ test('monthly planning matches transactions, supports row controls and copies on
   await addBudget(page, 'recurring', 'Transport', '300000');
   await addBudget(page, 'monthly', 'Books', '200000');
   const heights = await page
-    .locator('.plan-group')
+    .locator('.plan-column')
     .evaluateAll((cards) =>
       cards.map((card) => card.getBoundingClientRect().height),
     );
@@ -128,8 +128,8 @@ test('monthly planning matches transactions, supports row controls and copies on
   await expect(page.locator('[data-plan-summary="planned"]')).toContainText(
     '6.500.000',
   );
-  await expect(page.locator('[data-plan-summary="current"]')).toContainText(
-    '375.000',
+  await expect(page.locator('[data-plan-summary="remaining"]')).toContainText(
+    '6.425.000',
   );
   await row(page, 'Food')
     .getByRole('button', { name: 'Include Food', exact: true })
@@ -137,7 +137,7 @@ test('monthly planning matches transactions, supports row controls and copies on
   await row(page, 'Food')
     .getByRole('button', { name: 'Food', exact: true })
     .click();
-  await expect(dialog(page)).toContainText('food purchase');
+  await expect(dialog(page)).toContainText('Food purchase');
   await dialog(page)
     .getByRole('button', { name: 'Close', exact: true })
     .click();
@@ -178,8 +178,8 @@ test('monthly planning matches transactions, supports row controls and copies on
     row(page, 'Books').locator('td').last().locator('strong'),
   ).toHaveText(/Rp\s*0/);
   await expect(row(page, 'Health')).toHaveCount(0);
-  await expect(page.locator('[data-plan-summary="current"]')).toHaveText(
-    /Rp\s*0/,
+  await expect(page.locator('[data-plan-summary="remaining"]')).toHaveText(
+    /5.200.000/,
   );
   await page
     .getByRole('button', { name: 'Close November 26', exact: true })
@@ -415,4 +415,30 @@ test('account plans synchronize, retain conflicting form edits and remain read-o
     ).toBeTruthy();
     await secondContext.close();
   }
+});
+
+test('monthly overview exposes negative remaining funds and over-budget variance', async ({
+  page,
+}) => {
+  await visit(page);
+  await createMonth(page, '2026-10');
+  await addBudget(page, 'income', 'salary', '1000000');
+  await addBudget(page, 'recurring', 'rent', '800000');
+  await addTransaction(page, 'repairs', '400000');
+  const overview = page.getByRole('region', { name: 'Monthly financial plan' });
+  await expect(overview.locator('[data-plan-summary="planned"]')).toContainText(
+    '200.000',
+  );
+  await expect(
+    overview.locator('[data-plan-summary="remaining"]'),
+  ).toContainText('-Rp 200.000');
+  await expect(overview).toContainText('-20% remaining');
+  await expect(overview).toContainText('-Rp 400.000');
+  await expect(page.getByText('Opening balance', { exact: true })).toHaveCount(
+    0,
+  );
+  await expect(row(page, 'salary')).toBeVisible();
+  const top = (await overview.boundingBox())!;
+  const income = (await card(page, 'income').boundingBox())!;
+  expect(top.y + top.height).toBeLessThanOrEqual(income.y);
 });

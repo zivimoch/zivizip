@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { capitalizeField } from './capitalization';
   import { tick } from 'svelte';
   import { api, ApiError, type Account } from './account';
   export let language: 'en' | 'id' = 'en';
@@ -164,6 +165,7 @@
           'What would you like from Zivizip?',
           'Apa yang kamu harapkan dari Zivizip?',
         )}<textarea
+          use:capitalizeField
           class="message-field"
           bind:value={message}
           required

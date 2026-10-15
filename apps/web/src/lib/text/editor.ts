@@ -230,7 +230,17 @@ export function mountText(host: HTMLElement, options: Options) {
     };
     const prefix = width(item.prefix.length);
     const whitespace = width(item.prefix.match(/^[ \t]*/)?.[0].length || 0);
-    p.style.paddingLeft = `${24 * item.depth + prefix - whitespace}px`;
+    let inset = item.depth * (prefix - whitespace);
+    let previous = p.previousElementSibling;
+    while (previous) {
+      const parent = listItem(previous.textContent || '');
+      if (parent && parent.depth < item.depth) {
+        inset = parseFloat((previous as HTMLElement).style.paddingLeft) || 0;
+        break;
+      }
+      previous = previous.previousElementSibling;
+    }
+    p.style.paddingLeft = `${inset + prefix - whitespace}px`;
     p.style.textIndent = `${-prefix}px`;
   }
   function indentAll() {

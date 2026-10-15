@@ -58,3 +58,7 @@ A fresh Chrome profile at a 390px viewport verified guest creation, persistence,
 ## Finance interaction update — 2026-10-09
 
 Frontend diagnostics passed without errors or warnings; 32 frontend unit tests and 9 Rust tests passed. The final targeted browser run passed 13 Finance, planning and Tasks scenarios. Nine image/list editor scenarios also passed after link rendering changed. Coverage includes optional transaction descriptions, field-width suggestions, display currency formatting, daily totals, equal-height planning cards and safe clickable web links. Mobile checks use simulated Chrome viewports and touch events, not physical devices.
+
+## Finance planning and form refinements — 2026-10-15
+
+Frontend diagnostics, 33 unit tests and the production build passed. Twenty targeted browser scenarios passed across Notes, Tasks, Finance and monthly planning, including nested marker alignment, first-letter capitalization, unchanged category input, mobile header layout, and negative remaining funds. Planning checks cover excluded categories, copying months, account conflicts and offline data. Mobile checks use Chromium viewports, not physical devices. Legacy task amounts and opening-balance data remain stored; their removed controls do not erase existing records.

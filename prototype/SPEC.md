@@ -17,7 +17,7 @@ This document describes the target interaction model. The [verification scope](.
 - Tabs support mouse/touch reordering with persistent order. Double-click/double-tap and F2 open editing. Long press does not open editing.
 - New and edit dialogs share icon, name and category fields. New notes also choose Text or Draw; existing note types are not converted during edit.
 - Focus the name field immediately. Defaults are sequential `Note1`, `Note2`, etc., category `General`/`Umum`, and empty content.
-- Title-case names and categories as typed, preserving caret position and composition input. Categories accept free text with suggestions from history.
+- Capitalize the first letter of note names as typed, preserving caret position and composition input. Preserve category spelling as entered. Categories accept free text with suggestions from history.
 - Editing offers Update and Delete; deletion requires confirmation.
 - The note header is only `Category / Note name`. Omit large titles, dates, field labels, separate rename controls and local-save labels.
 - The editor fills available height and accepts native caret placement throughout. Focus adds no colored side line or canvas border.
@@ -57,7 +57,7 @@ This document describes the target interaction model. The [verification scope](.
 
 ## Tasks
 
-- Add tasks through the header `+` button and a modal with title, optional due date and related amount. Editing uses the same modal; deletion requires confirmation. No inline add form or browser prompts.
+- Add tasks through the header `+` button and a modal with title and optional due date. Editing uses the same modal; deletion requires confirmation. No inline add form or browser prompts.
 - Show completed/active counts and percentage above a scrollable list. Archive completed tasks together; viewing the archive offers restoration to the active list with completion cleared.
 - Dated tasks always precede undated tasks and sort by due date ascending. Manual drag order applies to tasks sharing a date and to undated tasks; dragging cannot override chronological order. No separate drag icon.
 - Single-click selects; double-clicking the row or F2 edits. Completion controls act independently.
@@ -68,20 +68,20 @@ This document describes the target interaction model. The [verification scope](.
 - On mobile, double-tap edits. Tap to select before touch-dragging; unselected rows allow normal vertical scrolling. Keyboard users can focus rows, press F2/Enter to edit, Shift+Space to select and Alt+Arrow to reorder.
 - Guest tasks persist offline in IndexedDB; account tasks use revision-checked server storage and SSE, with a read-only offline cache. Version 4 workspace backups include active and archived tasks. Guest copying remains explicit.
 - Background refreshes leave existing Tasks controls enabled and retain unchanged rows, selection and scroll position. Saving a note must not make Tasks flash or fade.
-- The target shared Tasks/Finance entry form includes description, category with history suggestions, date and amount. An amount associates the entry with Finance. This shared form is not yet implemented.
+- Tasks and Finance are independent. Tasks have no amount field or transaction link; previously stored task amounts remain preserved for compatibility but are not displayed.
 
 ## Finance transactions
 
 - Main shows income, expenses and balance for the selected month above a scrollable ledger. Toggle grouping by date/category; dates sort newest first. The month and grouping choice persist within the browser workspace.
 - Add through the header `+`; clicking a transaction opens its edit modal. Autofocus the description. Fields are explicit income/expense type, description, positive integer IDR amount, searchable/free-input category and date. Category suggestions come from existing transactions and planned categories.
-- Saving switches to the transaction's month. Confirm deletion and recalculate totals. Actual transactions remain independent of planned budgets and task amounts.
+- Saving switches to the transaction's month. Confirm deletion and recalculate totals. Actual transactions remain independent of planned budgets and Tasks.
 - Guest transactions stay editable offline; account transactions synchronize and are read-only offline. Revisions reject conflicting writes while retaining form values for reload/retry. Login requires explicit consent to copy guest transactions, with stable copy identifiers to avoid duplicate retries.
 - Workspace backups include transactions. Import validates them and creates new IDs without replacing existing data. Version 6 backups also include monthly plans.
 
 ## Finance planning
 
 - Detail → Finance uses a Main-like split: planning on the left, transaction ledger on the right, no Tasks panel. Income, recurring expenses and monthly expenses form adjacent cards. Narrow layouts scroll cards horizontally and place the ledger below.
-- Keep opening, planned, projected and current balances above the cards. Each expense card shows remaining amount/percentage and a battery-style bar; low remaining budgets use amber and deficits use red. Overspent categories show their deficit.
+- The income column stacks a monthly financial plan summary above the income card. The summary shows planned income, recurring and monthly expenses, planned remainder, remaining percentage of planned income, and negative variance for over-budget spending. Remove the separate opening, planned ending, projected ending and current balance cards. Each expense card shows remaining amount/percentage and a battery-style bar; low remaining budgets use amber and deficits use red. Overspent categories show their deficit.
 - Plan rows display category, not a separate title. Each card has category search/free input, amount and Save at the bottom. Reject duplicate category/type/month budgets without clearing the form.
 - Match realization by month, normalized category and income/expense type. Sum partial transactions and recalculate after transaction edits/deletes. Plans need no due or realization date.
 - Projected balance uses the greater of budget or actual spending per category and includes unexpected expenses. Current balance uses recorded transactions. Disabled plan categories follow the exclusion rules below.
@@ -129,7 +129,7 @@ This document describes the target interaction model. The [verification scope](.
 
 - Detail Finance uses compact cards and rows, with readable light text; only excluded items are gray. Per-item remaining amounts are omitted while card-level remaining/deficit meters remain. Category and transaction-description suggestions use searchable field-width dropdowns; descriptions come from existing transactions. Transaction type uses Income/Expense radio choices, and Tasks/Finance share the same add-button styling.
 
-- Finance entry order is Date, Type, Category, Amount, optional Description. Date groups show both income and expense totals; empty descriptions display the category as the ledger label. Planning cards have equal heights with independently scrolling item lists.
+- Finance entry order is Date, Type, Category, Amount, optional Description. Date groups show both income and expense totals right-aligned on the same line as the date; empty descriptions display the category as the ledger label. Planning columns have equal, taller heights with independently scrolling item lists.
 - Money fields format whole currency units while typing. Workspace display currency defaults to IDR, with USD/EUR/SGD/MYR/JPY available in Settings; switching currency changes presentation, not stored amounts or exchange rates.
 - Scrollbars are thin with transparent tracks and unobtrusive thumbs revealed on hover/focus. HTTP(S) links in Text notes and Tasks open in a new tab, appear white with dotted underlines, and do not activate task editing or dragging.
 
@@ -143,3 +143,7 @@ This document describes the target interaction model. The [verification scope](.
 - Shared-note edits preserve owner metadata and reject stale revisions without overwriting either editor's unsaved content. Shared pages do not expose the rest of the account workspace.
 - Shared pages have no language dropdown or manual Save button. Text and Draw edits save automatically after a short pause, without interrupting editing. A status indicates pending, saved or failed writes; temporary connection failures retry, while revision conflicts preserve the local draft and stop automatic writes.
 - Autosave acknowledgements preserve the live editor's caret, selection and undo history, including formatted paragraphs and nested lists.
+
+- Nested list markers align with the parent content start (the same position as a Shift+Enter continuation), without adding manual spaces.
+- Free-text form fields capitalize their first letter while typing; categories, credentials, addresses, search queries and editor content retain their literal input. Existing stored content is not rewritten.
+- Main Finance grouping and month controls sit between the heading and add button.

@@ -44,7 +44,7 @@ test('guest note persists, closing only hides it, backup downloads', async ({
     'Keep my thoughts',
   );
   await page
-    .getByRole('button', { name: 'Close Daily Ideas', exact: true })
+    .getByRole('button', { name: 'Close Daily ideas', exact: true })
     .click();
   await expect(page.getByRole('textbox', { name: 'Note content' })).toHaveCount(
     0,
@@ -57,7 +57,7 @@ test('guest note persists, closing only hides it, backup downloads', async ({
   await page.mouse.move(650, 300);
   await page
     .locator('.note-library')
-    .getByRole('button', { name: /Daily Ideas/ })
+    .getByRole('button', { name: /Daily ideas/ })
     .click();
   await expect(page.getByRole('textbox', { name: 'Note content' })).toHaveText(
     'Keep my thoughts',

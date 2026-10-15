@@ -120,3 +120,47 @@ test('list continuation aligns with its first letter without inserting spaces', 
     )
     .toBeLessThan(1);
 });
+
+test('nested markers align with parent continuation text', async ({ page }) => {
+  await page.goto('/');
+  await page
+    .getByRole('button', { name: 'Continue as guest', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'New note', exact: true }).click();
+  await page.getByRole('button', { name: 'Create', exact: true }).click();
+  const editor = page.getByRole('textbox', { name: 'Note content' });
+  await editor.click();
+  await page.keyboard.type('1. Parent');
+  await page.keyboard.press('Shift+Enter');
+  await page.keyboard.type('Continuation');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Tab');
+  await page.keyboard.type('Child');
+  await expect
+    .poll(() =>
+      editor.evaluate((el) => {
+        const positions: number[] = [];
+        for (const [i, p] of [
+          ...el.querySelectorAll('.text-paragraph'),
+        ].entries()) {
+          const walker = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
+          let node;
+          while ((node = walker.nextNode())) {
+            const text = node.textContent || '';
+            const index =
+              i === 0 ? text.indexOf('Parent') : text.search(/[a-zA-Z0-9•]/);
+            if (index < 0) continue;
+            const range = document.createRange();
+            range.setStart(node, index);
+            range.setEnd(node, index + 1);
+            positions.push(range.getBoundingClientRect().x);
+            break;
+          }
+        }
+        return positions.length === 2
+          ? Math.abs(positions[0] - positions[1])
+          : 999;
+      }),
+    )
+    .toBeLessThan(1);
+});

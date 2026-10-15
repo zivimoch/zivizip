@@ -1,7 +1,6 @@
 <script lang="ts">
-  import { displayCurrency, formatMoney } from './currency';
+  import { capitalizeField } from './capitalization';
   import LinkedText from './LinkedText.svelte';
-  import MoneyField from './MoneyField.svelte';
   import { onMount, tick } from 'svelte';
   import Icon from './Icon.svelte';
   import {
@@ -30,7 +29,6 @@
   let editing: string | null = null,
     title = '',
     date = '',
-    amount = '',
     deleting = false,
     formOpen = false;
   let draftOrder: Task[] | null = null;
@@ -128,7 +126,6 @@
     editing = task?.id || null;
     title = task?.title || '';
     date = task?.date || '';
-    amount = task?.amount ? String(task.amount) : '';
     deleting = false;
     formOpen = true;
     message = '';
@@ -157,16 +154,14 @@
       id: editing || crypto.randomUUID(),
       title: title.trim(),
       date,
-      amount: Number(amount || 0),
+      amount: 0,
       done: false,
       archived: false,
       createdAt: Date.now(),
     };
     const items = editing
       ? state.items.map((old) =>
-          old.id === editing
-            ? { ...old, title: task.title, date, amount: task.amount }
-            : old,
+          old.id === editing ? { ...old, title: task.title, date } : old,
         )
       : [...state.items, task];
     if (await commit(items)) close();
@@ -379,7 +374,6 @@
     listDropReady = false;
     listDropOver = false;
   }
-  $: money = (n: number) => formatMoney(n, $displayCurrency);
   const dateLabel = (value: string) =>
     new Intl.DateTimeFormat(language === 'en' ? 'en-GB' : 'id-ID', {
       day: 'numeric',
@@ -546,9 +540,6 @@
               >
             </div>{/if}
         </div>
-        {#if task.amount}<span class="task-amount" role="gridcell"
-            >{money(task.amount)}</span
-          >{/if}
       </div>
     {:else}<p class="task-empty">
         {!initialized
@@ -623,6 +614,7 @@
           'What would you like to finish?',
           'Apa yang ingin diselesaikan?',
         )}<input
+          use:capitalizeField
           bind:this={titleInput}
           bind:value={title}
           required
@@ -636,12 +628,6 @@
           bind:value={date}
           disabled={busy}
         /></label
-      >
-      <label
-        >{t(
-          `Related amount (${$displayCurrency}, optional)`,
-          `Nominal terkait (${$displayCurrency}, opsional)`,
-        )}<MoneyField bind:value={amount} min={0} disabled={busy} /></label
       >
       {#if editing}<button
           class="danger"
@@ -819,10 +805,6 @@
     width: 14px;
     height: 14px;
   }
-  .task-amount {
-    font-size: 11px;
-    white-space: nowrap;
-  }
   .task-archive-link {
     align-self: flex-start;
     font-size: 11px;
@@ -846,9 +828,6 @@
     }
     .task-title {
       font-size: 14px;
-    }
-    .task-amount {
-      font-size: 13px;
     }
   }
   @media (max-width: 760px) {

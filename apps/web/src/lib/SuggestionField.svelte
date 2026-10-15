@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { capitalFirst, capitalizeField } from './capitalization';
+  export let capitalize = false;
   import { onMount, tick } from 'svelte';
   export let id: string;
   export let label: string;
@@ -46,7 +48,7 @@
     open = true;
   }
   function choose(option: string) {
-    value = option;
+    value = capitalize ? capitalFirst(option) : option;
     close();
     input.focus();
   }
@@ -84,6 +86,7 @@
 </script>
 
 <input
+  use:capitalizeField={capitalize}
   bind:this={input}
   bind:value
   {id}

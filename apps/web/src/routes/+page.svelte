@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { capitalFirst } from '$lib/capitalization';
   import {
     currencies,
     displayCurrency,
@@ -116,8 +117,6 @@
     document.documentElement.lang = prefs.language;
     remember();
   }
-  const titleCase = (s: string) =>
-    s.replace(/(^|[\s-])\p{L}/gu, (c) => c.toLocaleUpperCase());
   function problem(e: unknown) {
     error =
       t(
@@ -690,7 +689,7 @@
     if ((event as InputEvent).isComposing) return;
     const start = input.selectionStart,
       end = input.selectionEnd;
-    input.value = titleCase(input.value);
+    if (kind === 'name') input.value = capitalFirst(input.value);
     if (kind === 'name') formName = input.value;
     else formCategory = input.value;
     if (start !== null) input.setSelectionRange(start, end);
