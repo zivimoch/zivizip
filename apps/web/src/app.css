@@ -209,7 +209,7 @@ small {
 }
 .workspace.main {
   display: grid;
-  grid-template-columns: minmax(0, var(--notes)) 6px minmax(240px, 1fr);
+  grid-template-columns: minmax(0, var(--notes)) 6px minmax(0, var(--side));
 }
 .notes-pane {
   display: flex;
@@ -968,4 +968,82 @@ a.content-link {
   text-decoration: underline dotted;
   text-underline-offset: 3px;
   cursor: pointer;
+}
+
+.resize-handle {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: inherit;
+  touch-action: none;
+  z-index: 1;
+}
+.panel-toggle {
+  position: absolute;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  background: var(--surface, #142128);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+}
+.panel-toggle svg {
+  width: 14px;
+  height: 14px;
+}
+.vertical .panel-toggle {
+  bottom: 8px;
+  right: 0;
+  width: 20px;
+  height: 30px;
+}
+.horizontal .panel-toggle {
+  right: 8px;
+  bottom: 0;
+  width: 30px;
+  height: 20px;
+}
+.finance-slot {
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.finance-slot > .finance-panel {
+  height: 100%;
+}
+@media (min-width: 761px) {
+  .workspace.main .right-pane {
+    display: grid;
+    grid-template-rows: minmax(0, var(--tasks)) 6px minmax(0, var(--finance));
+  }
+  .tasks-slot {
+    overflow: hidden;
+  }
+  .notes-collapsed > .notes-pane,
+  .side-collapsed > .right-pane,
+  .tasks-collapsed .tasks-slot,
+  .finance-collapsed .finance-slot {
+    visibility: hidden;
+  }
+  .notes-collapsed > .vertical .panel-toggle {
+    left: 0;
+    right: auto;
+  }
+  .tasks-collapsed .horizontal .panel-toggle {
+    top: 0;
+    bottom: auto;
+  }
+}
+@media (max-width: 760px) {
+  .workspace.main[data-mobile-section='tasks'] .finance-slot {
+    display: none;
+  }
+  .workspace.main[data-mobile-section='finance'] .finance-slot {
+    flex: 1;
+  }
 }

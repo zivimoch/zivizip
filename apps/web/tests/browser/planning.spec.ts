@@ -442,3 +442,31 @@ test('monthly overview exposes negative remaining funds and over-budget variance
   const income = (await card(page, 'income').boundingBox())!;
   expect(top.y + top.height).toBeLessThanOrEqual(income.y);
 });
+
+test('unplanned expenses populate a month without creating a plan first', async ({
+  page,
+}) => {
+  await visit(page);
+  await addTransaction(page, 'Emergency repairs', '250000');
+  await page
+    .locator('.month-links')
+    .getByRole('button', { name: 'October 26', exact: true })
+    .click();
+  await expect(card(page, 'monthly').locator('.plan-category')).toHaveText([
+    'Emergency repairs',
+  ]);
+  await expect(card(page, 'income').locator('.plan-category')).toHaveCount(0);
+  await expect(card(page, 'recurring').locator('.plan-category')).toHaveCount(
+    0,
+  );
+  await addTransaction(page, 'emergency repairs', '50000');
+  await expect(card(page, 'monthly').locator('.plan-category')).toHaveCount(1);
+  await expect(
+    row(page, 'Emergency repairs').locator('.plan-actual'),
+  ).toContainText('300.000');
+  await page.reload();
+  await detail(page);
+  await expect(
+    row(page, 'Emergency repairs').locator('.plan-actual'),
+  ).toContainText('300.000');
+});

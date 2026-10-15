@@ -213,3 +213,36 @@
   padding: 0 4px;
   min-height: 24px;
 }
+
+.text-format-bar button,
+.text-image-tools button,
+.text-tool-field {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.text-format-bar svg,
+.text-image-tools svg {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.text-image-tools button {
+  padding: 5px 9px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+}
+.text-image-tools button[aria-expanded='true'] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.text-tool-field {
+  flex-shrink: 0;
+  margin: 0;
+}

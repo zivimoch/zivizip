@@ -62,3 +62,7 @@ Frontend diagnostics passed without errors or warnings; 32 frontend unit tests a
 ## Finance planning and form refinements — 2026-10-15
 
 Frontend diagnostics, 33 unit tests and the production build passed. Twenty targeted browser scenarios passed across Notes, Tasks, Finance and monthly planning, including nested marker alignment, first-letter capitalization, unchanged category input, mobile header layout, and negative remaining funds. Planning checks cover excluded categories, copying months, account conflicts and offline data. Mobile checks use Chromium viewports, not physical devices. Legacy task amounts and opening-balance data remain stored; their removed controls do not erase existing records.
+
+## Collapsible workspace panels and text tools — 2026-10-15
+
+Frontend diagnostics, 33 unit tests and the production build passed. Sixteen targeted browser scenarios passed, followed by four focused checks after adding persisted expanded dimensions. Coverage includes the four-state panel cycle, dragging to collapsed edges, restoring custom dimensions after reload, mobile navigation, toolbar icons and formatting, and unexpected expense categories appearing without a pre-created monthly plan. Automatic categories aggregate case-insensitive matches and survive reload. Desktop screenshots and a 390px mobile viewport were inspected; physical-device testing remains separate.

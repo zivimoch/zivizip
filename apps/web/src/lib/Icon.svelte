@@ -1,6 +1,10 @@
 <script lang="ts">
   export let name = 'note';
   const paths: Record<string, string> = {
+    'chevron-left': 'm14 5-7 7 7 7',
+    'chevron-right': 'm10 5 7 7-7 7',
+    'chevron-up': 'm5 14 7-7 7 7',
+    'chevron-down': 'm5 10 7 7 7-7',
     download: 'M12 3v12m-5-5 5 5 5-5 M4 16v5h16v-5',
     eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12 M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0',
     'eye-off':

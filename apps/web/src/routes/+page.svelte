@@ -776,8 +776,30 @@
     if (next === 'main') mobileSection = 'notes';
     mobileMenu = false;
   }
+  let collapseFinanceNext = true;
+  function toggleSide() {
+    if (prefs.width === 100) prefs.width = prefs.expandedWidth || 75;
+    else {
+      if (prefs.width > 0) prefs.expandedWidth = prefs.width;
+      prefs.width = 100;
+    }
+    remember();
+  }
+  function cyclePanels() {
+    if (prefs.height === 100 || prefs.height === 0) {
+      collapseFinanceNext = prefs.height === 0;
+      prefs.height = prefs.expandedHeight || 49;
+    } else {
+      prefs.expandedHeight = prefs.height;
+      prefs.height = collapseFinanceNext ? 100 : 0;
+    }
+    remember();
+  }
   function startResize(e: PointerEvent, axis: 'width' | 'height') {
     e.preventDefault();
+    if (prefs[axis] > 0 && prefs[axis] < 100)
+      prefs[axis === 'width' ? 'expandedWidth' : 'expandedHeight'] =
+        prefs[axis];
     const target = e.currentTarget as HTMLElement;
     target.setPointerCapture(e.pointerId);
     const move = (ev: PointerEvent) => {
@@ -785,9 +807,9 @@
         axis === 'width' ? workspace : right
       ).getBoundingClientRect();
       prefs[axis] = Math.max(
-        20,
+        0,
         Math.min(
-          axis === 'width' ? 85 : 80,
+          100,
           (axis === 'width'
             ? (ev.clientX - box.left) / box.width
             : (ev.clientY - box.top) / box.height) * 100,
@@ -795,6 +817,8 @@
       );
     };
     const stop = () => {
+      if (prefs[axis] < 2) prefs[axis] = 0;
+      if (prefs[axis] > 98) prefs[axis] = 100;
       target.removeEventListener('pointermove', move);
       target.removeEventListener('pointerup', stop);
       target.removeEventListener('pointercancel', stop);
@@ -991,7 +1015,11 @@
   class:main={view === 'main'}
   data-mobile-section={mobileSection}
   bind:this={workspace}
-  style={`--notes:${prefs.width}%;--tasks:${prefs.height}%`}
+  class:notes-collapsed={prefs.width === 0}
+  class:side-collapsed={prefs.width === 100}
+  class:tasks-collapsed={prefs.height === 0}
+  class:finance-collapsed={prefs.height === 100}
+  style={`--notes:${prefs.width}fr;--side:${100 - prefs.width}fr;--tasks:${prefs.height}fr;--finance:${100 - prefs.height}fr`}
 >
   {#if error}<div class="error" role="alert">
       {error}<button onclick={retrySave}
@@ -1113,24 +1141,37 @@
           >
         </div>{/if}
     </section>
-    {#if view === 'main'}<button
-        class="divider vertical"
-        aria-label="Resize notes"
-        onpointerdown={(e) => startResize(e, 'width')}
-        ondblclick={() => {
-          prefs.width = 75;
-          remember();
-        }}
-        onkeydown={(e) => {
-          if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-            prefs.width = Math.max(
-              20,
-              Math.min(85, prefs.width + (e.key === 'ArrowRight' ? 2 : -2)),
-            );
+    {#if view === 'main'}<div class="divider vertical">
+        <button
+          class="resize-handle"
+          aria-label="Resize notes"
+          onpointerdown={(e) => startResize(e, 'width')}
+          ondblclick={() => {
+            prefs.width = 75;
             remember();
-          }
-        }}
-      ></button>
+          }}
+          onkeydown={(e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+              e.preventDefault();
+              prefs.width = Math.max(
+                0,
+                Math.min(100, prefs.width + (e.key === 'ArrowRight' ? 2 : -2)),
+              );
+              remember();
+            }
+          }}
+        ></button>
+        <button
+          class="panel-toggle"
+          aria-label={prefs.width === 100
+            ? t('Show side panels', 'Buka panel samping')
+            : t('Hide side panels', 'Tutup panel samping')}
+          onclick={toggleSide}
+          ><Icon
+            name={prefs.width === 100 ? 'chevron-left' : 'chevron-right'}
+          /></button
+        >
+      </div>
       <div class="right-pane" bind:this={right}>
         <div class="tasks-slot">
           {#key tasksRepo.db.name}<TasksPanel
@@ -1141,23 +1182,55 @@
               onbusy={(value) => (taskBusy = value)}
             />{/key}
         </div>
-        <button
-          class="divider horizontal"
-          aria-label="Resize tasks"
-          onpointerdown={(e) => startResize(e, 'height')}
-          ondblclick={() => {
-            prefs.height = 49;
-            remember();
-          }}
-        ></button>
-        {#key financeRepo.db.name}<FinancePanel
-            repository={financeRepo}
-            planningRepository={planningRepo}
-            {writable}
-            language={prefs.language}
-            refreshToken={taskRefresh}
-            onbusy={(value) => (financeBusy = value)}
-          />{/key}
+        <div class="divider horizontal">
+          <button
+            class="resize-handle"
+            aria-label="Resize tasks"
+            onpointerdown={(e) => startResize(e, 'height')}
+            ondblclick={() => {
+              prefs.height = 49;
+              remember();
+            }}
+            onkeydown={(e) => {
+              if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                prefs.height = Math.max(
+                  0,
+                  Math.min(
+                    100,
+                    prefs.height + (e.key === 'ArrowDown' ? 2 : -2),
+                  ),
+                );
+                remember();
+              }
+            }}
+          ></button>
+          <button
+            class="panel-toggle"
+            aria-label={prefs.height === 0 || prefs.height === 100
+              ? t('Show both panels', 'Buka kedua panel')
+              : collapseFinanceNext
+                ? t('Hide finance', 'Tutup Finance')
+                : t('Hide tasks', 'Tutup To do')}
+            onclick={cyclePanels}
+            ><Icon
+              name={prefs.height === 100 ||
+              (prefs.height > 0 && !collapseFinanceNext)
+                ? 'chevron-up'
+                : 'chevron-down'}
+            /></button
+          >
+        </div>
+        <div class="finance-slot">
+          {#key financeRepo.db.name}<FinancePanel
+              repository={financeRepo}
+              planningRepository={planningRepo}
+              {writable}
+              language={prefs.language}
+              refreshToken={taskRefresh}
+              onbusy={(value) => (financeBusy = value)}
+            />{/key}
+        </div>
       </div>{/if}
   {:else if view === 'tasks'}<div class="tasks-page">
       {#key tasksRepo.db.name}<TasksPanel

@@ -46,6 +46,8 @@ export interface Preferences {
   currency?: string;
   width: number;
   height: number;
+  expandedWidth?: number;
+  expandedHeight?: number;
 }
 export interface Backup {
   format: 'zivizip';
@@ -221,11 +223,16 @@ export function validateBackup(value: unknown): Backup {
     !Number.isSafeInteger(p.counter) ||
     p.counter < 0 ||
     !Number.isFinite(p.width) ||
-    p.width < 20 ||
-    p.width > 85 ||
+    p.width < 0 ||
+    p.width > 100 ||
     !Number.isFinite(p.height) ||
-    p.height < 20 ||
-    p.height > 80
+    p.height < 0 ||
+    p.height > 100 ||
+    [p.expandedWidth, p.expandedHeight].some(
+      (value) =>
+        value !== undefined &&
+        (!Number.isFinite(value) || value <= 0 || value >= 100),
+    )
   )
     throw new Error('Invalid workspace settings');
   return b;

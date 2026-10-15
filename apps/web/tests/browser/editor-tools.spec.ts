@@ -27,6 +27,15 @@ test('text tools preserve formatting and Shift+Enter stays inside a list item', 
     .poll(() => alignment(editor.locator('.text-paragraph').first()))
     .toBeLessThan(1);
   await page.getByRole('button', { name: /Tools/ }).click();
+  const toolButtons = page
+    .getByRole('toolbar', { name: 'Text tools' })
+    .getByRole('button');
+  expect(await toolButtons.count()).toBeGreaterThan(0);
+  expect(await toolButtons.locator('svg').count()).toBe(
+    await toolButtons.count(),
+  );
+
+  await page.screenshot({ path: '/tmp/zivizip-text-tools.png' });
   await editor.click();
   await page.keyboard.press('Control+a');
   await page.getByRole('button', { name: 'Bold', exact: true }).click();

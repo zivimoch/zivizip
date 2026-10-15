@@ -82,9 +82,39 @@ export function mountText(host: HTMLElement, options: Options) {
     savedRange = range();
     file.click();
   };
+  const icons: Record<string, string> = {
+    tools: 'M4 6h16M4 12h16M4 18h16M8 3v6M16 9v6M10 15v6',
+    down: 'm6 9 6 6 6-6',
+    up: 'm6 15 6-6 6 6',
+    bold: 'M6 4h7a4 4 0 0 1 0 8H6zM6 12h8a4 4 0 0 1 0 8H6z',
+    italic: 'M10 4h10M4 20h10M15 4 9 20',
+    underline: 'M6 3v8a6 6 0 0 0 12 0V3M4 21h16',
+    divider: 'M3 12h18',
+    undo: 'm8 4-5 5 5 5M3 9h11a6 6 0 0 1 0 12',
+    redo: 'm16 4 5 5-5 5M21 9H10a6 6 0 0 0 0 12',
+    image: 'M3 3h18v18H3zM3 17l5-5 4 4 4-6 5 7M8 7h.01',
+    color: 'm6 17 6-14 6 14M8 12h8M3 21h18',
+    size: 'M3 5h12M9 5v15M17 10h5M20 10v10',
+  };
+  function toolIcon(name: string) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    const path = document.createElementNS(svg.namespaceURI, 'path');
+    path.setAttribute('d', icons[name]);
+    svg.append(path);
+    return svg;
+  }
+  add.prepend(toolIcon('image'));
   const toggle = document.createElement('button');
   toggle.type = 'button';
-  toggle.textContent = '⌄ ' + t('Tools', 'Alat');
+  const toggleLabel = () =>
+    toggle.replaceChildren(
+      toolIcon('tools'),
+      document.createTextNode(t('Tools', 'Alat')),
+      toolIcon(toggle.getAttribute('aria-expanded') === 'true' ? 'up' : 'down'),
+    );
+  toggleLabel();
   toggle.setAttribute('aria-expanded', 'false');
   const bar = document.createElement('div');
   bar.className = 'text-format-bar';
@@ -93,13 +123,15 @@ export function mountText(host: HTMLElement, options: Options) {
   bar.setAttribute('aria-label', t('Text tools', 'Alat teks'));
   toggle.onclick = () => {
     bar.hidden = !bar.hidden;
-    toggle.textContent = (bar.hidden ? '⌄ ' : '⌃ ') + t('Tools', 'Alat');
     toggle.setAttribute('aria-expanded', String(!bar.hidden));
+    toggleLabel();
   };
-  function command(label: string, action: () => void) {
+  function command(label: string, action: () => void, icon: string) {
     const button = document.createElement('button');
     button.type = 'button';
     button.textContent = label;
+    button.prepend(toolIcon(icon));
+    button.title = label;
     button.onpointerdown = (e) => e.preventDefault();
     button.onclick = () => {
       if (opts.writable) action();
@@ -142,25 +174,42 @@ export function mountText(host: HTMLElement, options: Options) {
     savedRange = range();
   };
   size.onchange = () => format('fontSize', '7');
-  bar.append(color, size);
-  command(t('Bold', 'Tebal'), () => format('bold'));
-  command(t('Italic', 'Miring'), () => format('italic'));
-  command(t('Underline', 'Garis bawah'), () => format('underline'));
-  command(t('Divider', 'Garis pemisah'), () => {
-    const previous = accepted;
-    const next = splitAtCaret();
-    if (next) {
-      const divider = paragraph();
-      divider.dataset.rule = 'true';
-      divider.classList.add('text-divider');
-      next.before(divider);
-      caret(next);
-      persist(previous);
-      paint();
-    }
-  });
-  command('Undo', () => undo(false));
-  command('Redo', () => undo(true));
+  for (const [control, name] of [
+    [color, 'color'],
+    [size, 'size'],
+  ] as const) {
+    const label = document.createElement('label');
+    label.className = 'text-tool-field';
+    label.title = control.getAttribute('aria-label') || '';
+    label.append(toolIcon(name), control);
+    bar.append(label);
+  }
+  command(t('Bold', 'Tebal'), () => format('bold'), 'bold');
+  command(t('Italic', 'Miring'), () => format('italic'), 'italic');
+  command(
+    t('Underline', 'Garis bawah'),
+    () => format('underline'),
+    'underline',
+  );
+  command(
+    t('Divider', 'Garis pemisah'),
+    () => {
+      const previous = accepted;
+      const next = splitAtCaret();
+      if (next) {
+        const divider = paragraph();
+        divider.dataset.rule = 'true';
+        divider.classList.add('text-divider');
+        next.before(divider);
+        caret(next);
+        persist(previous);
+        paint();
+      }
+    },
+    'divider',
+  );
+  command('Undo', () => undo(false), 'undo');
+  command('Redo', () => undo(true), 'redo');
   bar.append(add, file);
   tools.append(toggle);
   (opts.toolbar || host).append(tools);

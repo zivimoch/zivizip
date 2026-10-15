@@ -6,7 +6,7 @@ This document describes the target interaction model. The [verification scope](.
 
 - Desktop sidebar starts as an icon rail and expands on hover or keyboard focus. Detail starts collapsed. Space between the logo and Main matches the navigation rhythm. Open Detail submenu icons align with Main and Goals when the rail collapses; indentation and the hierarchy line appear only while expanded.
 - Mobile sidebar fills the screen width and has a back/close control. Main opens without an authentication redirect.
-- Desktop Main places Notes on the left and Tasks/Finance on the right. Default width is 75%/25%, subject to minimum widths. Both dividers are draggable, persist their positions, and reset on double-click.
+- Desktop Main places Notes on the left and Tasks/Finance on the right. Default width is 75%/25%; panels can collapse fully. Both dividers are draggable, persist their positions, and reset on double-click.
 - Mobile uses section navigation, a compact 48px header, and reduced spacing beneath tabs. Note tabs remain compact: 46px desktop, 49px mobile in the prototype.
 - English is the default interface language. Bahasa Indonesia is selectable and persisted. Never translate user content automatically.
 
@@ -147,3 +147,7 @@ This document describes the target interaction model. The [verification scope](.
 - Nested list markers align with the parent content start (the same position as a Shift+Enter continuation), without adding manual spaces.
 - Free-text form fields capitalize their first letter while typing; categories, credentials, addresses, search queries and editor content retain their literal input. Existing stored content is not rewritten.
 - Main Finance grouping and month controls sit between the heading and add button.
+
+- Desktop panel dividers drag to either edge to fully collapse a panel and retain their saved size. Double-click restores defaults. The bottom control on the vertical divider hides/restores the right pane. The right control on the horizontal divider cycles Finance hidden, both visible, Tasks hidden, both visible. Mobile navigation remains independent of desktop collapse state.
+- Text Tools uses consistent outline icons for its toggle and every formatting action, with accessible labels.
+- Unexpected expense categories populate the monthly expense card directly from recorded transactions, even without a pre-created plan. Matching is case-insensitive and does not duplicate recurring categories; automatic categories have zero planned budget until edited.

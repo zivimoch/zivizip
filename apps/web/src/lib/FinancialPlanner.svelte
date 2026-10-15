@@ -804,7 +804,12 @@
                         >
                       </tr>{:else}<tr
                         ><td colspan="2" class="empty-plan"
-                          >{t('No plans yet', 'Belum ada rencana')}</td
+                          >{card.key === 'monthly'
+                            ? t(
+                                'New expense categories appear here automatically.',
+                                'Kategori pengeluaran baru muncul otomatis di sini.',
+                              )
+                            : t('No plans yet', 'Belum ada rencana')}</td
                         ></tr
                       >{/each}
                   </tbody>
