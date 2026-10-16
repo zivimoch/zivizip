@@ -106,11 +106,12 @@ This document describes the target interaction model. The [verification scope](.
 
 ## Goals
 
-- Create, edit and delete goals with a required title, optional description and an optional curated cover image. Bundled free photographs remain available offline. Cards show aggregate completed-task count and total linked expenses, not growing assigned-item lists.
-- Only completed tasks, including archived tasks, and expense transactions enter Unassigned. Income is excluded, including legacy income links.
-- Dropping an item onto a goal assigns it exclusively and removes it from Unassigned without deleting its source. A per-item assignment control supports keyboard/touch access.
-- Source edits/deletions update totals and remove stale links; tasks marked incomplete no longer count as complete. Deleting a goal returns assignments to the pool while preserving source records.
-- Goal cards scroll horizontally above Unassigned on all screen sizes. Unassigned is a horizontal strip of draggable cards with source labels/amounts. Mobile supports swipe and scroll snapping.
+- Create, edit and delete goals with a required title and optional description. A lightweight SVG garden replaces photo covers: it grows from seed to flowering tree with the number of linked contributions, never the amount spent. Legacy cover identifiers remain accepted in backups.
+- Completed tasks (including archived tasks) and expense transactions can be assigned; income is excluded. Cards show totals and a compact, vertically scrollable contribution list. Long titles use ellipsis with the full title available on hover/focus.
+- Assignment uses drag only, without Move to goal buttons. Desktop uses native dragging; touch uses a brief hold then drag, with edge scrolling. Keyboard users can pick up an item with Space/Enter, Tab to a drop region and press Enter; Escape cancels.
+- Dropping onto another goal adds a reference without removing the source goal reference. The same source may belong to several goals, but never twice in one goal. Unassigned contains only sources with no goal references.
+- Dropping an assigned item into Unassigned removes only its source-goal reference. It reappears in the pool when no remaining goals reference it. Deleting a goal follows the same rule and preserves source records.
+- Source changes update totals; removed sources and incomplete tasks no longer contribute. Goal cards scroll horizontally above the horizontal Unassigned strip on desktop and mobile.
 
 ## Accounts, offline and privacy
 

@@ -18,8 +18,6 @@ pub struct GoalState {
 }
 fn validate(state: &GoalState) -> Result<()> {
     let mut ids = HashSet::new();
-    let mut tasks = HashSet::new();
-    let mut expenses = HashSet::new();
     let valid_id = |id: &String| {
         !id.is_empty()
             && id.len() <= 64
@@ -30,6 +28,8 @@ fn validate(state: &GoalState) -> Result<()> {
         || state.items.len() > 1000
         || serde_json::to_vec(&state.items).unwrap().len() > 2_000_000
         || state.items.iter().any(|g| {
+            let mut tasks = HashSet::new();
+            let mut expenses = HashSet::new();
             !valid_id(&g.id)
                 || !ids.insert(&g.id)
                 || g.title.trim().is_empty()
@@ -108,7 +108,14 @@ mod tests {
         second.id = "other".into();
         assert!(validate(&GoalState {
             revision: 1,
-            items: vec![goal, second]
+            items: vec![goal.clone(), second]
+        })
+        .is_ok());
+        let mut duplicate = goal;
+        duplicate.tasks.push("task".into());
+        assert!(validate(&GoalState {
+            revision: 1,
+            items: vec![duplicate]
         })
         .is_err());
     }

@@ -19,9 +19,7 @@ export const emptyGoals = (): GoalState => ({ revision: 0, items: [] });
 export function validateGoals(items: Goal[]) {
   if (!Array.isArray(items) || items.length > 1000)
     throw Error('Invalid goals');
-  const ids = new Set<string>(),
-    tasks = new Set<string>(),
-    expenses = new Set<string>();
+  const ids = new Set<string>();
   const validId = (id: unknown): id is string =>
     typeof id === 'string' && /^[a-zA-Z0-9-]{1,64}$/.test(id);
   for (const g of items) {
@@ -38,6 +36,8 @@ export function validateGoals(items: Goal[]) {
     )
       throw Error('Invalid goal');
     ids.add(g.id);
+    const tasks = new Set<string>(),
+      expenses = new Set<string>();
     for (const [links, seen] of [
       [g.tasks, tasks],
       [g.expenses, expenses],

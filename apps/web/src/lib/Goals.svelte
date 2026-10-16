@@ -2,13 +2,9 @@
   import { onMount } from 'svelte';
   import { capitalFirst } from './capitalization';
   import Icon from './Icon.svelte';
-  import {
-    GoalsRepository,
-    emptyGoals,
-    covers,
-    goalTotals,
-    type Goal,
-  } from './goals';
+  import GoalGrowth from './GoalGrowth.svelte';
+  import GoalItem from './GoalItem.svelte';
+  import { GoalsRepository, emptyGoals, goalTotals, type Goal } from './goals';
   import type { TasksRepository, Task } from './tasks';
   import type { FinanceRepository, Transaction } from './finance';
   import { displayCurrency, formatMoney } from './currency';
@@ -27,7 +23,20 @@
     error = '',
     hover = '',
     dragging = '',
-    selected = '';
+    dragSource = '';
+  let ghostX = 0,
+    ghostY = 0,
+    touchActive = false;
+  let touch: {
+    id: number;
+    x: number;
+    y: number;
+    key: string;
+    source: string;
+    timer: ReturnType<typeof setTimeout>;
+  } | null = null;
+  let scrollFrame = 0;
+  let pageElement: HTMLElement;
   let dialog: HTMLDialogElement, nameField: HTMLInputElement;
   let editing = '',
     title = '',
@@ -37,9 +46,9 @@
   const t = (en: string, id: string) => (language === 'id' ? id : en);
   $: assignedTasks = new Set(state.items.flatMap((g) => g.tasks));
   $: assignedExpenses = new Set(state.items.flatMap((g) => g.expenses));
-  $: pool = [
+  $: allItems = [
     ...tasks
-      .filter((task) => task.done && !assignedTasks.has(task.id))
+      .filter((task) => task.done)
       .map((task) => ({
         key: 'task:' + task.id,
         id: task.id,
@@ -48,7 +57,7 @@
         detail: t('Completed task', 'Tugas selesai'),
       })),
     ...transactions
-      .filter((tx) => tx.type === 'expense' && !assignedExpenses.has(tx.id))
+      .filter((tx) => tx.type === 'expense')
       .map((tx) => ({
         key: 'expense:' + tx.id,
         id: tx.id,
@@ -57,6 +66,14 @@
         detail: formatMoney(tx.amount, $displayCurrency),
       })),
   ];
+  $: pool = allItems.filter(
+    (item) =>
+      !(item.type === 'task' ? assignedTasks : assignedExpenses).has(item.id),
+  );
+  const linked = (goal: Goal) =>
+    allItems.filter((item) =>
+      (item.type === 'task' ? goal.tasks : goal.expenses).includes(item.id),
+    );
   async function refresh() {
     if (busy) return;
     try {
@@ -78,8 +95,16 @@
   onMount(() => {
     ready = true;
     const change = () => refresh();
+    const preventScroll = (e: TouchEvent) => {
+      if (touchActive) e.preventDefault();
+    };
+    window.addEventListener('touchmove', preventScroll, { passive: false });
     window.addEventListener('online', change);
-    return () => window.removeEventListener('online', change);
+    return () => {
+      window.removeEventListener('touchmove', preventScroll);
+      window.removeEventListener('online', change);
+      cancelDrag();
+    };
   });
   $: if (ready && refreshToken >= 0) void refresh();
   async function commit(items: Goal[]) {
@@ -149,38 +174,169 @@
     if (await commit(state.items.filter((g) => g.id !== editing)))
       dialog.close();
   }
-  async function assign(key: string, goalId: string) {
-    const item = pool.find((p) => p.key === key);
-    if (!item) return;
-    if (
+  function startDrag(key: string, source: string) {
+    if (!writable || busy) return;
+    dragging = key;
+    dragSource = source;
+  }
+  function cancelDrag() {
+    if (touch) clearTimeout(touch.timer);
+    touch = null;
+    touchActive = false;
+    dragging = '';
+    dragSource = '';
+    hover = '';
+    cancelAnimationFrame(scrollFrame);
+  }
+  async function assign(key: string, target: string, source: string) {
+    const item = allItems.find((p) => p.key === key);
+    if (!item || !writable || busy) return;
+    const field = item.type === 'task' ? 'tasks' : 'expenses';
+    if (target === 'pool') {
+      if (!source) return;
       await commit(
         state.items.map((g) =>
-          g.id === goalId
-            ? {
-                ...g,
-                [item.type === 'task' ? 'tasks' : 'expenses']: [
-                  ...(item.type === 'task' ? g.tasks : g.expenses),
-                  item.id,
-                ],
-              }
+          g.id === source
+            ? { ...g, [field]: g[field].filter((id) => id !== item.id) }
             : g,
         ),
-      )
-    )
-      selected = '';
+      );
+    } else {
+      const goal = state.items.find((g) => g.id === target);
+      if (!goal || goal[field].includes(item.id)) return;
+      await commit(
+        state.items.map((g) =>
+          g.id === target ? { ...g, [field]: [...g[field], item.id] } : g,
+        ),
+      );
+    }
+  }
+  function finish(target: string) {
+    const key = dragging,
+      source = dragSource;
+    cancelDrag();
+    if (target) void assign(key, target, source);
   }
   function drop(e: DragEvent, id: string) {
     e.preventDefault();
-    hover = '';
-    void assign(
-      e.dataTransfer?.getData('application/x-zivizip-goal') || '',
-      id,
+    e.stopPropagation();
+    if (dragging) finish(id);
+  }
+  function over(e: DragEvent, id: string) {
+    if (writable && dragging) {
+      e.preventDefault();
+      hover = id;
+      if (e.dataTransfer)
+        e.dataTransfer.dropEffect = id === 'pool' ? 'move' : 'copy';
+    }
+  }
+  function targetAt(x: number, y: number) {
+    return (
+      document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-goal-drop]')
+        ?.dataset.goalDrop || ''
     );
-    dragging = '';
+  }
+  function autoScroll() {
+    if (!dragging || !touchActive) return;
+    const el = document.elementFromPoint(ghostX, ghostY);
+    const strip = el?.closest<HTMLElement>(
+      '.goal-strip,.pool-strip,.linked-items',
+    );
+    if (strip) {
+      const r = strip.getBoundingClientRect();
+      if (strip.classList.contains('linked-items'))
+        strip.scrollTop +=
+          ghostY < r.top + 30 ? -7 : ghostY > r.bottom - 30 ? 7 : 0;
+      else
+        strip.scrollLeft +=
+          ghostX < r.left + 35 ? -8 : ghostX > r.right - 35 ? 8 : 0;
+    }
+    const r = pageElement.getBoundingClientRect();
+    pageElement.scrollTop +=
+      ghostY < r.top + 55 ? -10 : ghostY > r.bottom - 55 ? 10 : 0;
+    hover = targetAt(ghostX, ghostY);
+    scrollFrame = requestAnimationFrame(autoScroll);
+  }
+  function beginTouch(e: PointerEvent, key: string, source: string) {
+    if (e.pointerType === 'mouse' || !writable || busy) return;
+    cancelDrag();
+    const node = e.currentTarget as HTMLElement;
+    touch = {
+      id: e.pointerId,
+      x: e.clientX,
+      y: e.clientY,
+      key,
+      source,
+      timer: setTimeout(() => {
+        if (!touch) return;
+        startDrag(key, source);
+        touchActive = true;
+        ghostX = touch.x;
+        ghostY = touch.y;
+        node.setPointerCapture(touch.id);
+        scrollFrame = requestAnimationFrame(autoScroll);
+      }, 280),
+    };
+  }
+  function moveTouch(e: PointerEvent) {
+    if (!touch || touch.id !== e.pointerId) return;
+    if (!touchActive) {
+      if (Math.hypot(e.clientX - touch.x, e.clientY - touch.y) > 9)
+        cancelDrag();
+      return;
+    }
+    e.preventDefault();
+    ghostX = e.clientX;
+    ghostY = e.clientY;
+    hover = targetAt(ghostX, ghostY);
+  }
+  function endTouch(e: PointerEvent) {
+    if (!touch || touch.id !== e.pointerId) return;
+    if (touchActive) {
+      e.preventDefault();
+      finish(targetAt(e.clientX, e.clientY));
+    } else cancelDrag();
+  }
+  function keyboard(e: KeyboardEvent, key: string, source: string) {
+    if (e.key === 'Escape') {
+      cancelDrag();
+      return;
+    }
+    if ((e.key === ' ' || e.key === 'Enter') && writable && !busy) {
+      e.preventDefault();
+      startDrag(key, source);
+    }
+  }
+  function targetKey(e: KeyboardEvent, target: string) {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === 'Enter' && dragging) {
+      e.preventDefault();
+      finish(target);
+    } else if (e.key === 'Escape') cancelDrag();
   }
 </script>
 
-<section class="goals-page" aria-label={t('Goals', 'Target')}>
+<svelte:window
+  onpointermove={moveTouch}
+  onpointerup={endTouch}
+  onpointercancel={() => {
+    if (touch) cancelDrag();
+  }}
+  onkeydown={(e) => {
+    if (e.key === 'Escape') cancelDrag();
+  }}
+/>
+{#if touchActive}<div
+    class="drag-ghost"
+    style={`left:${ghostX}px;top:${ghostY}px`}
+  >
+    {allItems.find((i) => i.key === dragging)?.title}
+  </div>{/if}
+<section
+  bind:this={pageElement}
+  class="goals-page"
+  aria-label={t('Goals', 'Target')}
+>
   <header>
     <div>
       <h1>{t('Goals', 'Target')}<span>.</span></h1>
@@ -196,26 +352,23 @@
   <div class="goal-strip">
     {#each state.items as goal (goal.id)}
       {@const totals = goalTotals(goal, tasks, transactions)}
+      <!-- Keyboard-focusable drop region supports Space/Tab/Enter drag without nested buttons. -->
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex a11y_no_noninteractive_element_interactions -->
       <article
         class:drop-hover={hover === goal.id}
         class:accepting={!!dragging}
         class="goal-card"
+        data-goal-drop={goal.id}
+        tabindex="0"
+        onkeydown={(e) => targetKey(e, goal.id)}
         aria-label={goal.title}
         role="region"
-        ondragover={(e) => {
-          if (writable && dragging) {
-            e.preventDefault();
-            hover = goal.id;
-          }
-        }}
+        ondragover={(e) => over(e, goal.id)}
         ondragleave={() => (hover = '')}
         ondrop={(e) => drop(e, goal.id)}
       >
-        <div class="cover" class:plain={!goal.cover}>
-          {#if goal.cover}<img
-              src={'/goals/' + goal.cover + '.webp'}
-              alt=""
-            />{:else}<Icon name="goals" />{/if}<button
+        <div class="cover">
+          <GoalGrowth count={linked(goal).length} {language} /><button
             class="edit"
             aria-label={t('Edit goal', 'Edit target') + ': ' + goal.title}
             disabled={!writable || busy}
@@ -223,7 +376,7 @@
           >
         </div>
         <div class="goal-body">
-          <h2>{goal.title}</h2>
+          <h2 title={goal.title}>{goal.title}</h2>
           <p class="description">{goal.description}</p>
           <div class="totals">
             <div>
@@ -237,10 +390,22 @@
             </div>
           </div>
         </div>
+        <div class="linked-items" aria-label={t('Contributions', 'Kontribusi')}>
+          {#each linked(goal) as item (item.key)}<GoalItem
+              {item}
+              source={goal.id}
+              disabled={!writable || busy}
+              {language}
+              onstart={startDrag}
+              onend={cancelDrag}
+              ontouch={beginTouch}
+              onkeyboard={keyboard}
+            />{/each}
+        </div>
         <div class="drop-label">
           {t(
-            'Drop completed tasks or expenses here',
-            'Taruh tugas selesai atau pengeluaran di sini',
+            'Drag here to add progress',
+            'Tarik ke sini untuk menambah progres',
           )}
         </div>
       </article>
@@ -257,7 +422,17 @@
         </p>
       </div>{/each}
   </div>
-  <section class="unassigned" aria-label={t('Unassigned', 'Belum ditetapkan')}>
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex a11y_no_noninteractive_element_interactions -->
+  <section
+    class="unassigned"
+    class:drop-hover={hover === 'pool'}
+    data-goal-drop="pool"
+    tabindex="0"
+    aria-label={t('Unassigned', 'Belum ditetapkan')}
+    ondragover={(e) => over(e, 'pool')}
+    ondrop={(e) => drop(e, 'pool')}
+    onkeydown={(e) => targetKey(e, 'pool')}
+  >
     <header>
       <div>
         <h2>
@@ -265,46 +440,22 @@
         </h2>
         <p>
           {t(
-            'Completed tasks and expenses, ready for a goal.',
-            'Tugas selesai dan pengeluaran yang siap masuk ke target.',
+            'Drag tasks and expenses to a goal. On touch screens, hold then drag.',
+            'Tarik tugas dan pengeluaran ke target. Di layar sentuh, tahan lalu tarik.',
           )}
         </p>
       </div>
     </header>
     <div class="pool-strip">
-      {#each pool as item (item.key)}<div
-          class="source-card"
-          class:dragging={dragging === item.key}
-          draggable={writable && !busy}
-          role="group"
-          aria-label={item.title}
-          ondragstart={(e) => {
-            dragging = item.key;
-            e.dataTransfer?.setData('application/x-zivizip-goal', item.key);
-            if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
-          }}
-          ondragend={() => {
-            dragging = '';
-            hover = '';
-          }}
-        >
-          <small
-            >{item.type === 'task'
-              ? t('To do', 'To do')
-              : t('Finance', 'Keuangan')}</small
-          ><strong>{item.title}</strong><span>{item.detail}</span><button
-            disabled={!writable || busy || !state.items.length}
-            onclick={() => (selected = selected === item.key ? '' : item.key)}
-            >{t('Move to goal', 'Pindahkan ke target')}
-            <Icon name="chevron-down" /></button
-          >{#if selected === item.key}<select
-              aria-label={t('Choose goal', 'Pilih target')}
-              onchange={(e) => assign(item.key, e.currentTarget.value)}
-              ><option value="">{t('Choose goal', 'Pilih target')}</option
-              >{#each state.items as g}<option value={g.id}>{g.title}</option
-                >{/each}</select
-            >{/if}
-        </div>{:else}<p class="empty-pool">
+      {#each pool as item (item.key)}<GoalItem
+          {item}
+          disabled={!writable || busy}
+          {language}
+          onstart={startDrag}
+          onend={cancelDrag}
+          ontouch={beginTouch}
+          onkeyboard={keyboard}
+        />{:else}<p class="empty-pool">
           {t(
             'All caught up. Completed tasks and new expenses will appear here.',
             'Semua sudah ditetapkan. Tugas selesai dan pengeluaran baru akan muncul di sini.',
@@ -352,22 +503,7 @@
       ></textarea></label
     >
     {#if error}<p role="alert">{error}</p>{/if}
-    <fieldset>
-      <legend>{t('Cover image', 'Gambar sampul')}</legend>
-      <div class="covers">
-        {#each ['', ...covers] as image}<button
-            type="button"
-            class:chosen={cover === image}
-            aria-pressed={cover === image}
-            aria-label={image || t('No image', 'Tanpa gambar')}
-            onclick={() => (cover = image)}
-            >{#if image}<img
-                src={'/goals/' + image + '.webp'}
-                alt={image}
-              />{:else}<Icon name="goals" />{/if}</button
-          >{/each}
-      </div>
-    </fieldset>
+
     <footer>
       {#if editing}<button
           type="button"
@@ -435,7 +571,7 @@
   }
   .goal-strip {
     flex: 1;
-    min-height: 380px;
+    min-height: 520px;
     align-items: stretch;
   }
   .goal-card {
@@ -452,19 +588,10 @@
       transform 0.15s;
   }
   .cover {
-    height: 150px;
+    height: 160px;
     position: relative;
     flex-shrink: 0;
     background: linear-gradient(135deg, #06444e, #192531);
-  }
-  .cover img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-  .plain {
-    display: grid;
-    place-items: center;
   }
   .edit {
     position: absolute;
@@ -485,19 +612,21 @@
   }
   .goal-body h2 {
     font-size: 22px;
-    overflow-wrap: anywhere;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .description {
     white-space: pre-wrap;
     font-size: 14px;
     line-height: 1.6;
-    max-height: 120px;
+    max-height: 60px;
     overflow: auto;
     overflow-wrap: anywhere;
   }
   .totals {
     margin-top: auto;
-    padding-top: 20px;
+    padding-top: 8px;
     display: flex;
     justify-content: space-between;
     gap: 16px;
@@ -547,34 +676,40 @@
   .pool-strip {
     margin-top: 16px;
   }
-  .source-card {
-    flex: 0 0 220px;
-    scroll-snap-align: start;
-    background: #17252b;
-    border: 1px solid #30434b;
-    border-radius: 10px;
-    padding: 15px;
+  .linked-items {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    cursor: grab;
+    gap: 6px;
+    margin: 0 16px 12px;
+    max-height: 146px;
+    min-height: 146px;
+    overflow-y: auto;
+    flex-shrink: 0;
   }
-  .source-card strong {
-    overflow-wrap: anywhere;
+  .drag-ghost {
+    position: fixed;
+    z-index: 10000;
+    transform: translate(-50%, -110%);
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 12px 16px;
+    border: 1px solid var(--accent);
+    background: #163b40;
+    border-radius: 8px;
+    pointer-events: none;
+    box-shadow: 0 10px 24px #0008;
+    font-size: 13px;
   }
-  .source-card small,
-  .source-card span {
-    font-size: 12px;
+  .unassigned.drop-hover {
+    outline: 2px dashed var(--accent);
+    outline-offset: 6px;
   }
-  .source-card button {
-    font-size: 12px;
-    margin-top: auto;
-  }
-  .source-card select {
-    max-width: 100%;
-  }
-  .dragging {
-    opacity: 0.4;
+  .goal-card:focus-visible,
+  .unassigned:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
   .empty {
     align-self: center;
@@ -613,30 +748,6 @@
     width: 100%;
     box-sizing: border-box;
   }
-  fieldset {
-    border: 0;
-    padding: 0;
-  }
-  .covers {
-    display: flex;
-    gap: 8px;
-    margin-top: 8px;
-  }
-  .covers button {
-    width: 80px;
-    height: 56px;
-    padding: 0;
-    overflow: hidden;
-    border: 2px solid transparent;
-  }
-  .covers img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-  .covers .chosen {
-    border-color: var(--accent);
-  }
   footer {
     display: flex;
     gap: 8px;
@@ -658,13 +769,10 @@
       max-width: 220px;
     }
     .goal-strip {
-      min-height: 360px;
+      min-height: 500px;
     }
     .cover {
-      height: 130px;
-    }
-    .source-card {
-      flex-basis: 200px;
+      height: 160px;
     }
     h1 {
       font-size: 24px;

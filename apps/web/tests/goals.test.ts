@@ -20,8 +20,9 @@ const goal: Goal = {
   tasks: ['task'],
   expenses: ['expense'],
 };
-it('preserves exclusive assignments and derives totals only from completed tasks and expenses', () => {
-  expect(() => validateGoals([goal, { ...goal, id: 'other' }])).toThrow();
+it('supports shared assignments and derives totals only from completed tasks and expenses', () => {
+  expect(() => validateGoals([goal, { ...goal, id: 'other' }])).not.toThrow();
+  expect(() => validateGoals([{ ...goal, tasks: ['task', 'task'] }])).toThrow();
   expect(() =>
     validateGoals([{ ...goal, cover: 'https://invalid.test' }]),
   ).toThrow();
@@ -90,6 +91,7 @@ it('rejects stale goal writes and remaps links when importing backups', async ()
         ],
       },
     });
+    await repo.write(await repo.list(), [goal, { ...goal, id: 'second' }]);
     const backup = await exportWorkspace(db);
     await importWorkspace(target, backup);
     const restored = await exportWorkspace(target);
@@ -98,8 +100,10 @@ it('rejects stale goal writes and remaps links when importing backups', async ()
     expect(restored.goals?.[0].expenses).toEqual([
       restored.transactions?.[0].id,
     ]);
+    expect(restored.goals?.[1].tasks).toEqual(restored.goals?.[0].tasks);
+    expect(restored.goals?.[1].expenses).toEqual(restored.goals?.[0].expenses);
     await importWorkspace(target, backup);
-    expect((await exportWorkspace(target)).goals).toHaveLength(2);
+    expect((await exportWorkspace(target)).goals).toHaveLength(4);
   } finally {
     await db.delete();
     await target.delete();
