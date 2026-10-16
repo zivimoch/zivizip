@@ -1238,7 +1238,7 @@
   }
   .remaining-comparison {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 14px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 0.85fr) 14px minmax(0, 1.15fr);
     gap: 10px;
     align-items: center;
     margin-top: 18px;
@@ -1266,6 +1266,11 @@
     overflow-wrap: anywhere;
     line-height: 1.3;
   }
+  .remaining-planned strong {
+    font-size: clamp(18px, 7.5cqi, 30px);
+    font-weight: 750;
+    color: var(--accent);
+  }
   .remaining-comparison span {
     font-size: 12px;
   }
@@ -1274,8 +1279,9 @@
   }
   .remaining-divider {
     height: 54px;
-    width: 2px;
-    background: linear-gradient(transparent, #9ccdd2, transparent);
+    width: 3px;
+    border-radius: 2px;
+    background: #c2dade;
     transform: rotate(24deg);
     justify-self: center;
   }

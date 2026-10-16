@@ -157,3 +157,5 @@ This document describes the target interaction model. The [verification scope](.
 - Financial overview presents clickable month cards with recorded income, expenses, actual remainder, planned remainder, transaction count and budget status. Plan cards omit the repeated Planned/Actual subtotal line and percentage labels.
 
 - The monthly summary combines actual remaining on the left and planned remaining on the right in one accented card, with a diagonal divider and actual status underneath. Long amounts remain readable on narrow screens.
+
+- Planned remaining is the dominant amount in the combined card, with larger bold cyan typography and extra column space. The diagonal separator is a solid line without a fading gradient.
