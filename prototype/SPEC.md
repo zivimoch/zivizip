@@ -155,3 +155,5 @@ This document describes the target interaction model. The [verification scope](.
 - Tasks has no archive footer; an icon in the header opens existing archived tasks. Panel collapse buttons use compact 14 × 22px / 22 × 14px controls.
 
 - Financial overview presents clickable month cards with recorded income, expenses, actual remainder, planned remainder, transaction count and budget status. Plan cards omit the repeated Planned/Actual subtotal line and percentage labels.
+
+- The monthly summary combines actual remaining on the left and planned remaining on the right in one accented card, with a diagonal divider and actual status underneath. Long amounts remain readable on narrow screens.

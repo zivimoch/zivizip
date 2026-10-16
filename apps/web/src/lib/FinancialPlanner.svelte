@@ -685,28 +685,30 @@
                     </dt>
                     <dd>{money(groups[2].stats.budget)}</dd>
                   </div>
-                  <div class="planned-highlight">
-                    <dt>{t('Planned remaining', 'Rencana Sisa Bulan Ini')}</dt>
-                    <dd
+                </dl>
+                <div class="remaining-comparison">
+                  <div class="remaining-actual">
+                    <span>{t('Actual remaining', 'Sisa aktual')}</span>
+                    <strong
+                      data-plan-summary="remaining"
+                      class:deficit={remaining < 0}>{money(remaining)}</strong
+                    >
+                    <span
+                      class="remaining-status"
+                      class:deficit={remaining < 0 || overBudget > 0}
+                      >{statusLabel(remaining, overBudget)}</span
+                    >
+                  </div>
+                  <span class="remaining-divider" aria-hidden="true"></span>
+                  <div class="remaining-planned">
+                    <span>{t('Planned remaining', 'Rencana sisa')}</span>
+                    <strong
                       data-plan-summary="planned"
                       class:deficit={plannedRemaining < 0}
+                      >{money(plannedRemaining)}</strong
                     >
-                      {money(plannedRemaining)}
-                    </dd>
                   </div>
-                </dl>
-                <div class="remaining-summary">
-                  <span>{t('Actual remaining', 'Sisa aktual')}</span>
-                  <strong
-                    data-plan-summary="remaining"
-                    class:deficit={remaining < 0}>{money(remaining)}</strong
-                  >
-                  <span
-                    class="plan-status"
-                    class:deficit={remaining < 0 || overBudget > 0}
-                    >{statusLabel(remaining, overBudget)}</span
-                  >
-                  {#if overBudget > 0}<small class="deficit"
+                  {#if overBudget > 0}<small class="remaining-variance deficit"
                       >{t('Above budget', 'Di atas rencana')}: {money(
                         overBudget,
                       )}</small
@@ -1234,34 +1236,54 @@
     margin: 0;
     white-space: nowrap;
   }
-  .monthly-overview dl .planned-highlight {
-    display: block;
-    padding: 15px;
-    margin: 18px 0 0;
-    border: 1px solid #08b5c8;
-    border-radius: 9px;
-    background: linear-gradient(120deg, #07343c, #10232c);
+  .remaining-comparison {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 14px minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+    margin-top: 18px;
+    padding: 16px 12px;
+    border: 1px solid #149dab;
+    border-radius: 10px;
+    background: linear-gradient(120deg, #0b3037, #101f28);
+    box-shadow: inset 0 1px 0 #40d9e51a;
+    container-type: inline-size;
   }
-  .planned-highlight dt {
-    font-size: 12px;
-    letter-spacing: 0.03em;
-  }
-  .planned-highlight dd {
-    font-size: 25px;
-    font-weight: 700;
-    color: var(--accent);
-    margin-top: 8px;
-  }
-  .remaining-summary {
+  .remaining-actual,
+  .remaining-planned {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-    margin-top: 16px;
+    gap: 7px;
+    min-width: 0;
+  }
+  .remaining-planned {
+    text-align: right;
+  }
+  .remaining-comparison strong {
+    font-size: clamp(14px, 5.8cqi, 23px);
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+    line-height: 1.3;
+  }
+  .remaining-comparison span {
     font-size: 12px;
   }
-  .remaining-summary > strong {
-    font-size: 22px;
+  .remaining-status {
+    color: #75e3cf;
+  }
+  .remaining-divider {
+    height: 54px;
+    width: 2px;
+    background: linear-gradient(transparent, #9ccdd2, transparent);
+    transform: rotate(24deg);
+    justify-self: center;
+  }
+  .remaining-variance {
+    grid-column: 1 / -1;
+    font-size: 11px;
+    padding-top: 8px;
+    border-top: 1px solid #47606a;
   }
   .plan-status {
     display: inline-flex;
