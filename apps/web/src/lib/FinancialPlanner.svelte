@@ -1238,9 +1238,9 @@
   }
   .remaining-comparison {
     display: grid;
-    grid-template-columns: minmax(0, 0.85fr) 14px minmax(0, 1.15fr);
+    grid-template-columns: minmax(0, 1fr) 14px minmax(0, 1fr);
     gap: 10px;
-    align-items: center;
+    align-items: start;
     margin-top: 18px;
     padding: 16px 12px;
     border: 1px solid #149dab;
@@ -1278,6 +1278,7 @@
     color: #75e3cf;
   }
   .remaining-divider {
+    align-self: center;
     height: 54px;
     width: 3px;
     border-radius: 2px;

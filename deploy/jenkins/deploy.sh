@@ -16,7 +16,9 @@ docker image inspect "zivizip-web:$release" "zivizip-api:$release" >/dev/null
 install -d -m 700 "$destination" /srv/backups/zivizip
 volume=$(docker volume inspect zivizip-production_notes-data --format '{{.Mountpoint}}')
 python3 /srv/zivizip/backup-sqlite.py "$volume/notes.sqlite" "/srv/backups/zivizip/$(date -u +%Y%m%dT%H%M%SZ)-before-$release.sqlite"
-cp "$previous/compose.yaml" "$previous/nginx.conf" "$previous/production.env" "$destination/"
+if [[ "$previous" != "$destination" ]]; then
+  cp "$previous/compose.yaml" "$previous/nginx.conf" "$previous/production.env" "$destination/"
+fi
 sed -i "s|^ZIVIZIP_WEB_IMAGE=.*|ZIVIZIP_WEB_IMAGE=zivizip-web:$release|;s|^ZIVIZIP_API_IMAGE=.*|ZIVIZIP_API_IMAGE=zivizip-api:$release|" "$destination/production.env"
 chmod 600 "$destination/production.env"
 cd "$destination"

@@ -43,7 +43,7 @@ The browser scenarios were checked with one worker, including targeted reruns af
 
 ## Scope
 
-Rich formatting beyond automatic lists, Goals, shared Tasks/Finance entry, Web Push, and prototype-data migration remain outside the implemented flow. Task amounts currently remain metadata. Account backup import can complete partially if a request fails; it is not an atomic server transaction. Large collections and real-device performance need separate verification.
+Web Push and prototype-data migration remain outside the implemented flow. Task amounts currently remain metadata. Account backup import can complete partially if a request fails; it is not an atomic server transaction. Large collections and real-device performance need separate verification.
 
 Workspace styling was compared with the prototype at 1864×1000 and 390×844 viewports. Tabs start at the workspace top; account status stays in the sidebar. Finance transactions were also checked at 1600×1000 and 390×844; the ledger and monthly planning have automated browser coverage. Planning checks cover category budgets, notes, inclusion, copying months, backups, and account synchronization. Sidebar checks cover expanded hierarchy and collapsed icon alignment.
 
@@ -74,3 +74,9 @@ Frontend diagnostics, 35 unit tests and the production build passed. All eleven 
 ## Financial overview summaries — 2026-10-16
 
 Frontend diagnostics completed without warnings; 35 unit tests, the build and six planning browser scenarios passed. Planned remaining has a distinct visual treatment, while actual remaining uses recorded monthly income minus recorded monthly expenses. Status separates negative cash balance from over-budget spending. Month cards include income, expenses, planned/actual remainder and transaction count; desktop screenshots and a 390px viewport were checked. Repeated subtotal lines and percentage labels were removed without changing stored plans or transactions.
+
+## Goals and remaining alignment — 2026-10-16
+
+Goals support title/description editing, bundled cover choices, exclusive completed-task and expense assignment, and aggregate progress. Guest storage is local; account state uses authenticated, revision-checked API writes and SSE refresh. Backup v7 preserves assignments while remapping imported source IDs; earlier backup versions remain accepted. Deleting a goal preserves its source records. Income and incomplete tasks do not contribute to progress.
+
+37 frontend unit tests and 11 Rust tests passed. Browser checks cover drag assignment, mobile assignment controls, persisted covers, offline guest editing, source restoration on goal deletion, account synchronization, anonymous access rejection and stale writes. Six Finance planning regressions passed. Desktop and 390px screenshots were inspected; these are not physical-device tests. The remaining card uses equal columns and top-aligned labels, with a solid centered divider.

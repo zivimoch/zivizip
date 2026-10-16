@@ -11,6 +11,7 @@
   import ShareSettings from '$lib/ShareSettings.svelte';
   import NoteLibrary from '$lib/NoteLibrary.svelte';
   import TasksPanel from '$lib/TasksPanel.svelte';
+  import { GoalsRepository, readGoalState, remapGoals } from '$lib/goals';
   import { TasksRepository, readTaskState } from '$lib/tasks';
   import FinancePanel from '$lib/FinancePanel.svelte';
   import { FinanceRepository, readFinanceState } from '$lib/finance';
@@ -91,6 +92,8 @@
   let migration: HTMLDialogElement;
   let guestCount = 0;
   let dirty = new Set<string>();
+  let goalsRepo: GoalsRepository;
+  let goalBusy = false;
   let tasksRepo: TasksRepository;
   let taskBusy = false;
   let taskRefresh = 0;
@@ -98,7 +101,7 @@
   let financeBusy = false;
   let planningRepo: PlanningRepository;
   let planningBusy = false;
-  $: workspaceBusy = taskBusy || financeBusy || planningBusy;
+  $: workspaceBusy = taskBusy || financeBusy || planningBusy || goalBusy;
   let alive = true;
   let workspaceEpoch = 0;
   const redirectedNotes = new Map<string, string>();
@@ -144,6 +147,11 @@
       () => epoch === workspaceEpoch,
     );
     financeRepo = new FinanceRepository(
+      db,
+      !!account,
+      () => epoch === workspaceEpoch,
+    );
+    goalsRepo = new GoalsRepository(
       db,
       !!account,
       () => epoch === workspaceEpoch,
@@ -197,6 +205,12 @@
         () => epoch === workspaceEpoch,
       );
       await nextPlanning.list(fetchServer);
+      const nextGoals = new GoalsRepository(
+        nextDb,
+        !!user,
+        () => epoch === workspaceEpoch,
+      );
+      await nextGoals.list(fetchServer);
       if (user) await guestDb.meta.put({ key: 'active-account', value: user });
       else await guestDb.meta.delete('active-account');
       eventSource?.close();
@@ -214,6 +228,7 @@
       tasksRepo = nextTasks;
       financeRepo = nextFinance;
       planningRepo = nextPlanning;
+      goalsRepo = nextGoals;
       taskRefresh++;
       if (user && fetchServer) listen();
     } catch (e) {
@@ -225,6 +240,11 @@
         () => epoch === workspaceEpoch,
       );
       financeRepo = new FinanceRepository(
+        db,
+        !!account,
+        () => epoch === workspaceEpoch,
+      );
+      goalsRepo = new GoalsRepository(
         db,
         !!account,
         () => epoch === workspaceEpoch,
@@ -315,6 +335,7 @@
     await activate(user);
     channel?.postMessage('session');
     guestCount =
+      readGoalState((await guestDb.meta.get('goals'))?.value).items.length +
       (await guestDb.notes.count()) +
       readTaskState((await guestDb.meta.get('tasks'))?.value).items.length +
       readFinanceState((await guestDb.meta.get('finance'))?.value).items
@@ -372,6 +393,8 @@
         });
         await db.meta.put({ key, value: copy.id });
       }
+      const goalTaskIds = new Map<string, string>(),
+        goalExpenseIds = new Map<string, string>();
       const guestTasks = readTaskState(
         (await guestDb.meta.get('tasks'))?.value,
       ).items;
@@ -392,6 +415,7 @@
             };
           }),
         );
+        guestTasks.forEach((task, i) => goalTaskIds.set(task.id, copies[i].id));
         await tasksRepo.write(currentTasks, [
           ...currentTasks.items,
           ...copies.filter(
@@ -418,6 +442,9 @@
             };
           }),
         );
+        guestTransactions.forEach((tx, i) =>
+          goalExpenseIds.set(tx.id, copies[i].id),
+        );
         await financeRepo.write(currentFinance, [
           ...currentFinance.items,
           ...copies.filter(
@@ -429,6 +456,20 @@
         (await guestDb.meta.get('planning'))?.value,
       );
       if (guestPlans.months.length) await planningRepo.merge(guestPlans);
+      const guestGoals = readGoalState(
+        (await guestDb.meta.get('goals'))?.value,
+      ).items;
+      const goalCopies = remapGoals(guestGoals, goalTaskIds, goalExpenseIds);
+      for (let i = 0; i < goalCopies.length; i++) {
+        const digest = await crypto.subtle.digest(
+          'SHA-256',
+          new TextEncoder().encode('guest-goal:' + guestGoals[i].id),
+        );
+        goalCopies[i].id = [...new Uint8Array(digest)]
+          .map((byte) => byte.toString(16).padStart(2, '0'))
+          .join('');
+      }
+      if (goalCopies.length) await goalsRepo.merge(goalCopies);
       notes = await repo.list();
       taskRefresh++;
       migration.close();
@@ -703,6 +744,7 @@
           tasksRepo.list(),
           financeRepo.list(),
           planningRepo.list(),
+          goalsRepo.list(),
         ]);
       }
       for (const id of new Set(notes.flatMap((n) => assetsIn(n.rich))))
@@ -752,9 +794,31 @@
           count++;
         }
         notes = await repo.list();
-        if (backup.tasks?.length) await tasksRepo.merge(backup.tasks);
-        if (backup.transactions?.length)
-          await financeRepo.merge(backup.transactions);
+        const taskIds = new Map(
+          (backup.tasks || []).map((t) => [t.id, crypto.randomUUID()]),
+        );
+        const expenseIds = new Map(
+          (backup.transactions || []).map((t) => [t.id, crypto.randomUUID()]),
+        );
+        if (backup.tasks?.length) {
+          const state = await tasksRepo.list();
+          await tasksRepo.write(state, [
+            ...state.items,
+            ...backup.tasks.map((t) => ({ ...t, id: taskIds.get(t.id)! })),
+          ]);
+        }
+        if (backup.transactions?.length) {
+          const state = await financeRepo.list();
+          await financeRepo.write(state, [
+            ...state.items,
+            ...backup.transactions.map((t) => ({
+              ...t,
+              id: expenseIds.get(t.id)!,
+            })),
+          ]);
+        }
+        if (backup.goals?.length)
+          await goalsRepo.merge(remapGoals(backup.goals, taskIds, expenseIds));
         if (backup.planning) await planningRepo.merge(backup.planning);
         taskRefresh++;
       } else {
@@ -1254,15 +1318,22 @@
           onplanbusy={(value) => (planningBusy = value)}
         />{/key}
     {:catch issue}<p role="alert">{issue.message}</p>{/await}
+  {:else if view === 'goals'}
+    {#await import('$lib/Goals.svelte') then module}
+      {#key goalsRepo.db.name}<svelte:component
+          this={module.default}
+          repository={goalsRepo}
+          tasksRepository={tasksRepo}
+          financeRepository={financeRepo}
+          {writable}
+          language={prefs.language}
+          refreshToken={taskRefresh}
+          onbusy={(value: boolean) => (goalBusy = value)}
+        />{/key}
+    {:catch issue}<p role="alert">{issue.message}</p>{/await}
   {:else}<section class="placeholder">
       <Icon name={view} />
-      <h1>
-        {view === 'goals'
-          ? t('Goals', 'Target')
-          : view === 'tasks'
-            ? 'To do'
-            : 'Finance'}
-      </h1>
+      <h1>Finance</h1>
       <p>
         {t(
           'This section is being prepared. Your notes are ready to use.',
@@ -1504,8 +1575,8 @@
   <h2>{t('Choose your workspace', 'Pilih workspace kamu')}</h2>
   <p>
     {t(
-      `You have ${guestCount} local notes, tasks, transactions and plan months. Open your account workspace, or copy this data to your account. Nothing is uploaded without your choice.`,
-      `Ada ${guestCount} catatan, tugas, transaksi dan bulan rencana lokal. Buka workspace akun, atau salin data ini ke akunmu. Tidak ada data yang diunggah tanpa pilihanmu.`,
+      `You have ${guestCount} local notes, tasks, transactions, goals and plan months. Open your account workspace, or copy this data to your account. Nothing is uploaded without your choice.`,
+      `Ada ${guestCount} catatan, tugas, transaksi, target dan bulan rencana lokal. Buka workspace akun, atau salin data ini ke akunmu. Tidak ada data yang diunggah tanpa pilihanmu.`,
     )}
   </p>
   <button disabled={switching} onclick={() => migration.close()}

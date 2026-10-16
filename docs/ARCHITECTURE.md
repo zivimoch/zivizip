@@ -86,4 +86,10 @@ Budgets match transactions by month, case-insensitive trimmed category, and inco
 
 Excluding a category affects planned/projected totals and card counters, but never removes actual spending from the ledger or analysis. Copying a month preserves income/recurring expectations, resets monthly expectations to zero, and leaves actual transactions and opening balances untouched. Existing destination budgets take precedence.
 
-Workspace backup v6 includes plan months, opening balances, ordered category budgets, notes and inclusion state. Imports accept versions 1–6. Existing month/type/category budgets and opening balances are preserved when merging plans; imported notes, tasks and transactions still receive new IDs. Guest copy is explicit and plan retries do not duplicate categories. Account writes use the same authentication, stale-revision rejection, SSE and offline-cache boundaries as transactions.
+Workspace backup v7 includes plan months, opening balances, ordered category budgets, notes and inclusion state. Imports accept versions 1–7. Existing month/type/category budgets and opening balances are preserved when merging plans; imported notes, tasks and transactions still receive new IDs. Guest copy is explicit and plan retries do not duplicate categories. Account writes use the same authentication, stale-revision rejection, SSE and offline-cache boundaries as transactions.
+
+## Goals
+
+Goals are a separate revision-checked workspace document (`/api/goals`) stored in SQLite for the owner and IndexedDB for guests. Assignments reference completed tasks and expense transactions without copying or deleting source records. The UI derives totals from current source values, excludes income and incomplete tasks, and returns assignments to the pool when a goal is deleted. Goals use the existing account SSE stream and offline read-only policy.
+
+Backup v7 includes goals and remaps assignment IDs alongside imported tasks and transactions. Explicit guest copying uses stable source-copy IDs for retry safety. Goal cover IDs select bundled, licensed photographs; arbitrary remote image URLs are not accepted. The Goals UI is loaded on demand and precached for offline use.

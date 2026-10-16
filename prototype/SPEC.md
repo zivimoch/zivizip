@@ -106,7 +106,7 @@ This document describes the target interaction model. The [verification scope](.
 
 ## Goals
 
-- Create, edit and delete goals with optional descriptions. Cards show aggregate completed-task count and total linked expenses, not growing assigned-item lists.
+- Create, edit and delete goals with a required title, optional description and an optional curated cover image. Bundled free photographs remain available offline. Cards show aggregate completed-task count and total linked expenses, not growing assigned-item lists.
 - Only completed tasks, including archived tasks, and expense transactions enter Unassigned. Income is excluded, including legacy income links.
 - Dropping an item onto a goal assigns it exclusively and removes it from Unassigned without deleting its source. A per-item assignment control supports keyboard/touch access.
 - Source edits/deletions update totals and remove stale links; tasks marked incomplete no longer count as complete. Deleting a goal returns assignments to the pool while preserving source records.

@@ -1,3 +1,4 @@
+import { readGoalState, validateGoals, remapGoals, type Goal } from './goals';
 import {
   readPlanningState,
   validatePlanning,
@@ -51,7 +52,8 @@ export interface Preferences {
 }
 export interface Backup {
   format: 'zivizip';
-  version: 1 | 2 | 3 | 4 | 5 | 6;
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+  goals?: Goal[];
   planning?: PlanningData;
   tasks?: Task[];
   transactions?: Transaction[];
@@ -166,7 +168,7 @@ export function validateBackup(value: unknown): Backup {
   const b = value as Backup;
   if (
     b.format !== 'zivizip' ||
-    ![1, 2, 3, 4, 5, 6].includes(b.version) ||
+    ![1, 2, 3, 4, 5, 6, 7].includes(b.version) ||
     !Array.isArray(b.notes) ||
     b.notes.length > 10000
   )
@@ -212,6 +214,7 @@ export function validateBackup(value: unknown): Backup {
   for (const n of b.notes)
     for (const id of assetsIn(n.rich))
       if (!mediaIds.has(id)) throw Error('Missing backup image');
+  if (b.goals !== undefined) validateGoals(b.goals);
   const p = b.preferences;
   if (
     !p ||
@@ -248,7 +251,8 @@ export async function exportWorkspace(
     db.meta,
     async () => ({
       format: 'zivizip' as const,
-      version: 6 as const,
+      version: 7 as const,
+      goals: readGoalState((await db.meta.get('goals'))?.value).items,
       planning: await (async () => {
         const { months, items } = readPlanningState(
           (await db.meta.get('planning'))?.value,
@@ -279,6 +283,12 @@ export async function exportWorkspace(
 export async function importWorkspace(db: WorkspaceDB, input: unknown) {
   const b = validateBackup(input);
   const media = await Promise.all((b.media || []).map(decodeMedia));
+  const taskIds = new Map(
+    (b.tasks || []).map((t) => [t.id, crypto.randomUUID()]),
+  );
+  const expenseIds = new Map(
+    (b.transactions || []).map((t) => [t.id, crypto.randomUUID()]),
+  );
   return db.transaction(
     'rw',
     db.notes,
@@ -303,7 +313,7 @@ export async function importWorkspace(db: WorkspaceDB, input: unknown) {
           ...current.items,
           ...b.transactions.map((item) => ({
             ...item,
-            id: crypto.randomUUID(),
+            id: expenseIds.get(item.id)!,
           })),
         ];
         validateTransactions(items);
@@ -316,11 +326,23 @@ export async function importWorkspace(db: WorkspaceDB, input: unknown) {
         const current = readTaskState((await db.meta.get('tasks'))?.value);
         const items = [
           ...current.items,
-          ...b.tasks.map((t) => ({ ...t, id: crypto.randomUUID() })),
+          ...b.tasks.map((t) => ({ ...t, id: taskIds.get(t.id)! })),
         ];
         validateTasks(items);
         await db.meta.put({
           key: 'tasks',
+          value: { revision: current.revision + 1, items },
+        });
+      }
+      if (b.goals?.length) {
+        const current = readGoalState((await db.meta.get('goals'))?.value);
+        const items = [
+          ...current.items,
+          ...remapGoals(b.goals, taskIds, expenseIds),
+        ];
+        validateGoals(items);
+        await db.meta.put({
+          key: 'goals',
           value: { revision: current.revision + 1, items },
         });
       }

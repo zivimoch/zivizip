@@ -3,6 +3,7 @@ mod finance;
 mod planning;
 mod sharing;
 mod tasks;
+mod goals;
 mod text;
 use argon2::{password_hash::SaltString, Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use axum::{
@@ -515,6 +516,8 @@ fn schema(db: &Connection) -> rusqlite::Result<()> {
  CREATE TABLE IF NOT EXISTS owner(id INTEGER PRIMARY KEY CHECK(id=1),username TEXT NOT NULL, hash TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,expires INTEGER NOT NULL);
  CREATE TABLE IF NOT EXISTS media(id TEXT PRIMARY KEY, data BLOB NOT NULL);
+ CREATE TABLE IF NOT EXISTS goal_workspace(id INTEGER PRIMARY KEY CHECK(id=1),data TEXT NOT NULL);
+ INSERT OR IGNORE INTO goal_workspace VALUES(1,'{\"revision\":0,\"items\":[]}');
  CREATE TABLE IF NOT EXISTS task_workspace(id INTEGER PRIMARY KEY CHECK(id=1),data TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS finance_workspace(id INTEGER PRIMARY KEY CHECK(id=1),data TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS finance_planning(id INTEGER PRIMARY KEY CHECK(id=1),data TEXT NOT NULL);
@@ -595,6 +598,7 @@ async fn main() {
         )
         .route("/api/session", get(me).post(login).delete(logout))
         .route("/api/notes", get(list).post(create))
+        .route("/api/goals", get(goals::list).put(goals::update))
         .route("/api/tasks", get(tasks::list).put(tasks::update))
         .route("/api/finance", get(finance::list).put(finance::update))
         .route(

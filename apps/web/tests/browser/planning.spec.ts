@@ -208,7 +208,7 @@ test('monthly planning matches transactions, supports row controls and copies on
     .click();
   const path = (await (await pending).path())!,
     backup = JSON.parse(fs.readFileSync(path, 'utf8'));
-  expect(backup.version).toBe(6);
+  expect(backup.version).toBe(7);
   expect(backup.planning.months).toHaveLength(2);
   const otherContext = await browser.newContext(),
     other = await otherContext.newPage();
@@ -539,6 +539,28 @@ test('overview month cards show actual cash separately from planned remaining an
   await expect(overview.locator('[data-plan-summary="remaining"]')).toHaveText(
     /Rp\s*100.000/,
   );
+  const alignment = await overview
+    .locator('.remaining-comparison')
+    .evaluate((el) => {
+      const actual = el
+          .querySelector('.remaining-actual > span')!
+          .getBoundingClientRect(),
+        planned = el
+          .querySelector('.remaining-planned > span')!
+          .getBoundingClientRect(),
+        divider = el
+          .querySelector('.remaining-divider')!
+          .getBoundingClientRect(),
+        box = el.getBoundingClientRect();
+      return {
+        labels: Math.abs(actual.y - planned.y),
+        divider: Math.abs(
+          divider.x + divider.width / 2 - box.x - box.width / 2,
+        ),
+      };
+    });
+  expect(alignment.labels).toBeLessThan(1);
+  expect(alignment.divider).toBeLessThan(1);
   await page.screenshot({ path: '/tmp/zivizip-plan-summary-redesign.png' });
   await page.getByRole('button', { name: 'Analysis', exact: true }).click();
   const month = page
