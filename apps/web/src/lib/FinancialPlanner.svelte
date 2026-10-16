@@ -97,20 +97,47 @@
         total + Math.max(plan.amount, actualAmount(plan, transactions)),
       0,
     );
-  $: remaining = plannedIncome - projectedSpending;
-  $: remainingPercent = plannedIncome
-    ? Math.round((remaining / plannedIncome) * 100)
-    : null;
+  $: actualTotals = totals(
+    transactions.filter((item) => item.date.startsWith(active + '-')),
+  );
+  $: remaining = actualTotals.balance;
+  $: overBudget =
+    projectedSpending - groups[1].stats.budget - groups[2].stats.budget;
+  const statusLabel = (balance: number, excess: number) =>
+    balance < 0
+      ? t('Negative balance', 'Saldo minus')
+      : excess > 0
+        ? t('Over budget', 'Melebihi rencana')
+        : t('Within plan', 'Sesuai rencana');
   $: months = [
     ...new Set([
       ...state.months.map((entry) => entry.month),
       ...transactions.map((item) => item.date.slice(0, 7)),
     ]),
   ].sort();
-  $: chart = months.map((month) => ({
-    month,
-    ...totals(transactions.filter((item) => item.date.startsWith(month + '-'))),
-  }));
+  $: chart = months.map((month) => {
+    const items = transactions.filter((item) =>
+      item.date.startsWith(month + '-'),
+    );
+    const budgets = monthBudgets(state, transactions, month).filter(
+      (plan) => plan.enabled,
+    );
+    const income = budgets
+      .filter((plan) => plan.group === 'income')
+      .reduce((sum, plan) => sum + plan.amount, 0);
+    const expenses = budgets.filter((plan) => plan.group !== 'income');
+    return {
+      month,
+      ...totals(items),
+      count: items.length,
+      planned: income - expenses.reduce((sum, plan) => sum + plan.amount, 0),
+      excess: expenses.reduce(
+        (sum, plan) =>
+          sum + Math.max(0, actualAmount(plan, transactions) - plan.amount),
+        0,
+      ),
+    };
+  });
   $: chartMax = Math.max(
     1,
     ...chart.flatMap((entry) => [entry.income, entry.expense]),
@@ -581,9 +608,44 @@
       </div>
       <h3>{t('Open a month', 'Buka bulan')}</h3>
       <div class="month-links">
-        {#each months as month}<button onclick={() => openMonth(month)}
-            >{monthLabel(month)}</button
-          >{/each}
+        {#each [...chart].reverse() as entry}<button
+            class="month-card"
+            aria-label={monthLabel(entry.month)}
+            onclick={() => openMonth(entry.month)}
+          >
+            <span class="month-card-heading"
+              ><Icon name="calendar" /><strong>{monthLabel(entry.month)}</strong
+              ><Icon name="chevron-right" /></span
+            >
+            <span class="month-card-balance"
+              ><small>{t('Actual remaining', 'Sisa aktual')}</small><strong
+                class:deficit={entry.balance < 0}>{money(entry.balance)}</strong
+              ></span
+            >
+            <span class="month-card-line"
+              ><span>{t('Income', 'Pemasukan')}</span><b
+                >{money(entry.income)}</b
+              ></span
+            >
+            <span class="month-card-line"
+              ><span>{t('Expenses', 'Pengeluaran')}</span><b
+                >{money(entry.expense)}</b
+              ></span
+            >
+            <span class="month-card-line"
+              ><span>{t('Planned remaining', 'Rencana sisa')}</span><b
+                >{money(entry.planned)}</b
+              ></span
+            >
+            <span class="month-card-footer"
+              ><span
+                class="plan-status"
+                class:deficit={entry.balance < 0 || entry.excess > 0}
+                >{statusLabel(entry.balance, entry.excess)}</span
+              ><small>{entry.count} {t('transactions', 'transaksi')}</small
+              ></span
+            >
+          </button>{/each}
       </div>
     {:else}
       <h1 class="month-title">{monthLabel(active)}</h1>
@@ -623,7 +685,7 @@
                     </dt>
                     <dd>{money(groups[2].stats.budget)}</dd>
                   </div>
-                  <div>
+                  <div class="planned-highlight">
                     <dt>{t('Planned remaining', 'Rencana Sisa Bulan Ini')}</dt>
                     <dd
                       data-plan-summary="planned"
@@ -633,28 +695,23 @@
                     </dd>
                   </div>
                 </dl>
-                <div class="remaining-summary" class:deficit={remaining < 0}>
-                  <strong data-plan-summary="remaining"
-                    >{money(remaining)}</strong
+                <div class="remaining-summary">
+                  <span>{t('Actual remaining', 'Sisa aktual')}</span>
+                  <strong
+                    data-plan-summary="remaining"
+                    class:deficit={remaining < 0}>{money(remaining)}</strong
                   >
                   <span
-                    >{remainingPercent === null ? '—' : `${remainingPercent}%`}
-                    {t('remaining', 'tersisa')}</span
+                    class="plan-status"
+                    class:deficit={remaining < 0 || overBudget > 0}
+                    >{statusLabel(remaining, overBudget)}</span
                   >
-                  <div class="battery">
-                    <i style:width={`${percent(remainingPercent ?? 0)}%`}></i>
-                  </div>
-                  <small
-                    >{t(
-                      'After planned and over-budget spending',
-                      'Setelah rencana dan pengeluaran di luar anggaran',
-                    )}</small
-                  >
+                  {#if overBudget > 0}<small class="deficit"
+                      >{t('Above budget', 'Di atas rencana')}: {money(
+                        overBudget,
+                      )}</small
+                    >{/if}
                 </div>
-                {#if remaining < plannedRemaining}<p class="deficit">
-                    {t('Against plan', 'Selisih dari rencana')}:
-                    <strong>{money(remaining - plannedRemaining)}</strong>
-                  </p>{/if}
               </section>{/if}
             <section
               class="plan-group"
@@ -683,10 +740,7 @@
                       ? t('received', 'diterima')
                       : card.stats.left < 0
                         ? t('Deficit', 'Defisit')
-                        : t(
-                            `${card.stats.percent}% remaining`,
-                            `${card.stats.percent}% tersisa`,
-                          )}</span
+                        : t('Within budget', 'Sesuai anggaran')}</span
                   >
                 </div>
                 <div
@@ -707,12 +761,6 @@
                     style:width={`${percent(card.key === 'income' ? (card.stats.budget ? (card.stats.used / card.stats.budget) * 100 : 0) : card.stats.percent)}%`}
                   ></i>
                 </div>
-                <small
-                  >{t('Planned', 'Rencana')}: {money(card.stats.budget)} · {t(
-                    'Actual',
-                    'Realisasi',
-                  )}: {money(card.stats.used)}</small
-                >
               </div>
               <div class="plan-items-scroll">
                 <table>
@@ -1146,11 +1194,6 @@
   .month-bars i + i {
     background: #ff987a;
   }
-  .month-links {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
   .plan-columns {
     display: grid;
     grid-template-columns: repeat(3, minmax(275px, 1fr));
@@ -1191,20 +1234,104 @@
     margin: 0;
     white-space: nowrap;
   }
-  .monthly-overview p {
-    margin: 10px 0 0;
-    font-size: 13px;
+  .monthly-overview dl .planned-highlight {
+    display: block;
+    padding: 15px;
+    margin: 18px 0 0;
+    border: 1px solid #08b5c8;
+    border-radius: 9px;
+    background: linear-gradient(120deg, #07343c, #10232c);
+  }
+  .planned-highlight dt {
+    font-size: 12px;
+    letter-spacing: 0.03em;
+  }
+  .planned-highlight dd {
+    font-size: 25px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-top: 8px;
   }
   .remaining-summary {
-    color: var(--accent);
-    margin-top: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 16px;
+    font-size: 12px;
   }
-  .remaining-summary > span {
-    float: right;
-    font-size: 13px;
+  .remaining-summary > strong {
+    font-size: 22px;
   }
-  .remaining-summary small {
+  .plan-status {
+    display: inline-flex;
+    border: 1px solid #21615a;
+    border-radius: 20px;
+    padding: 4px 8px;
+    color: #83e0be;
     font-size: 11px;
+  }
+  .plan-status.deficit {
+    border-color: #794343;
+    background: #3a2024;
+  }
+  .month-links {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+    gap: 14px;
+  }
+  .month-card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 18px;
+    text-align: left;
+    border: 1px solid #28414a;
+    border-radius: 12px;
+    background: linear-gradient(145deg, #142a32, #101b21);
+    transition:
+      border-color 0.15s,
+      background 0.15s;
+  }
+  .month-card:hover {
+    border-color: var(--accent);
+    background: #163039;
+  }
+  .month-card-heading {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+  }
+  .month-card-heading strong {
+    flex: 1;
+    font-size: 17px;
+  }
+  .month-card-balance {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 0;
+  }
+  .month-card-balance strong {
+    font-size: 24px;
+    color: var(--accent);
+  }
+  .month-card-line,
+  .month-card-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 12px;
+  }
+  .month-card-line b {
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .month-card-footer {
+    border-top: 1px solid var(--line);
+    padding-top: 12px;
+    align-items: center;
+    flex-wrap: wrap;
   }
   .plan-group {
     flex: 1;
@@ -1238,10 +1365,6 @@
     align-items: center;
     flex-wrap: wrap;
     font-size: 15px;
-  }
-  .budget-meter small {
-    font-size: 13px;
-    line-height: 1.6;
   }
   .battery {
     height: 10px;

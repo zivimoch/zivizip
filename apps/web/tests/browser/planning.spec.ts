@@ -105,7 +105,7 @@ test('monthly planning matches transactions, supports row controls and copies on
   );
   await addTransaction(page, 'food', '300000');
   await expect(card(page, 'recurring').locator('.budget-meter')).toContainText(
-    '89% remaining',
+    'Within budget',
   );
   await addTransaction(page, 'Health', '75000');
   await expect(row(page, 'Health').locator('.plan-actual')).not.toHaveClass(
@@ -129,7 +129,7 @@ test('monthly planning matches transactions, supports row controls and copies on
     '6.425.000',
   );
   await expect(page.locator('[data-plan-summary="remaining"]')).toContainText(
-    '6.425.000',
+    '375.000',
   );
   await row(page, 'Food')
     .getByRole('button', { name: 'Include Food', exact: true })
@@ -179,7 +179,7 @@ test('monthly planning matches transactions, supports row controls and copies on
   ).toHaveText(/Rp\s*0/);
   await expect(row(page, 'Health')).toHaveCount(0);
   await expect(page.locator('[data-plan-summary="remaining"]')).toHaveText(
-    /5.200.000/,
+    /Rp\s*0/,
   );
   await page
     .getByRole('button', { name: 'Close November 26', exact: true })
@@ -431,9 +431,9 @@ test('monthly overview exposes negative remaining funds and over-budget variance
   );
   await expect(
     overview.locator('[data-plan-summary="remaining"]'),
-  ).toContainText('-Rp 200.000');
-  await expect(overview).toContainText('-20% remaining');
-  await expect(overview).toContainText('-Rp 400.000');
+  ).toContainText('-Rp 1.200.000');
+  await expect(overview).toContainText('Negative balance');
+  await expect(overview).toContainText('Above budget: Rp 400.000');
   await expect(page.getByText('Opening balance', { exact: true })).toHaveCount(
     0,
   );
@@ -471,7 +471,7 @@ test('unplanned expenses populate a month without creating a plan first', async 
     row(page, 'Emergency repairs').locator('.plan-actual'),
   ).not.toHaveClass(/deficit/);
   await expect(card(page, 'monthly').locator('.budget-meter')).toContainText(
-    '0% remaining',
+    'Within budget',
   );
   await row(page, 'Emergency repairs')
     .getByRole('button', { name: 'Note', exact: true })
@@ -498,4 +498,62 @@ test('unplanned expenses populate a month without creating a plan first', async 
   await expect(
     row(page, 'Emergency repairs').locator('.plan-actual'),
   ).toContainText('300.000');
+});
+
+test('overview month cards show actual cash separately from planned remaining and budget status', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await visit(page);
+  await createMonth(page, '2026-10');
+  await addBudget(page, 'income', 'Salary', '1000000');
+  await addBudget(page, 'recurring', 'Rent', '800000');
+  await page
+    .getByRole('button', { name: 'Add transaction', exact: true })
+    .click();
+  await dialog(page)
+    .getByRole('radio', { name: 'Income', exact: true })
+    .check();
+  await dialog(page).getByLabel('Category', { exact: true }).fill('Salary');
+  await dialog(page)
+    .getByLabel('Amount (IDR)', { exact: true })
+    .fill('1000000');
+  await dialog(page).getByLabel('Date', { exact: true }).fill('2026-10-02');
+  await dialog(page).getByRole('button', { name: 'Save', exact: true }).click();
+  await addTransaction(page, 'Rent', '500000');
+  const overview = page.getByRole('region', { name: 'Monthly financial plan' });
+  await expect(overview.locator('[data-plan-summary="planned"]')).toContainText(
+    '200.000',
+  );
+  await expect(
+    overview.locator('[data-plan-summary="remaining"]'),
+  ).toContainText('500.000');
+  await expect(overview).toContainText('Within plan');
+  await expect(overview).not.toContainText('%');
+  await expect(overview).not.toContainText('After planned');
+  await expect(
+    card(page, 'recurring').locator('.budget-meter'),
+  ).not.toContainText('Planned:');
+  await addTransaction(page, 'Rent', '400000');
+  await expect(overview).toContainText('Over budget');
+  await expect(overview.locator('[data-plan-summary="remaining"]')).toHaveText(
+    /Rp\s*100.000/,
+  );
+  await page.screenshot({ path: '/tmp/zivizip-plan-summary-redesign.png' });
+  await page.getByRole('button', { name: 'Analysis', exact: true }).click();
+  const month = page
+    .locator('.month-links')
+    .getByRole('button', { name: 'October 26', exact: true });
+  await expect(month).toContainText('Income');
+  await expect(month).toContainText('Expenses');
+  await expect(month).toContainText('3 transactions');
+  await expect(month).toContainText('Over budget');
+  await page.screenshot({ path: '/tmp/zivizip-overview-cards.png' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect((await month.boundingBox())!.width).toBeLessThan(390);
+  await month.click();
+  await expect(overview).toBeVisible();
+  await expect(overview.locator('[data-plan-summary="remaining"]')).toHaveText(
+    /Rp\s*100.000/,
+  );
 });

@@ -70,3 +70,7 @@ Frontend diagnostics, 33 unit tests and the production build passed. Sixteen tar
 ## Automatic monthly budgets — 2026-10-15
 
 Frontend diagnostics, 35 unit tests and the production build passed. All eleven targeted browser scenarios passed across planning, Tasks and panel controls after correcting persistence of derived budget values. Automatic monthly budgets follow category actuals; explicit nonzero budgets remain unchanged. Derived amounts are normalized before persistence, preserving the API contract and keeping notes, exclusion and reordering compatible. Regression coverage includes transaction edits/removal and empty manually planned categories. Tasks archive access remains in the header, with no footer consuming list space.
+
+## Financial overview summaries — 2026-10-16
+
+Frontend diagnostics completed without warnings; 35 unit tests, the build and six planning browser scenarios passed. Planned remaining has a distinct visual treatment, while actual remaining uses recorded monthly income minus recorded monthly expenses. Status separates negative cash balance from over-budget spending. Month cards include income, expenses, planned/actual remainder and transaction count; desktop screenshots and a 390px viewport were checked. Repeated subtotal lines and percentage labels were removed without changing stored plans or transactions.

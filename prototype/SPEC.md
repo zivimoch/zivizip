@@ -81,7 +81,7 @@ This document describes the target interaction model. The [verification scope](.
 ## Finance planning
 
 - Detail → Finance uses a Main-like split: planning on the left, transaction ledger on the right, no Tasks panel. Income, recurring expenses and monthly expenses form adjacent cards. Narrow layouts scroll cards horizontally and place the ledger below.
-- The income column stacks a monthly financial plan summary above the income card. The summary shows planned income, recurring and monthly expenses, planned remainder, remaining percentage of planned income, and negative variance for over-budget spending. Remove the separate opening, planned ending, projected ending and current balance cards. Each expense card shows remaining amount/percentage and a battery-style bar; low remaining budgets use amber and deficits use red. Overspent categories show their deficit.
+- The income column stacks a monthly financial plan summary above the income card. The summary shows planned income, recurring and monthly expenses, a highlighted planned remainder, actual remaining cash (recorded monthly income minus recorded monthly expenses), and a status distinguishing negative balance, over-budget spending, and within-plan spending. Remove the separate opening, planned ending, projected ending and current balance cards. Each expense card shows remaining amount and budget status and a battery-style bar; low remaining budgets use amber and deficits use red. Overspent categories show their deficit.
 - Plan rows display category, not a separate title. Each card has category search/free input, amount and Save at the bottom. Reject duplicate category/type/month budgets without clearing the form.
 - Match realization by month, normalized category and income/expense type. Sum partial transactions and recalculate after transaction edits/deletes. Plans need no due or realization date.
 - Projected balance uses the greater of budget or actual spending per category and includes unexpected expenses. Current balance uses recorded transactions. Disabled plan categories follow the exclusion rules below.
@@ -153,3 +153,5 @@ This document describes the target interaction model. The [verification scope](.
 - Unexpected expense categories populate the monthly expense card directly from recorded transactions, even without a pre-created plan. Matching is case-insensitive and does not duplicate recurring categories; automatic monthly budgets track the category’s actual total, including subsequent transaction edits; explicit nonzero budgets remain unchanged.
 
 - Tasks has no archive footer; an icon in the header opens existing archived tasks. Panel collapse buttons use compact 14 × 22px / 22 × 14px controls.
+
+- Financial overview presents clickable month cards with recorded income, expenses, actual remainder, planned remainder, transaction count and budget status. Plan cards omit the repeated Planned/Actual subtotal line and percentage labels.
