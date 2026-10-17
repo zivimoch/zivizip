@@ -4,7 +4,13 @@
   import Icon from './Icon.svelte';
   import GoalGrowth from './GoalGrowth.svelte';
   import GoalItem from './GoalItem.svelte';
-  import { GoalsRepository, emptyGoals, goalTotals, type Goal } from './goals';
+  import {
+    GoalsRepository,
+    emptyGoals,
+    goalTotals,
+    goalKeys,
+    type Goal,
+  } from './goals';
   import type { TasksRepository, Task } from './tasks';
   import type { FinanceRepository, Transaction } from './finance';
   import { displayCurrency, formatMoney } from './currency';
@@ -43,6 +49,8 @@
     description = '',
     cover = '';
   let completed = false;
+  let theme: 'island' | 'garden' | 'space' = 'island';
+  let generatorVersion: 1 | 2 = 2;
   let editSnapshot = '';
   const t = (en: string, id: string) => (language === 'id' ? id : en);
   $: assignedTasks = new Set(state.items.flatMap((g) => g.tasks));
@@ -71,10 +79,12 @@
     (item) =>
       !(item.type === 'task' ? assignedTasks : assignedExpenses).has(item.id),
   );
+  $: itemsByKey = new Map(allItems.map((item) => [item.key, item]));
   const linked = (goal: Goal) =>
-    allItems.filter((item) =>
-      (item.type === 'task' ? goal.tasks : goal.expenses).includes(item.id),
-    );
+    goalKeys(goal).flatMap((key) => {
+      const item = itemsByKey.get(key);
+      return item ? [item] : [];
+    });
   async function refresh() {
     if (busy) return;
     try {
@@ -132,6 +142,8 @@
     description = goal?.description || '';
     cover = goal?.cover || '';
     completed = goal?.completed || false;
+    theme = goal?.theme || 'island';
+    generatorVersion = goal ? goal.generatorVersion || 1 : 2;
     dialog.showModal();
     nameField.focus();
   }
@@ -152,6 +164,9 @@
       description: description.trim(),
       cover,
       completed,
+      theme,
+      generatorVersion,
+      order: [],
       seed: crypto.randomUUID(),
       tasks: [],
       expenses: [],
@@ -165,6 +180,8 @@
                 description: goal.description,
                 cover,
                 completed,
+                theme,
+                generatorVersion,
               }
             : g,
         )
@@ -207,7 +224,11 @@
       await commit(
         state.items.map((g) =>
           g.id === source
-            ? { ...g, [field]: g[field].filter((id) => id !== item.id) }
+            ? {
+                ...g,
+                [field]: g[field].filter((id) => id !== item.id),
+                order: goalKeys(g).filter((k) => k !== key),
+              }
             : g,
         ),
       );
@@ -216,7 +237,13 @@
       if (!goal || goal[field].includes(item.id)) return;
       await commit(
         state.items.map((g) =>
-          g.id === target ? { ...g, [field]: [...g[field], item.id] } : g,
+          g.id === target
+            ? {
+                ...g,
+                [field]: [...g[field], item.id],
+                order: [key, ...goalKeys(g)],
+              }
+            : g,
         ),
       );
     }
@@ -381,6 +408,8 @@
           <GoalGrowth
             count={linked(goal).length}
             seed={goal.seed || goal.id}
+            theme={goal.theme || 'island'}
+            generatorVersion={goal.generatorVersion || 1}
             completed={goal.completed || false}
             {language}
           /><button
@@ -392,7 +421,7 @@
         </div>
         <div class="goal-body">
           <h2 title={goal.title}>{goal.title}</h2>
-          <p class="description">{goal.description}</p>
+          <p class="description" title={goal.description}>{goal.description}</p>
           <div class="totals">
             <div>
               <strong>{totals.tasks}</strong><span
@@ -517,6 +546,22 @@
         rows="3"
       ></textarea></label
     >
+    <fieldset class="themes">
+      <legend>{t('Theme', 'Tema')}</legend>
+      {#each ['island', 'garden', 'space'] as option}<label
+          ><input
+            type="radio"
+            name="theme"
+            value={option}
+            bind:group={theme}
+            onchange={() => (generatorVersion = 2)}
+          />{option === 'island'
+            ? t('Island', 'Pulau')
+            : option === 'garden'
+              ? t('Garden', 'Taman')
+              : t('Space', 'Antariksa')}</label
+        >{/each}
+    </fieldset>
     <label class="completion"
       ><input type="checkbox" bind:checked={completed} />{t(
         'Completed',
@@ -541,6 +586,22 @@
 </dialog>
 
 <style>
+  .themes {
+    display: flex;
+    gap: 12px;
+    border: 0;
+    padding: 0;
+    flex-wrap: wrap;
+  }
+  .themes label {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .themes input {
+    width: 18px;
+    min-height: 18px;
+  }
   .completion {
     display: flex;
     align-items: center;
@@ -601,7 +662,7 @@
   }
   .goal-strip {
     flex: 1;
-    min-height: 520px;
+    min-height: 640px;
     align-items: stretch;
   }
   .goal-card {
@@ -635,10 +696,10 @@
   }
   .goal-body {
     padding: 20px;
-    flex: 1;
+    flex: 0;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
   }
   .goal-body h2 {
     font-size: 22px;
@@ -647,12 +708,11 @@
     text-overflow: ellipsis;
   }
   .description {
-    white-space: pre-wrap;
-    font-size: 14px;
-    line-height: 1.6;
-    max-height: 60px;
-    overflow: auto;
-    overflow-wrap: anywhere;
+    white-space: nowrap;
+    font-size: 13px;
+    line-height: 1.5;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .totals {
     margin-top: auto;
@@ -711,8 +771,10 @@
     flex-direction: column;
     gap: 6px;
     margin: 0 16px 12px;
-    max-height: 146px;
-    min-height: 146px;
+    height: clamp(240px, 38vh, 420px);
+    min-height: 240px;
+    max-height: 420px;
+    flex: 1;
     overflow-y: auto;
     flex-shrink: 0;
   }
@@ -799,7 +861,7 @@
       max-width: 220px;
     }
     .goal-strip {
-      min-height: 500px;
+      min-height: 640px;
     }
     .cover {
       height: 160px;

@@ -46,3 +46,42 @@ it('preserves legacy geography and completion when importing under new IDs', () 
     validateGoals([{ ...legacy, completed: 'true' as unknown as boolean }]),
   ).toThrow();
 });
+
+import { dna, worldScene, WORLD_CHUNK } from '../src/lib/world-dna';
+it('generates diverse DNA, stable addressable objects and bounded detail at high counts', () => {
+  const seeds = Array.from({ length: 100 }, (_, i) => 'seed-' + i);
+  expect(new Set(seeds.map((s) => dna(s).plant)).size).toBe(6);
+  expect(new Set(seeds.map((s) => dna(s).climate)).size).toBe(4);
+  for (const theme of ['island', 'garden', 'space'] as const) {
+    const small = worldScene('dna', theme, 256, 0, 'card');
+    const large = worldScene('dna', theme, 256, 0, 'detail', 1000);
+    expect(small.objects.length).toBeLessThanOrEqual(24);
+    expect(large.objects.length).toBeLessThanOrEqual(128);
+    expect(large.objects.length).toBeGreaterThan(small.objects.length);
+    for (const obj of small.objects)
+      expect(large.objects.find((o) => o.id === obj.id)).toEqual(obj);
+    expect(
+      worldScene('dna', theme, 1000000, 0, 'detail', 1000).objects,
+    ).toEqual(large.objects);
+    for (const count of [
+      1,
+      23,
+      24,
+      25,
+      255,
+      256,
+      257,
+      1000000,
+      Number.MAX_SAFE_INTEGER,
+    ]) {
+      const world = worldScene('dna', theme, count, undefined, 'card');
+      expect(world.objects.length).toBeLessThanOrEqual(24);
+      expect(world.objects.some((o) => o.id === world.steps - 1)).toBe(true);
+      expect(world.genes).toEqual(dna('dna'));
+      expect(worldScene('dna', theme, count, undefined, 'card')).toBe(world);
+    }
+    expect(
+      worldScene('dna', theme, WORLD_CHUNK + 1, undefined, 'card').chunk,
+    ).toBe(1);
+  }
+});

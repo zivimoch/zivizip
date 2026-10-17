@@ -9,6 +9,16 @@ pub struct Goal {
     cover: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     seed: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    theme: Option<String>,
+    #[serde(
+        default,
+        rename = "generatorVersion",
+        skip_serializing_if = "Option::is_none"
+    )]
+    generator_version: Option<u8>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    order: Vec<String>,
     #[serde(default)]
     completed: bool,
     tasks: Vec<String>,
@@ -32,9 +42,25 @@ fn validate(state: &GoalState) -> Result<()> {
         || state.items.len() > 1000
         || serde_json::to_vec(&state.items).unwrap().len() > 2_000_000
         || state.items.iter().any(|g| {
+            let mut order = HashSet::new();
+            let keys: HashSet<String> = g
+                .tasks
+                .iter()
+                .map(|id| format!("task:{id}"))
+                .chain(g.expenses.iter().map(|id| format!("expense:{id}")))
+                .collect();
             let mut tasks = HashSet::new();
             let mut expenses = HashSet::new();
-            !valid_id(&g.id)
+            g.theme
+                .as_ref()
+                .is_some_and(|theme| !["island", "garden", "space"].contains(&theme.as_str()))
+                || g.generator_version
+                    .is_some_and(|version| ![1, 2].contains(&version))
+                || g.order.len() > 20000
+                || g.order
+                    .iter()
+                    .any(|key| !keys.contains(key) || !order.insert(key))
+                || !valid_id(&g.id)
                 || g.seed.as_ref().is_some_and(|seed| !valid_id(seed))
                 || !ids.insert(&g.id)
                 || g.title.trim().is_empty()
@@ -101,6 +127,11 @@ mod tests {
         assert!(!goal.completed);
         assert!(goal.seed.is_none());
         goal.completed = true;
+        goal.theme = Some("garden".into());
+        goal.generator_version = Some(2);
+        goal.tasks = vec!["first".into()];
+        goal.expenses = vec!["second".into()];
+        goal.order = vec!["expense:second".into(), "task:first".into()];
         goal.seed = Some("world-seed".into());
         let mut db = Connection::open_in_memory().unwrap();
         super::super::schema(&db).unwrap();
@@ -114,6 +145,9 @@ mod tests {
         .unwrap();
         let saved = read(&db).unwrap();
         assert!(saved.items[0].completed);
+        assert_eq!(saved.items[0].theme.as_deref(), Some("garden"));
+        assert_eq!(saved.items[0].generator_version, Some(2));
+        assert_eq!(saved.items[0].order[0], "expense:second");
         assert_eq!(saved.items[0].seed.as_deref(), Some("world-seed"));
     }
     #[test]
@@ -129,6 +163,9 @@ mod tests {
             description: String::new(),
             cover: "lake".into(),
             seed: None,
+            theme: None,
+            generator_version: None,
+            order: vec![],
             completed: false,
             tasks: vec!["task".into()],
             expenses: vec![],

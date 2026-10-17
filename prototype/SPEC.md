@@ -168,3 +168,12 @@ This document describes the target interaction model. The [verification scope](.
 - Contributions construct vegetation, paths and homes, then additional islands and regions. The renderer displays the active region with bounded detail rather than allocating one rendered object per lifetime contribution. Explore opens a larger view with an active-island focus and navigation through earlier regions.
 - Completion is an explicit, reversible setting in the goal form, independent of point totals. Completed goals receive a landmark; motion respects reduced-motion preferences.
 - World settings persist in guest/account storage and backups. Rendering large point totals does not raise the existing workspace record or payload limits.
+
+### Versioned world DNA and goal layout
+
+- New goals choose Island, Garden or Space. Persist only the seed, theme, generator version and completion state alongside source references; generated scenery is not stored as records or image snapshots.
+- Version 1 goals retain their existing scenery unless their theme is explicitly changed. Version 2 derives climate, palette, terrain, plant species and planetary variation from independently addressable seed hashes. Garden growth includes surrounding plants, stones and water as well as the focal plant.
+- Generate only the requested region. Use bounded, responsive detail for cards and Explore, an eviction-limited scene cache, and viewport observation to unmount offscreen scenery. Lazy-loaded renderers are included in the PWA shell cache for offline use.
+- Completion adds a theme-specific landmark without requiring a point threshold. Respect reduced motion; no continuous idle animation.
+- Goal descriptions occupy a single line with ellipsis and full-text hover. Contribution lists receive the remaining card height, with at least 240px. New contributions appear first across both task and expense types, and their order survives reload, account sync and backup remapping.
+- Resetting Goals is a one-time maintenance operation requested explicitly by the owner, never a startup routine, schema migration, or feature that resets other workspace records.

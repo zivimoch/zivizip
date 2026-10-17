@@ -9,6 +9,7 @@ import {
   GoalsRepository,
   emptyGoals,
   goalTotals,
+  goalKeys,
   validateGoals,
   type Goal,
 } from '../src/lib/goals';
@@ -18,6 +19,9 @@ const goal: Goal = {
   description: 'Travel further',
   cover: 'lake',
   seed: 'stable-world',
+  theme: 'garden',
+  generatorVersion: 2,
+  order: ['expense:expense', 'task:task'],
   completed: true,
   tasks: ['task'],
   expenses: ['expense'],
@@ -97,6 +101,12 @@ it('rejects stale goal writes and remaps links when importing backups', async ()
     const backup = await exportWorkspace(db);
     await importWorkspace(target, backup);
     const restored = await exportWorkspace(target);
+    expect(restored.goals?.[0].theme).toBe('garden');
+    expect(restored.goals?.[0].generatorVersion).toBe(2);
+    expect(restored.goals?.[0].order).toEqual([
+      'expense:' + restored.transactions?.[0].id,
+      'task:' + restored.tasks?.[0].id,
+    ]);
     expect(restored.goals?.[0].seed).toBe('stable-world');
     expect(restored.goals?.[0].completed).toBe(true);
     expect(restored.goals?.[0].id).not.toBe(goal.id);
@@ -112,4 +122,18 @@ it('rejects stale goal writes and remaps links when importing backups', async ()
     await db.delete();
     await target.delete();
   }
+});
+
+it('validates theme and mixed contribution order', () => {
+  expect(goalKeys(goal)).toEqual(['expense:expense', 'task:task']);
+  expect(() => validateGoals([{ ...goal, order: ['task:missing'] }])).toThrow();
+  expect(() =>
+    validateGoals([{ ...goal, order: ['task:task', 'task:task'] }]),
+  ).toThrow();
+  expect(() =>
+    validateGoals([{ ...goal, generatorVersion: 3 as 2 }]),
+  ).toThrow();
+  expect(() =>
+    validateGoals([{ ...goal, theme: 'invalid' as 'garden' }]),
+  ).toThrow();
 });

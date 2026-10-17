@@ -14,12 +14,14 @@ async function goals(page: Page) {
   await expect(page.locator('.goals-page')).toBeVisible();
   await page.mouse.move(700, 300);
 }
-async function create(page: Page, title: string) {
+async function create(page: Page, title: string, theme?: string) {
   await page.getByRole('button', { name: 'New goal', exact: true }).click();
   await page.getByLabel('Title', { exact: true }).fill(title);
   await page
     .getByLabel('Description', { exact: true })
     .fill('Make time to explore');
+  if (theme)
+    await page.getByRole('radio', { name: theme, exact: true }).check();
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
 }
@@ -100,7 +102,7 @@ test('goals support drag assignment, shared links, persistence and return items 
   const card = page.getByRole('region', { name: 'Explore more', exact: true });
   await page
     .getByRole('button', { name: task.title, exact: true })
-    .dragTo(card);
+    .dragTo(card.locator('.drop-label'));
   await expect(page.locator('.pool-strip .goal-item')).toHaveCount(1);
   await expect(card.locator('.totals strong').first()).toHaveText('1');
   await page.screenshot({
@@ -113,11 +115,11 @@ test('goals support drag assignment, shared links, persistence and return items 
   });
   await card
     .getByRole('button', { name: task.title, exact: true })
-    .dragTo(other);
+    .dragTo(other.locator('.drop-label'));
   await expect(other.locator('.totals strong').first()).toHaveText('1');
   await card
     .getByRole('button', { name: task.title, exact: true })
-    .dragTo(other);
+    .dragTo(other.locator('.drop-label'));
   await expect(other.locator('.totals strong').first()).toHaveText('1');
   await card
     .getByRole('button', { name: task.title, exact: true })
@@ -131,11 +133,12 @@ test('goals support drag assignment, shared links, persistence and return items 
   await page
     .locator('.pool-strip')
     .getByRole('button', { name: task.title, exact: true })
-    .dragTo(card);
+    .dragTo(card.locator('.drop-label'));
   await page
     .getByRole('button', { name: expense.title, exact: true })
-    .dragTo(card);
+    .dragTo(card.locator('.drop-label'));
   await expect(page.locator('.pool-strip .goal-item')).toHaveCount(0);
+  await expect(card.locator('.goal-item').first()).toContainText(expense.title);
   await expect(card.locator('[data-growth]')).toHaveAttribute(
     'data-growth',
     '2',
@@ -520,6 +523,116 @@ test('growth reflects contributions and keeps long contribution lists bounded', 
   expect(await card.locator('svg[role=img]').innerHTML()).toBe(before);
   await page.screenshot({
     path: '/tmp/zivizip-goal-garden.png',
+    fullPage: true,
+  });
+});
+
+test('world themes persist, limit detail and stop rendering offscreen cards', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page
+    .getByRole('button', { name: 'Continue as guest', exact: true })
+    .click();
+  await goals(page);
+  for (const theme of ['Island', 'Garden', 'Space'])
+    await create(page, theme + ' world', theme);
+  await page.evaluate(async () => {
+    await new Promise<void>((resolve, reject) => {
+      const req = indexedDB.open('zivizip-guest-v1');
+      req.onsuccess = () => {
+        const db = req.result,
+          tx = db.transaction('meta', 'readwrite'),
+          meta = tx.objectStore('meta');
+        const tasks = Array.from({ length: 256 }, (_, i) => ({
+          id: 'world-task-' + i,
+          title: 'Contribution ' + i,
+          done: true,
+          archived: false,
+          date: '',
+          amount: 0,
+          createdAt: 1,
+        }));
+        meta.put({ key: 'tasks', value: { revision: 1, items: tasks } });
+        const get = meta.get('goals');
+        get.onsuccess = () => {
+          const state = get.result.value;
+          for (const goal of state.items) {
+            goal.tasks = tasks.map((t) => t.id);
+            goal.description =
+              'A meaningful goal with a long description that must fit on a single line instead of pushing contributions down the page.';
+          }
+          meta.put({ key: 'goals', value: state });
+        };
+        tx.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        tx.onerror = () => reject(tx.error);
+      };
+    });
+  });
+  await page.reload();
+  await goals(page);
+  for (const theme of ['island', 'garden', 'space']) {
+    const card = page.locator('.goal-card').filter({
+      has: page.getByRole('heading', {
+        name: theme[0].toUpperCase() + theme.slice(1) + ' world',
+        exact: true,
+      }),
+    });
+    await expect(card.locator('[data-theme=' + theme + ']')).toBeVisible();
+    expect(await card.locator('.object').count()).toBeLessThanOrEqual(24);
+    expect(
+      await card.locator('.linked-items').evaluate((el) => el.clientHeight),
+    ).toBeGreaterThanOrEqual(240);
+    const bounds = await card.boundingBox();
+    const listBounds = await card.locator('.linked-items').boundingBox();
+    expect(listBounds!.y + listBounds!.height).toBeLessThanOrEqual(
+      bounds!.y + bounds!.height,
+    );
+    await expect(card.locator('.description')).toHaveCSS(
+      'text-overflow',
+      'ellipsis',
+    );
+    await card.getByRole('button', { name: 'Explore', exact: true }).click();
+    const world = page.getByRole('dialog', { name: 'Goal world', exact: true });
+    await expect(world.locator('[data-detail=detail]')).toBeVisible();
+    expect(await world.locator('.object').count()).toBeGreaterThan(24);
+    expect(await world.locator('.object').count()).toBeLessThanOrEqual(128);
+    await page.keyboard.press('Escape');
+    await card
+      .getByRole('button', {
+        name:
+          'Edit goal: ' + theme[0].toUpperCase() + theme.slice(1) + ' world',
+        exact: true,
+      })
+      .click();
+    await page.getByLabel('Completed', { exact: true }).check();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(card.locator('.landmark')).toHaveCount(1);
+  }
+  await page.screenshot({
+    path: '/tmp/zivizip-dna-desktop.png',
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('.goal-strip').evaluate((el) => (el.scrollLeft = 0));
+  await expect(
+    page.locator('.goal-card').first().locator('.scene'),
+  ).toBeVisible();
+  await expect(page.locator('.goal-card').last().locator('.scene')).toHaveCount(
+    0,
+  );
+  await page.locator('.goal-card').last().scrollIntoViewIfNeeded();
+  await expect(
+    page.locator('.goal-card').last().locator('[data-theme=space]'),
+  ).toBeVisible();
+  await expect(
+    page.locator('.goal-card').first().locator('.scene'),
+  ).toHaveCount(0);
+  await page.screenshot({
+    path: '/tmp/zivizip-dna-mobile.png',
     fullPage: true,
   });
 });

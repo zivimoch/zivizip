@@ -9,6 +9,9 @@ export interface Goal {
   description: string;
   cover: string;
   seed?: string;
+  theme?: 'island' | 'garden' | 'space';
+  generatorVersion?: 1 | 2;
+  order?: string[];
   completed?: boolean;
   tasks: string[];
   expenses: string[];
@@ -28,6 +31,10 @@ export function validateGoals(items: Goal[]) {
     if (
       !g ||
       !validId(g.id) ||
+      (g.theme !== undefined &&
+        !['island', 'garden', 'space'].includes(g.theme)) ||
+      (g.generatorVersion !== undefined &&
+        ![1, 2].includes(g.generatorVersion)) ||
       (g.seed !== undefined && !validId(g.seed)) ||
       (g.completed !== undefined && typeof g.completed !== 'boolean') ||
       ids.has(g.id) ||
@@ -54,6 +61,19 @@ export function validateGoals(items: Goal[]) {
         seen.add(id);
       }
     }
+    if (g.order !== undefined) {
+      const keys = new Set([
+        ...g.tasks.map((id) => 'task:' + id),
+        ...g.expenses.map((id) => 'expense:' + id),
+      ]);
+      if (
+        !Array.isArray(g.order) ||
+        g.order.length > 20000 ||
+        new Set(g.order).size !== g.order.length ||
+        g.order.some((key) => !keys.has(key))
+      )
+        throw Error('Invalid contribution order');
+    }
   }
   if (new TextEncoder().encode(JSON.stringify(items)).length > 2_000_000)
     throw Error('Goals exceed their limit');
@@ -74,6 +94,15 @@ export function goalTotals(goal: Goal, tasks: Task[], expenses: Transaction[]) {
       .reduce((n, t) => n + t.amount, 0),
   };
 }
+export function goalKeys(g: Goal): string[] {
+  return [
+    ...new Set([
+      ...(g.order || []),
+      ...g.tasks.map((id) => 'task:' + id).reverse(),
+      ...g.expenses.map((id) => 'expense:' + id).reverse(),
+    ]),
+  ];
+}
 export function remapGoals(
   items: Goal[],
   tasks: Map<string, string>,
@@ -82,6 +111,11 @@ export function remapGoals(
   return items.map((g) => ({
     ...g,
     seed: g.seed || g.id,
+    order: goalKeys(g).flatMap((key) => {
+      const [type, id] = key.split(':');
+      const mapped = (type === 'task' ? tasks : expenses).get(id);
+      return mapped ? [type + ':' + mapped] : [];
+    }),
     id: crypto.randomUUID(),
     tasks: g.tasks.flatMap((id) => (tasks.has(id) ? [tasks.get(id)!] : [])),
     expenses: g.expenses.flatMap((id) =>

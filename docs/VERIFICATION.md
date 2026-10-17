@@ -94,3 +94,11 @@ Goal worlds replace the fixed tree stages with seeded island terrain, settlement
 Unit coverage checks deterministic geometry, distinct seeds, per-contribution changes, regeneration of earlier regions, bounded scenes at one million points, legacy decoding and backup preservation. Browser coverage includes completion/reopening, persistence, Explore/focus/Escape, and the existing drag, touch, account synchronization and offline flows. The generator's large-count tests do not claim million-record storage capacity or physical-device performance.
 
 Local validation passed: Svelte check with no errors/warnings, 39 frontend unit tests, 12 Rust tests, production Docker builds and all six Goals browser scenarios. Desktop and 390px mobile screenshots were inspected. Touch checks use Chrome emulation; physical-phone testing remains separate.
+
+## Goal DNA and contribution layout — 2026-10-17
+
+World generator v2 adds Island, Garden and Space themes while retaining v1 decoding/rendering. Goal documents accept optional theme, generator version and mixed contribution-order keys. Both API and browser validation reject invalid themes, unsupported versions, duplicate order keys and keys outside the goal's source references. Backup remapping preserves DNA and maps ordering keys to imported source IDs.
+
+Coverage includes species/climate diversity, deterministic coordinate lookup, shared object coordinates across detail levels, latest-step visibility, bounded object generation through the safe-integer range, ordering, backup preservation, theme form selection, completion landmarks and offscreen renderer removal. Large-count generator support does not raise workspace storage limits. Browser touch checks remain emulated rather than physical-device measurements.
+
+Local checks passed: Svelte validation without errors or warnings, 41 frontend unit tests, 12 Rust tests, production builds and seven Goals browser scenarios. Screenshots were inspected at desktop and 390px mobile widths. List bounds are checked against the card, and native drag targets the visible drop strip when taller cards require page scrolling.
