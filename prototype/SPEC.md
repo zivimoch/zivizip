@@ -2,6 +2,12 @@
 
 This document describes the target interaction model. The [verification scope](../docs/VERIFICATION.md) distinguishes implemented application features from prototype-only behavior.
 
+## Brand identity
+
+- Use the cyan Link monogram: two angular interlocking strokes forming a Z. The sidebar, shared-note header, favicon and installed PWA icons use the same vector geometry.
+- The Zivizip wordmark uses the section-heading typography with an accent-colored terminal dot, including the mobile header.
+- Launcher icons use a dark background and keep the mark inside the maskable safe area; provide an Apple touch icon.
+
 ## Workspace and navigation
 
 - Desktop sidebar starts as an icon rail and expands on hover or keyboard focus. Detail starts collapsed. Space between the logo and Main matches the navigation rhythm. Open Detail submenu icons align with Main and Goals when the rail collapses; indentation and the hierarchy line appear only while expanded.

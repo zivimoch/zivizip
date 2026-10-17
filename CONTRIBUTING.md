@@ -41,3 +41,11 @@ The Notes Docker build also runs Rust tests. `python3 scripts/check-local-persis
 - Exclude credentials, user backups, database files, and generated build output.
 
 Use concise pull request descriptions covering the problem, behavior change, and validation. Keep implementation status accurate; do not describe prototypes or planned features as released capabilities.
+
+## Brand assets
+
+`apps/web/static/logo.svg` is the Link monogram source. After editing it, run
+`node scripts/generate-brand-icons.mjs` to rebuild the favicon, 192px/512px PWA
+icons and 180px Apple touch icon. The script uses the existing Playwright browser;
+set `CHROMIUM_PATH` if Chromium is installed outside Playwright. Keep the symbol
+within the maskable safe area and check it at sidebar and launcher sizes.

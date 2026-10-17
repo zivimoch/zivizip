@@ -934,7 +934,7 @@
 <header class="mobile-header">
   <button aria-label="Open menu" onclick={() => (mobileMenu = true)}
     ><Icon name="menu" /></button
-  ><b>zivizip<span>.</span></b>
+  ><b class="brand-wordmark">Zivizip<span aria-hidden="true">.</span></b>
 </header>
 <aside class:expanded={mobileMenu} class="sidebar">
   <div class="sidebar-heading">
@@ -947,7 +947,9 @@
         navigate('main');
       }}
     >
-      <span class="brand-mark">z</span><b>zivizip</b>
+      <img class="brand-mark" src="/logo.svg" alt="" width="28" height="28" /><b
+        class="brand-wordmark">Zivizip<span aria-hidden="true">.</span></b
+      >
     </a>
     <button
       class="hide-menu"

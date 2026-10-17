@@ -102,3 +102,15 @@ World generator v2 adds Island, Garden and Space themes while retaining v1 decod
 Coverage includes species/climate diversity, deterministic coordinate lookup, shared object coordinates across detail levels, latest-step visibility, bounded object generation through the safe-integer range, ordering, backup preservation, theme form selection, completion landmarks and offscreen renderer removal. Large-count generator support does not raise workspace storage limits. Browser touch checks remain emulated rather than physical-device measurements.
 
 Local checks passed: Svelte validation without errors or warnings, 41 frontend unit tests, 12 Rust tests, production builds and seven Goals browser scenarios. Screenshots were inspected at desktop and 390px mobile widths. List bounds are checked against the card, and native drag targets the visible drop strip when taller cards require page scrolling.
+
+## Link brand identity — 2026-10-17
+
+The sidebar and shared-note header use the Link SVG monogram. Desktop and mobile
+wordmarks share section-heading styling and an accent terminal dot. PWA launcher
+icons and the Apple touch icon are generated from the same geometry.
+
+Formatting, Svelte checks, all 41 frontend unit tests, production build and the
+existing sidebar browser scenario passed. Desktop (1600px) and mobile (390px)
+screenshots were inspected. Browser checks confirmed 192px/512px manifest icons,
+a 180px Apple touch icon and offline availability of all five brand assets through
+the service worker. Installed launcher refresh on physical devices was not tested.

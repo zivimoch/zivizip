@@ -87,14 +87,14 @@ small {
   letter-spacing: -1px;
 }
 .brand-mark {
-  font-size: 40px;
-  font-weight: 800;
-  font-style: italic;
-  color: var(--accent);
-  line-height: 1;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  display: block;
 }
-.brand b {
-  font-size: 27px;
+.brand-wordmark {
+  font-size: 25px;
+  letter-spacing: -1px;
   font-weight: 750;
 }
 .sidebar .workspace-label {
@@ -310,7 +310,7 @@ small {
   margin: 0 0 14px;
 }
 .section-heading h2 span,
-.mobile-header b span {
+.brand-wordmark span {
   color: var(--accent);
 }
 .section-heading small {

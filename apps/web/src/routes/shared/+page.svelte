@@ -131,7 +131,11 @@
 >
 <main class="shared-note">
   <header>
-    <a href="/">zivizip</a><span
+    <a href="/" aria-label="Zivizip Main"
+      ><img src="/logo.svg" alt="" width="28" height="28" /><b
+        class="brand-wordmark">Zivizip<span aria-hidden="true">.</span></b
+      ></a
+    ><span
       >{editable
         ? t('Editing allowed', 'Boleh mengedit')
         : t('Read only', 'Hanya baca')}</span
@@ -190,11 +194,13 @@
   }
   header a {
     margin-right: auto;
-    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--text, #edf1f3);
     text-decoration: none;
-    font-weight: bold;
   }
-  header span {
+  header > span {
     font-size: 12px;
   }
   p {
