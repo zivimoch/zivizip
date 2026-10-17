@@ -106,7 +106,7 @@ This document describes the target interaction model. The [verification scope](.
 
 ## Goals
 
-- Create, edit and delete goals with a required title and optional description. A lightweight SVG garden replaces photo covers: it grows from seed to flowering tree with the number of linked contributions, never the amount spent. Legacy cover identifiers remain accepted in backups.
+- Create, edit and delete goals with a required title and optional description. A lightweight procedural island world replaces photo covers: it develops with the number of linked contributions, never the amount spent. Legacy cover identifiers remain accepted in backups.
 - Completed tasks (including archived tasks) and expense transactions can be assigned; income is excluded. Cards show totals and a compact, vertically scrollable contribution list. Long titles use ellipsis with the full title available on hover/focus.
 - Assignment uses drag only, without Move to goal buttons. Desktop uses native dragging; touch uses a brief hold then drag, with edge scrolling. Keyboard users can pick up an item with Space/Enter, Tab to a drop region and press Enter; Escape cancels.
 - Dropping onto another goal adds a reference without removing the source goal reference. The same source may belong to several goals, but never twice in one goal. Unassigned contains only sources with no goal references.
@@ -160,3 +160,11 @@ This document describes the target interaction model. The [verification scope](.
 - The monthly summary combines actual remaining on the left and planned remaining on the right in one accented card, with a diagonal divider and actual status underneath. Long amounts remain readable on narrow screens.
 
 - Planned remaining is the dominant amount in the combined card, with larger bold cyan typography and extra column space. The diagonal separator is a solid line without a fading gradient.
+
+### Goal worlds
+
+- Each completed-task or expense reference contributes one point, independent of its monetary value. Shared references count once in each linked goal.
+- A stable procedural seed gives each goal distinct island terrain, placement and settlement details. Legacy goals derive their seed from their ID; imports preserve the original world's seed while remapping record IDs.
+- Contributions construct vegetation, paths and homes, then additional islands and regions. The renderer displays the active region with bounded detail rather than allocating one rendered object per lifetime contribution. Explore opens a larger view with an active-island focus and navigation through earlier regions.
+- Completion is an explicit, reversible setting in the goal form, independent of point totals. Completed goals receive a landmark; motion respects reduced-motion preferences.
+- World settings persist in guest/account storage and backups. Rendering large point totals does not raise the existing workspace record or payload limits.

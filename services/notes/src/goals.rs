@@ -7,6 +7,10 @@ pub struct Goal {
     title: String,
     description: String,
     cover: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    seed: Option<String>,
+    #[serde(default)]
+    completed: bool,
     tasks: Vec<String>,
     expenses: Vec<String>,
 }
@@ -31,6 +35,7 @@ fn validate(state: &GoalState) -> Result<()> {
             let mut tasks = HashSet::new();
             let mut expenses = HashSet::new();
             !valid_id(&g.id)
+                || g.seed.as_ref().is_some_and(|seed| !valid_id(seed))
                 || !ids.insert(&g.id)
                 || g.title.trim().is_empty()
                 || g.title.encode_utf16().count() > 150
@@ -90,6 +95,28 @@ pub async fn update(
 mod tests {
     use super::*;
     #[test]
+    fn reads_legacy_goals_and_persists_world_settings() {
+        let legacy = r#"{"id":"legacy","title":"Explore","description":"","cover":"","tasks":[],"expenses":[]}"#;
+        let mut goal: Goal = serde_json::from_str(legacy).unwrap();
+        assert!(!goal.completed);
+        assert!(goal.seed.is_none());
+        goal.completed = true;
+        goal.seed = Some("world-seed".into());
+        let mut db = Connection::open_in_memory().unwrap();
+        super::super::schema(&db).unwrap();
+        write(
+            &mut db,
+            GoalState {
+                revision: 0,
+                items: vec![goal],
+            },
+        )
+        .unwrap();
+        let saved = read(&db).unwrap();
+        assert!(saved.items[0].completed);
+        assert_eq!(saved.items[0].seed.as_deref(), Some("world-seed"));
+    }
+    #[test]
     fn rejects_stale_writes_and_duplicate_assignments() {
         let mut db = Connection::open_in_memory().unwrap();
         super::super::schema(&db).unwrap();
@@ -101,6 +128,8 @@ mod tests {
             title: "Explore".into(),
             description: String::new(),
             cover: "lake".into(),
+            seed: None,
+            completed: false,
             tasks: vec!["task".into()],
             expenses: vec![],
         };

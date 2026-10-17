@@ -1,9 +1,9 @@
 mod draw;
 mod finance;
+mod goals;
 mod planning;
 mod sharing;
 mod tasks;
-mod goals;
 mod text;
 use argon2::{password_hash::SaltString, Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use axum::{

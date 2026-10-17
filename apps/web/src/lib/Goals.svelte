@@ -42,6 +42,7 @@
     title = '',
     description = '',
     cover = '';
+  let completed = false;
   let editSnapshot = '';
   const t = (en: string, id: string) => (language === 'id' ? id : en);
   $: assignedTasks = new Set(state.items.flatMap((g) => g.tasks));
@@ -130,6 +131,7 @@
     title = goal?.title || '';
     description = goal?.description || '';
     cover = goal?.cover || '';
+    completed = goal?.completed || false;
     dialog.showModal();
     nameField.focus();
   }
@@ -149,13 +151,21 @@
       title: title.trim(),
       description: description.trim(),
       cover,
+      completed,
+      seed: crypto.randomUUID(),
       tasks: [],
       expenses: [],
     };
     const items = editing
       ? state.items.map((g) =>
           g.id === editing
-            ? { ...g, title: goal.title, description: goal.description, cover }
+            ? {
+                ...g,
+                title: goal.title,
+                description: goal.description,
+                cover,
+                completed,
+              }
             : g,
         )
       : [...state.items, goal];
@@ -368,7 +378,12 @@
         ondrop={(e) => drop(e, goal.id)}
       >
         <div class="cover">
-          <GoalGrowth count={linked(goal).length} {language} /><button
+          <GoalGrowth
+            count={linked(goal).length}
+            seed={goal.seed || goal.id}
+            completed={goal.completed || false}
+            {language}
+          /><button
             class="edit"
             aria-label={t('Edit goal', 'Edit target') + ': ' + goal.title}
             disabled={!writable || busy}
@@ -502,6 +517,12 @@
         rows="3"
       ></textarea></label
     >
+    <label class="completion"
+      ><input type="checkbox" bind:checked={completed} />{t(
+        'Completed',
+        'Selesai',
+      )}</label
+    >
     {#if error}<p role="alert">{error}</p>{/if}
 
     <footer>
@@ -520,6 +541,15 @@
 </dialog>
 
 <style>
+  .completion {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .completion input {
+    width: 18px;
+    min-height: 18px;
+  }
   .goals-page {
     height: 100%;
     min-width: 0;

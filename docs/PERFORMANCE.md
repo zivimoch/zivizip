@@ -53,3 +53,9 @@ Reordering writes once after a completed drag, not on pointer movement. The curr
 ## Finance planning baseline — 2026-10-06
 
 The compiled production preview contains 378,629 bytes of JavaScript/CSS across 19 files, totaling 133,563 bytes (130.4 KiB) when each file is gzip-compressed. This includes lazy editor and planning chunks, with the same exclusions as earlier baselines. It is not an initial network-transfer measurement, RAM benchmark or latency result.
+
+## Procedural goal worlds — 2026-10-17
+
+The island generator adds no dependency. Each visible region contains at most seven islands and 224 construction objects, regardless of the lifetime contribution count. Earlier regions regenerate from the same seed on demand. A local Node run of 1,000 generations per sample averaged 0.027 ms at one point, 0.173 ms at 224 points, and 0.027 ms at 1,000,000 points (the latter has 64 construction objects in its active region). These figures measure scene generation only, not SVG rendering, browser memory, frame rate or physical-phone performance.
+
+Large-count generator support does not change storage limits: each goal still accepts at most 10,000 task references and 10,000 expense references, subject to the 2 MB workspace payload limit. Supporting millions of stored contributions requires a separate paginated storage/API design.

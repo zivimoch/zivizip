@@ -138,7 +138,7 @@ test('goals support drag assignment, shared links, persistence and return items 
   await expect(page.locator('.pool-strip .goal-item')).toHaveCount(0);
   await expect(card.locator('[data-growth]')).toHaveAttribute(
     'data-growth',
-    '1',
+    '2',
   );
   await expect(
     page.getByRole('button', { name: 'Move to goal', exact: true }),
@@ -416,7 +416,7 @@ test('growth reflects contributions and keeps long contribution lists bounded', 
       req.onsuccess = () => {
         const db = req.result,
           tx = db.transaction('meta', 'readwrite');
-        const tasks = Array.from({ length: 24 }, (_, i) => ({
+        const tasks = Array.from({ length: 240 }, (_, i) => ({
           id: 'milestone-' + i,
           title: 'Milestone ' + (i + 1),
           done: true,
@@ -444,7 +444,7 @@ test('growth reflects contributions and keeps long contribution lists bounded', 
             items: [
               goal('seed', 'A fresh start', 0),
               goal('growing', 'Explore more', 5),
-              goal('blooming', 'A healthy routine', 24),
+              goal('blooming', 'A healthy routine', 240),
             ],
           },
         });
@@ -463,11 +463,11 @@ test('growth reflects contributions and keeps long contribution lists bounded', 
   );
   await expect(page.locator('[data-growth]').nth(1)).toHaveAttribute(
     'data-growth',
-    '2',
+    '5',
   );
   await expect(page.locator('[data-growth]').nth(2)).toHaveAttribute(
     'data-growth',
-    '4',
+    '240',
   );
   expect(
     await page
@@ -475,7 +475,49 @@ test('growth reflects contributions and keeps long contribution lists bounded', 
       .last()
       .evaluate((el) => el.scrollHeight > el.clientHeight),
   ).toBe(true);
-  await expect(page.locator('.leaf').last()).toHaveCSS('opacity', '1');
+  await expect(page.locator('.construction').last()).toHaveCSS('opacity', '1');
+  const card = page.locator('.goal-card').last();
+  const before = await card.locator('svg[role=img]').innerHTML();
+  await card.getByRole('button', { name: 'Edit goal' }).click();
+  await page.getByLabel('Completed', { exact: true }).check();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(card.locator('[data-completed]')).toHaveAttribute(
+    'data-completed',
+    'true',
+  );
+  await expect(card.locator('.landmark')).toHaveCount(1);
+  await card.getByRole('button', { name: 'Explore', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Previous region', exact: true })
+    .click();
+  await expect(page.getByRole('dialog', { name: 'Goal world' })).toContainText(
+    'Region 1',
+  );
+  await page.getByRole('button', { name: 'Next region', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Goal world' })).toContainText(
+    'Region 2',
+  );
+  await page
+    .getByRole('button', { name: 'Active island', exact: true })
+    .click();
+  await expect(
+    page.getByRole('button', { name: 'Overview', exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(
+    page.getByRole('dialog', { name: 'Goal world' }),
+  ).not.toBeVisible();
+  await page.reload();
+  await goals(page);
+  await expect(card.locator('[data-completed]')).toHaveAttribute(
+    'data-completed',
+    'true',
+  );
+  await card.getByRole('button', { name: 'Edit goal' }).click();
+  await page.getByLabel('Completed', { exact: true }).uncheck();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(card.locator('.landmark')).toHaveCount(0);
+  expect(await card.locator('svg[role=img]').innerHTML()).toBe(before);
   await page.screenshot({
     path: '/tmp/zivizip-goal-garden.png',
     fullPage: true,

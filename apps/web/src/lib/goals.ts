@@ -8,6 +8,8 @@ export interface Goal {
   title: string;
   description: string;
   cover: string;
+  seed?: string;
+  completed?: boolean;
   tasks: string[];
   expenses: string[];
 }
@@ -26,6 +28,8 @@ export function validateGoals(items: Goal[]) {
     if (
       !g ||
       !validId(g.id) ||
+      (g.seed !== undefined && !validId(g.seed)) ||
+      (g.completed !== undefined && typeof g.completed !== 'boolean') ||
       ids.has(g.id) ||
       typeof g.title !== 'string' ||
       !g.title.trim() ||
@@ -77,6 +81,7 @@ export function remapGoals(
 ): Goal[] {
   return items.map((g) => ({
     ...g,
+    seed: g.seed || g.id,
     id: crypto.randomUUID(),
     tasks: g.tasks.flatMap((id) => (tasks.has(id) ? [tasks.get(id)!] : [])),
     expenses: g.expenses.flatMap((id) =>

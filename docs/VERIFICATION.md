@@ -86,3 +86,11 @@ Goals support title/description editing, bundled cover choices, exclusive comple
 Goals now allow the same source in multiple goals, while rejecting duplicate references within one goal. Backup tests verify shared references survive ID remapping. Cards expose a bounded, scrollable contribution list with ellipsis, and dragging into Unassigned removes only the originating goal link. Native drag and Chrome touch-event tests cover assignment and removal; a brief hold starts touch dragging without blocking ordinary scrolling. Keyboard pickup/drop and cancellation are available without adding an assignment menu. Account synchronization and guest copying remain covered.
 
 The cover selector and bundled photographs were replaced with a procedural SVG garden driven by contribution count rather than expense amount. Legacy cover IDs remain valid data. Frontend diagnostics reported no errors or warnings; 37 unit tests and 11 Rust tests passed. Browser coverage includes native sharing, duplicate prevention, touch drag, persistence, authentication, account synchronization and explicit guest copying. Physical-phone testing remains separate.
+
+## Procedural goal worlds — 2026-10-17
+
+Goal worlds replace the fixed tree stages with seeded island terrain, settlements and successive regions. New optional seed/completion fields retain compatibility with older goal documents and backup v7. Imports retain the original seed while remapping IDs. Manual completion is reversible and independent of contributions.
+
+Unit coverage checks deterministic geometry, distinct seeds, per-contribution changes, regeneration of earlier regions, bounded scenes at one million points, legacy decoding and backup preservation. Browser coverage includes completion/reopening, persistence, Explore/focus/Escape, and the existing drag, touch, account synchronization and offline flows. The generator's large-count tests do not claim million-record storage capacity or physical-device performance.
+
+Local validation passed: Svelte check with no errors/warnings, 39 frontend unit tests, 12 Rust tests, production Docker builds and all six Goals browser scenarios. Desktop and 390px mobile screenshots were inspected. Touch checks use Chrome emulation; physical-phone testing remains separate.

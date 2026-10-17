@@ -17,6 +17,8 @@ const goal: Goal = {
   title: 'Explore',
   description: 'Travel further',
   cover: 'lake',
+  seed: 'stable-world',
+  completed: true,
   tasks: ['task'],
   expenses: ['expense'],
 };
@@ -95,6 +97,8 @@ it('rejects stale goal writes and remaps links when importing backups', async ()
     const backup = await exportWorkspace(db);
     await importWorkspace(target, backup);
     const restored = await exportWorkspace(target);
+    expect(restored.goals?.[0].seed).toBe('stable-world');
+    expect(restored.goals?.[0].completed).toBe(true);
     expect(restored.goals?.[0].id).not.toBe(goal.id);
     expect(restored.goals?.[0].tasks).toEqual([restored.tasks?.[0].id]);
     expect(restored.goals?.[0].expenses).toEqual([
