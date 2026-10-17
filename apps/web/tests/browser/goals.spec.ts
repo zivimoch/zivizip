@@ -165,12 +165,50 @@ test('goals support drag assignment, shared links, persistence and return items 
   await expect(
     page.getByRole('heading', { name: 'Explore the world', exact: true }),
   ).toBeVisible();
-  page.once('dialog', (d) => d.accept());
   await page
     .getByRole('button', { name: 'Edit goal: Explore the world', exact: true })
     .click();
-  await page.getByRole('button', { name: 'Delete', exact: true }).click();
+  page.once('dialog', async (d) => {
+    expect(d.message()).toContain(
+      'Tasks and financial transactions will be kept',
+    );
+    await d.dismiss();
+  });
+  await page.getByRole('button', { name: 'Delete goal', exact: true }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  page.once('dialog', (d) => d.accept());
+  await page.getByRole('button', { name: 'Delete goal', exact: true }).click();
   await expect(page.locator('.pool-strip .goal-item')).toHaveCount(2);
+  const preserved = await page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve) => {
+      const request = indexedDB.open('zivizip-guest-v1');
+      request.onsuccess = () => resolve(request.result);
+    });
+    const read = (key: string) =>
+      new Promise<any>((resolve) => {
+        const request = db.transaction('meta').objectStore('meta').get(key);
+        request.onsuccess = () => resolve(request.result.value);
+      });
+    const result = await Promise.all([read('tasks'), read('finance')]);
+    db.close();
+    return result;
+  });
+  expect(preserved).toEqual([
+    {
+      revision: 1,
+      items: [
+        task,
+        { ...task, id: 'pending', title: 'Not finished', done: false },
+      ],
+    },
+    {
+      revision: 1,
+      items: [
+        expense,
+        { ...expense, id: 'salary', type: 'income', title: 'Salary' },
+      ],
+    },
+  ]);
 });
 test('account goals use authenticated revision checks and reject anonymous access', async ({
   request,
@@ -339,72 +377,140 @@ test('guest-only goals require explicit copying into the account', async ({
     });
   }
 });
-test('touch drag assigns and returns contributions without an assignment menu', async ({
-  browser,
-}) => {
-  const context = await browser.newContext({
-    viewport: { width: 390, height: 1000 },
-    isMobile: true,
-    hasTouch: true,
-  });
-  const page = await context.newPage();
-  try {
-    await page.goto('http://127.0.0.1:4174/');
-    await page
-      .getByRole('button', { name: 'Continue as guest', exact: true })
-      .click();
-    await page.evaluate(async (task) => {
-      await new Promise<void>((resolve) => {
-        const req = indexedDB.open('zivizip-guest-v1');
-        req.onsuccess = () => {
-          const db = req.result;
-          const tx = db.transaction('meta', 'readwrite');
-          tx.objectStore('meta').put({
-            key: 'tasks',
-            value: { revision: 1, items: [task] },
-          });
-          tx.oncomplete = () => {
-            db.close();
-            resolve();
-          };
-        };
-      });
-    }, task);
-    await goals(page);
-    await create(page, 'Touch garden');
-    const card = page.getByRole('region', {
-      name: 'Touch garden',
-      exact: true,
+for (const height of [667, 844])
+  test(`mobile grip drag assigns, cancels and returns contributions at ${height}px`, async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({
+      viewport: { width: 390, height },
+      isMobile: true,
+      hasTouch: true,
     });
-    const client = await context.newCDPSession(page);
-    async function touchDrag(source: any, target: any) {
-      await source.scrollIntoViewIfNeeded();
-      const from = await source.boundingBox();
-      const to = await target.boundingBox();
-      const point = { x: from.x + 30, y: from.y + from.height / 2 };
+    const page = await context.newPage();
+    try {
+      await page.goto('http://127.0.0.1:4174/');
+      await page
+        .getByRole('button', { name: 'Continue as guest', exact: true })
+        .click();
+      await page.evaluate(async (task) => {
+        await new Promise<void>((resolve) => {
+          const req = indexedDB.open('zivizip-guest-v1');
+          req.onsuccess = () => {
+            const db = req.result;
+            const tx = db.transaction('meta', 'readwrite');
+            tx.objectStore('meta').put({
+              key: 'tasks',
+              value: {
+                revision: 1,
+                items: [
+                  task,
+                  { ...task, id: 'second', title: 'Second task' },
+                  { ...task, id: 'third', title: 'Third task' },
+                ],
+              },
+            });
+            tx.oncomplete = () => {
+              db.close();
+              resolve();
+            };
+          };
+        });
+      }, task);
+      await goals(page);
+      await create(page, 'Touch garden');
+      const card = page.getByRole('region', {
+        name: 'Touch garden',
+        exact: true,
+      });
+      const client = await context.newCDPSession(page);
+      const poolStrip = page.locator('.pool-strip');
+      await poolStrip.scrollIntoViewIfNeeded();
+      const body = (await poolStrip
+        .locator('.goal-item')
+        .first()
+        .boundingBox())!;
+      const swipeY = body.y + body.height / 2;
       await client.send('Input.dispatchTouchEvent', {
         type: 'touchStart',
-        touchPoints: [point],
+        touchPoints: [{ x: body.x + 130, y: swipeY }],
       });
-      await expect(page.locator('.drag-ghost')).toBeVisible();
-      await client.send('Input.dispatchTouchEvent', {
-        type: 'touchMove',
-        touchPoints: [{ x: to.x + 80, y: to.y + 25 }],
-      });
+      for (let step = 1; step <= 10; step++)
+        await client.send('Input.dispatchTouchEvent', {
+          type: 'touchMove',
+          touchPoints: [{ x: body.x + 130 - step * 10, y: swipeY }],
+        });
       await client.send('Input.dispatchTouchEvent', {
         type: 'touchEnd',
         touchPoints: [],
       });
+      await expect
+        .poll(() => poolStrip.evaluate((el) => el.scrollLeft))
+        .toBeGreaterThan(0);
+      await expect(page.locator('.drag-ghost')).toHaveCount(0);
+      await poolStrip.evaluate((el) => {
+        el.scrollLeft = 0;
+      });
+      await card.scrollIntoViewIfNeeded();
+      expect((await card.boundingBox())!.height).toBeLessThanOrEqual(400);
+      const cardBounds = (await card.boundingBox())!;
+      expect(cardBounds.y + cardBounds.height).toBeLessThan(height - 50);
+      await page
+        .getByRole('button', { name: 'Edit goal: Touch garden', exact: true })
+        .click();
+      const deleteButton = page.getByRole('button', {
+        name: 'Delete goal',
+        exact: true,
+      });
+      await deleteButton.scrollIntoViewIfNeeded();
+      const deleteBounds = (await deleteButton.boundingBox())!;
+      expect(deleteBounds.y + deleteBounds.height).toBeLessThanOrEqual(height);
+      await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+      async function touchDrag(source: any, target: any, cancel = false) {
+        await source.scrollIntoViewIfNeeded();
+        const from = await source.locator('.drag-handle').boundingBox();
+        const to = await target.boundingBox();
+        const point = {
+          x: from.x + from.width / 2,
+          y: from.y + from.height / 2,
+        };
+        await client.send('Input.dispatchTouchEvent', {
+          type: 'touchStart',
+          touchPoints: [point],
+        });
+        await expect(page.locator('.drag-ghost')).toBeVisible();
+        for (let step = 1; step <= 12; step++) {
+          await client.send('Input.dispatchTouchEvent', {
+            type: 'touchMove',
+            touchPoints: [
+              {
+                x: point.x + ((to.x + 80 - point.x) * step) / 12,
+                y: point.y + ((to.y + 25 - point.y) * step) / 12,
+              },
+            ],
+          });
+        }
+        await client.send('Input.dispatchTouchEvent', {
+          type: cancel ? 'touchCancel' : 'touchEnd',
+          touchPoints: [],
+        });
+      }
+      await touchDrag(
+        page.locator('.pool-strip .goal-item').first(),
+        card,
+        true,
+      );
+      await expect(page.locator('.drag-ghost')).toHaveCount(0);
+      await expect(page.locator('.pool-strip .goal-item')).toHaveCount(3);
+      await touchDrag(page.locator('.pool-strip .goal-item').first(), card);
+      await expect(card.locator('.linked-items .goal-item')).toHaveCount(1);
+      await touchDrag(card.locator('.goal-item'), page.locator('.unassigned'));
+      await expect(page.locator('.pool-strip .goal-item')).toHaveCount(3);
+      await expect(card.locator('.totals strong').first()).toHaveText('0');
+      await page.screenshot({ path: `/tmp/zivizip-goals-touch-${height}.png` });
+    } finally {
+      await context.close();
     }
-    await touchDrag(page.locator('.pool-strip .goal-item'), card);
-    await expect(card.locator('.linked-items .goal-item')).toHaveCount(1);
-    await touchDrag(card.locator('.goal-item'), page.locator('.unassigned'));
-    await expect(page.locator('.pool-strip .goal-item')).toHaveCount(1);
-    await expect(card.locator('.totals strong').first()).toHaveText('0');
-  } finally {
-    await context.close();
-  }
-});
+  });
 test('growth reflects contributions and keeps long contribution lists bounded', async ({
   page,
 }) => {
@@ -585,7 +691,7 @@ test('world themes persist, limit detail and stop rendering offscreen cards', as
     expect(await card.locator('.object').count()).toBeLessThanOrEqual(24);
     expect(
       await card.locator('.linked-items').evaluate((el) => el.clientHeight),
-    ).toBeGreaterThanOrEqual(240);
+    ).toBeGreaterThanOrEqual(60);
     const bounds = await card.boundingBox();
     const listBounds = await card.locator('.linked-items').boundingBox();
     expect(listBounds!.y + listBounds!.height).toBeLessThanOrEqual(

@@ -202,7 +202,7 @@
     background: #000b;
   }
   .world {
-    height: 160px;
+    height: var(--goal-cover-height, 160px);
     position: relative;
     background: linear-gradient(150deg, #193b48, #10272e);
     overflow: hidden;

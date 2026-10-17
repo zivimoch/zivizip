@@ -114,3 +114,17 @@ existing sidebar browser scenario passed. Desktop (1600px) and mobile (390px)
 screenshots were inspected. Browser checks confirmed 192px/512px manifest icons,
 a 180px Apple touch icon and offline availability of all five brand assets through
 the service worker. Installed launcher refresh on physical devices was not tested.
+
+## Compact Goals and touch controls — 2026-10-17
+
+Goals use bounded card heights and scrollable contribution lists. Touch gestures
+start immediately from a 44px grip with `touch-action: none`; the item body keeps
+native scrolling. The edit dialog exposes Delete goal with source-preservation
+confirmation and a sticky action footer.
+
+Local Docker checks passed with no Svelte diagnostics and all 41 frontend unit
+tests. All eight Goals browser scenarios passed, including multi-step touch drag,
+cancellation, return to Unassigned and native item-body scrolling at 390×667 and
+390×844. Deletion cancellation and completion verify unchanged Tasks and Finance
+snapshots. Desktop/mobile screenshots were inspected. Tests emulate Chrome touch;
+physical-device verification remains separate.

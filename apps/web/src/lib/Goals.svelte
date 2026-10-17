@@ -35,11 +35,7 @@
     touchActive = false;
   let touch: {
     id: number;
-    x: number;
-    y: number;
-    key: string;
-    source: string;
-    timer: ReturnType<typeof setTimeout>;
+    node: HTMLElement;
   } | null = null;
   let scrollFrame = 0;
   let pageElement: HTMLElement;
@@ -192,8 +188,8 @@
     if (
       !confirm(
         t(
-          'Delete this goal? Its items will return to Unassigned.',
-          'Hapus target ini? Item akan kembali ke Belum ditetapkan.',
+          'Delete this goal? Tasks and financial transactions will be kept. Items not linked to another goal will return to Unassigned.',
+          'Hapus target ini? Tugas dan transaksi keuangan tetap disimpan. Item yang tidak terhubung ke target lain kembali ke Belum ditetapkan.',
         ),
       )
     )
@@ -207,7 +203,8 @@
     dragSource = source;
   }
   function cancelDrag() {
-    if (touch) clearTimeout(touch.timer);
+    if (touch?.node.hasPointerCapture(touch.id))
+      touch.node.releasePointerCapture(touch.id);
     touch = null;
     touchActive = false;
     dragging = '';
@@ -295,33 +292,21 @@
     scrollFrame = requestAnimationFrame(autoScroll);
   }
   function beginTouch(e: PointerEvent, key: string, source: string) {
-    if (e.pointerType === 'mouse' || !writable || busy) return;
+    if (e.pointerType === 'mouse' || !e.isPrimary || !writable || busy) return;
+    // The handle reserves touch gestures before the browser starts scrolling.
+    e.preventDefault();
     cancelDrag();
     const node = e.currentTarget as HTMLElement;
-    touch = {
-      id: e.pointerId,
-      x: e.clientX,
-      y: e.clientY,
-      key,
-      source,
-      timer: setTimeout(() => {
-        if (!touch) return;
-        startDrag(key, source);
-        touchActive = true;
-        ghostX = touch.x;
-        ghostY = touch.y;
-        node.setPointerCapture(touch.id);
-        scrollFrame = requestAnimationFrame(autoScroll);
-      }, 280),
-    };
+    touch = { id: e.pointerId, node };
+    startDrag(key, source);
+    touchActive = true;
+    ghostX = e.clientX;
+    ghostY = e.clientY;
+    node.setPointerCapture(e.pointerId);
+    scrollFrame = requestAnimationFrame(autoScroll);
   }
   function moveTouch(e: PointerEvent) {
     if (!touch || touch.id !== e.pointerId) return;
-    if (!touchActive) {
-      if (Math.hypot(e.clientX - touch.x, e.clientY - touch.y) > 9)
-        cancelDrag();
-      return;
-    }
     e.preventDefault();
     ghostX = e.clientX;
     ghostY = e.clientY;
@@ -484,8 +469,8 @@
         </h2>
         <p>
           {t(
-            'Drag tasks and expenses to a goal. On touch screens, hold then drag.',
-            'Tarik tugas dan pengeluaran ke target. Di layar sentuh, tahan lalu tarik.',
+            'Drag tasks and expenses to a goal. On touch screens, drag the grip; swipe the item to scroll.',
+            'Tarik tugas dan pengeluaran ke target. Di layar sentuh, tarik pegangannya; usap item untuk menggulir.',
           )}
         </p>
       </div>
@@ -575,7 +560,7 @@
           type="button"
           class="danger"
           disabled={busy || !writable}
-          onclick={remove}>{t('Delete', 'Hapus')}</button
+          onclick={remove}>{t('Delete goal', 'Hapus target')}</button
         >{/if}<button type="button" onclick={() => dialog.close()}
         >{t('Cancel', 'Batal')}</button
       ><button class="primary" disabled={busy || !writable}
@@ -661,8 +646,9 @@
     flex-shrink: 0;
   }
   .goal-strip {
-    flex: 1;
-    min-height: 640px;
+    flex: 0 0 auto;
+    height: clamp(460px, 62dvh, 540px);
+    min-height: 0;
     align-items: stretch;
   }
   .goal-card {
@@ -679,7 +665,7 @@
       transform 0.15s;
   }
   .cover {
-    height: 160px;
+    height: var(--goal-cover-height, 160px);
     position: relative;
     flex-shrink: 0;
     background: linear-gradient(135deg, #06444e, #192531);
@@ -771,12 +757,9 @@
     flex-direction: column;
     gap: 6px;
     margin: 0 16px 12px;
-    height: clamp(240px, 38vh, 420px);
-    min-height: 240px;
-    max-height: 420px;
-    flex: 1;
+    min-height: 0;
+    flex: 1 1 0;
     overflow-y: auto;
-    flex-shrink: 0;
   }
   .drag-ghost {
     position: fixed;
@@ -823,7 +806,9 @@
     border-radius: 16px;
     background: #142126;
     color: white;
-    padding: 24px;
+    padding: 20px;
+    max-height: calc(100dvh - 24px);
+    overflow-y: auto;
   }
   form {
     display: flex;
@@ -844,6 +829,11 @@
     display: flex;
     gap: 8px;
     justify-content: flex-end;
+    flex-wrap: wrap;
+    position: sticky;
+    bottom: -20px;
+    padding: 12px 0;
+    background: #142126;
   }
   .danger {
     color: #ff7777;
@@ -852,7 +842,7 @@
   @media (max-width: 700px) {
     .goals-page {
       padding: 16px;
-      gap: 20px;
+      gap: 14px;
     }
     .goal-card {
       flex-basis: calc(100vw - 52px);
@@ -861,11 +851,48 @@
       max-width: 220px;
     }
     .goal-strip {
-      min-height: 640px;
+      height: clamp(340px, 46dvh, 400px);
+      --goal-cover-height: 112px;
     }
-    .cover {
-      height: 160px;
+    .goal-body {
+      padding: 10px 14px;
+      gap: 4px;
     }
+    .goal-body h2 {
+      font-size: 18px;
+    }
+    .totals {
+      padding-top: 4px;
+    }
+    .totals strong {
+      font-size: 18px;
+    }
+    .totals div {
+      gap: 3px;
+    }
+    .linked-items {
+      margin: 0 10px 8px;
+    }
+    .drop-label {
+      padding: 8px;
+    }
+    .edit {
+      width: 44px;
+      height: 44px;
+    }
+    dialog {
+      padding: 16px;
+    }
+    form {
+      gap: 12px;
+    }
+    footer {
+      bottom: -16px;
+    }
+    footer button {
+      min-height: 44px;
+    }
+
     h1 {
       font-size: 24px;
     }

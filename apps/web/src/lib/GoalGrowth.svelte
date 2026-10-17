@@ -135,7 +135,7 @@
   .host,
   .world,
   .placeholder {
-    height: 160px;
+    height: var(--goal-cover-height, 160px);
     position: relative;
     background: #15313c;
   }
