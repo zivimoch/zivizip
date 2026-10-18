@@ -194,3 +194,14 @@ This document describes the target interaction model. The [verification scope](.
 - Goal card Completed, edit and Explore controls use a compact visual size; expanded world controls remain larger.
 - The transaction ledger starts on the current calendar month when the workspace opens. Opening or creating a monthly plan never changes the ledger month. Manual ledger month selection remains independent of planning tabs.
 - Double-clicking a monthly plan tab opens a delete-only dialog. Deleting removes that month's saved plan and budgets, closes its tab, and preserves all recorded transactions. Closing a tab alone does not delete its plan. Analysis cannot be deleted; offline account plans remain read-only.
+
+## To do detail overview
+
+- Detail → To do shows overall completion and outstanding workload by due date: overdue, today, the next seven calendar days, later, and undated. Completed tasks, including archived tasks, count toward overall progress and are excluded from outstanding workload. No completion-date trend is inferred from task creation or due dates.
+- Two independently scrolling cards show unfinished and completed tasks. Completed includes archived tasks; restoring a task moves it back to unfinished. Completing, editing, deleting and archiving use the same repository and revision checks as Main.
+- Charts update with task changes, use the browser's local calendar, and show zero counts for an empty workspace. The layout stacks on mobile. Main keeps its existing compact To do panel.
+
+## Goal completion and brand refinement
+
+- Goal completion is controlled on the card only. The create/edit form has no Completed control; editing a goal preserves its existing completion state.
+- The slimmer Link monogram is shared by the sidebar, shared-note header, favicon, Apple touch icon and PWA launcher icons. Generated icons remain available offline.

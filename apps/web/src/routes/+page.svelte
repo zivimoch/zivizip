@@ -1315,15 +1315,17 @@
             />{/key}
         </div>
       </div>{/if}
-  {:else if view === 'tasks'}<div class="tasks-page">
-      {#key tasksRepo.db.name}<TasksPanel
+  {:else if view === 'tasks'}
+    {#await import('$lib/TasksDetail.svelte') then module}
+      {#key tasksRepo.db.name}<svelte:component
+          this={module.default}
           repository={tasksRepo}
           {writable}
           language={prefs.language}
           refreshToken={taskRefresh}
-          onbusy={(value) => (taskBusy = value)}
+          onbusy={(value: boolean) => (taskBusy = value)}
         />{/key}
-    </div>
+    {:catch issue}<p role="alert">{issue.message}</p>{/await}
   {:else if view === 'finance'}
     {#await import('$lib/FinanceDetail.svelte') then module}
       {#key financeRepo.db.name}<svelte:component

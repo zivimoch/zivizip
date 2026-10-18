@@ -629,12 +629,6 @@
               : t('Space', 'Antariksa')}</label
         >{/each}
     </fieldset>
-    <label class="completion"
-      ><input type="checkbox" bind:checked={completed} />{t(
-        'Completed',
-        'Selesai',
-      )}</label
-    >
     {#if error}<p role="alert">{error}</p>{/if}
 
     <footer>
@@ -666,15 +660,6 @@
     align-items: center;
   }
   .themes input {
-    width: 18px;
-    min-height: 18px;
-  }
-  .completion {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .completion input {
     width: 18px;
     min-height: 18px;
   }

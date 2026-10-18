@@ -776,8 +776,15 @@ test('world themes persist, limit detail and stop rendering offscreen cards', as
         exact: true,
       })
       .click();
-    await page.getByLabel('Completed', { exact: true }).check();
+    await expect(
+      page
+        .getByRole('dialog')
+        .getByRole('checkbox', { name: 'Completed', exact: true }),
+    ).toHaveCount(0);
     await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await card
+      .getByRole('checkbox', { name: 'Completed', exact: true })
+      .click();
     await expect(card.locator('.landmark')).toHaveCount(1);
   }
   await page.screenshot({

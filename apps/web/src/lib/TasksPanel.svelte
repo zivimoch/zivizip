@@ -14,6 +14,8 @@
   export let writable: boolean;
   export let language: 'en' | 'id';
   export let refreshToken = 0;
+  export let mode: 'main' | 'pending' | 'completed' = 'main';
+  export let ondata: (items: Task[]) => void = () => {};
   export let onbusy: (value: boolean) => void = () => {};
   let state = emptyTasks(),
     initialized = false,
@@ -54,7 +56,23 @@
   $: active = state.items.filter((task) => !task.archived);
   $: done = active.filter((task) => task.done).length;
   $: percent = active.length ? Math.round((done / active.length) * 100) : 0;
-  $: rows = visibleTasks(draftOrder || state.items, archived);
+  $: rows =
+    mode === 'main'
+      ? visibleTasks(draftOrder || state.items, archived)
+      : (draftOrder || state.items)
+          .filter((task) => task.done === (mode === 'completed'))
+          .sort(
+            (a, b) =>
+              Number(!!b.date) - Number(!!a.date) ||
+              a.date.localeCompare(b.date),
+          );
+  $: ondata(state.items);
+  $: panelTitle =
+    mode === 'pending'
+      ? t('Not completed', 'Belum selesai')
+      : mode === 'completed'
+        ? t('Completed', 'Selesai')
+        : 'To do';
   $: if (initialized && refreshToken !== seenRefresh) {
     seenRefresh = refreshToken;
     void refresh();
@@ -417,7 +435,7 @@
   class:list-drop-ready={listDropReady && writable}
   class:list-drop-over={listDropOver && writable}
   bind:this={panel}
-  aria-label="To do"
+  aria-label={panelTitle}
   ondragover={(e) => {
     if (
       writable &&
@@ -439,7 +457,10 @@
   ondrop={dropNote}
 >
   <div class="section-heading">
-    <h2>To do<span>.</span></h2>
+    <h2>
+      {panelTitle}<span>.</span>{#if mode !== 'main'}<small>{rows.length}</small
+        >{/if}
+    </h2>
     <div class="task-actions">
       {#if selected.size}<button
           class="task-delete-selected danger"
@@ -453,7 +474,7 @@
             >{t('Delete', 'Hapus')} ({selected.size})</span
           ></button
         >
-      {:else}
+      {:else if mode !== 'pending'}
         <button
           class="archive-button"
           disabled={!writable || busy || !done}
@@ -462,7 +483,7 @@
             >{t('Archive completed', 'Arsipkan selesai')}</span
           ></button
         >{/if}
-      {#if archived || state.items.some((task) => task.archived)}
+      {#if mode === 'main' && (archived || state.items.some((task) => task.archived))}
         <button
           class="archive-button"
           aria-label={archived
@@ -477,23 +498,23 @@
           }}><Icon name={archived ? 'tasks' : 'folder'} /></button
         >
       {/if}
-      <button
-        class="task-add section-add"
-        aria-label={t('Add task', 'Tambah tugas')}
-        disabled={!writable || busy || !initialized}
-        onclick={() => open()}><Icon name="plus" /></button
-      >
+      {#if mode !== 'completed'}<button
+          class="task-add section-add"
+          aria-label={t('Add task', 'Tambah tugas')}
+          disabled={!writable || busy || !initialized}
+          onclick={() => open()}><Icon name="plus" /></button
+        >{/if}
     </div>
   </div>
-  <div class="task-progress">
-    <span
-      >{done}
-      {t('of', 'dari')}
-      {active.length}
-      {t('completed', 'selesai')}</span
-    ><span>{percent}%</span>
-  </div>
-  <div class="progress"><i style:width={`${percent}%`}></i></div>
+  {#if mode === 'main'}<div class="task-progress">
+      <span
+        >{done}
+        {t('of', 'dari')}
+        {active.length}
+        {t('completed', 'selesai')}</span
+      ><span>{percent}%</span>
+    </div>
+    <div class="progress"><i style:width={`${percent}%`}></i></div>{/if}
   {#if message && !formOpen}<div class="task-error" role="alert">
       {message}<button onclick={() => refresh(true)}
         >{t('Reload list', 'Muat ulang daftar')}</button
@@ -559,12 +580,17 @@
     {:else}<p class="task-empty">
         {!initialized
           ? t('Loading tasks…', 'Memuat tugas…')
-          : archived
-            ? t('No archived tasks yet.', 'Belum ada tugas diarsipkan.')
-            : t(
-                'Space for a new plan. Add a task with +.',
-                'Ruang untuk rencana baru. Tambahkan tugas lewat +.',
-              )}
+          : mode === 'completed'
+            ? t(
+                'Completed tasks will appear here.',
+                'Tugas yang selesai akan muncul di sini.',
+              )
+            : archived
+              ? t('No archived tasks yet.', 'Belum ada tugas diarsipkan.')
+              : t(
+                  'Space for a new plan. Add a task with +.',
+                  'Ruang untuk rencana baru. Tambahkan tugas lewat +.',
+                )}
       </p>{/each}
   </div>
 </section>
@@ -712,6 +738,11 @@
   .archive-button :global(svg) {
     width: 16px;
     height: 16px;
+  }
+  h2 small {
+    font-size: 13px;
+    margin-left: 10px;
+    font-weight: 400;
   }
   .section-heading {
     gap: 10px;

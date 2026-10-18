@@ -36,7 +36,7 @@ sw.addEventListener('fetch', (event) => {
           return (await cache.match('/'))!;
         }
       }
-      return (await cache.match(event.request)) || fetch(event.request);
+      return (await cache.match(url.pathname)) || fetch(event.request);
     })(),
   );
 });
