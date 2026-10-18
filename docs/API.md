@@ -119,3 +119,11 @@ Rollback note: once the new field is stored, older API images that reject unknow
 GoalState fields cannot read that document. Roll back only to a compatible API
 image, or perform a separately reviewed, backed-up conversion that preserves the
 tray data; do not restore the entire database just to change the frontend.
+
+## Draw image attachments
+
+Draw scene v1 now accepts `type: "image"` with a required lowercase SHA-256 `asset` identifier and two rectangle corner points. Non-image shapes cannot carry `asset`. Images use the same immutable WebP media endpoints as Text Notes; note writes require referenced attachments to exist. Shared access includes only images already referenced by that note or uploaded through its editable capability. Shared edits cannot change note kind.
+
+Workspace backup v8 deduplicates both Text and Draw attachments. Guest-to-account copying and account backup prefetch include both document kinds. No database migration is required. A server/client predating Draw image support will reject image-bearing Draw documents; do not roll back to such a release without reviewing affected notes and taking a backup. Geometry-only Draw notes remain compatible.
+
+Draw clipboard objects use a `zivizip-draw-v1:` JSON payload containing a validated scene and base64 WebP attachments. Payloads are limited to 16 MB and 100 distinct attachments; each attachment is hash-checked. File/image paste accepts up to 20 images per operation, using the existing 15 MB input, 1,600px edge and 1 MB compressed-image limits. Raster bytes are not embedded in saved scene JSON or undo revisions. Unreferenced media retention follows the existing attachment policy.

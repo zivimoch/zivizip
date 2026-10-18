@@ -205,3 +205,10 @@ This document describes the target interaction model. The [verification scope](.
 
 - Goal completion is controlled on the card only. The create/edit form has no Completed control; editing a goal preserves its existing completion state.
 - The slimmer Link monogram is shared by the sidebar, shared-note header, favicon, Apple touch icon and PWA launcher icons. Generated icons remain available offline.
+
+## Draw clipboard and images
+
+- Ctrl/Cmd+C copies selected Draw objects; Ctrl/Cmd+V pastes editable copies with new IDs into the visible canvas. Plain clipboard text becomes editable canvas text. Inline text fields keep native text clipboard behavior.
+- Paste screenshot/image files directly into Draw. Add image provides a file-picker alternative for touch devices or unavailable clipboard access; Paste and Copy selection are also available in the toolbar. Browser permission failures explain the keyboard/file alternatives.
+- Images are separate content-hashed WebP attachments, shared with Text Notes storage. They support selection, dragging, resize, rotation, erasing, deletion and undo. Copy image and PNG export include raster images; backup, import, guest-to-account copying and shared-note permissions include Draw attachments.
+- Clipboard payloads validate object geometry and image hashes before inserting; unsupported or invalid payloads do not replace the drawing. Account/shared read-only states prevent paste and image uploads.

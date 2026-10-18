@@ -146,3 +146,44 @@ it('exports embedded attachments once and restores image placement', async () =>
   ).rejects.toThrow();
   expect(await target.repo.list()).toHaveLength(1);
 });
+
+it('round-trips Draw image attachments and rejects a backup missing their bytes', async () => {
+  const { hashBlob } = await import('../src/lib/text/media');
+  const { repo, db } = setup();
+  const blob = new Blob([new TextEncoder().encode('RIFF0000WEBPtest')], {
+    type: 'image/webp',
+  });
+  const asset = await hashBlob(blob);
+  await db.media.put({ id: asset, blob });
+  const note = await repo.create('Drawing image', 'General', 'draw', 'draw');
+  const body = JSON.stringify({
+    version: 1,
+    shapes: [
+      {
+        id: 'image-1',
+        type: 'image',
+        asset,
+        points: [
+          [20, 30],
+          [140, 120],
+        ],
+        color: '#17c5d5',
+        width: 4,
+        angle: 35,
+        text: '',
+        fontSize: 24,
+        erased: [],
+      },
+    ],
+  });
+  await repo.write({ ...note, body });
+  const backup = await exportWorkspace(db);
+  expect(backup.media).toHaveLength(1);
+  expect(() => validateBackup({ ...backup, media: [] })).toThrow(
+    'Missing backup image',
+  );
+  const target = setup();
+  await importWorkspace(target.db, backup);
+  expect((await target.repo.list())[0].body).toBe(body);
+  expect((await target.db.media.get(asset))?.blob.size).toBe(blob.size);
+});

@@ -1,3 +1,5 @@
+import { prepareImage } from '../text/media';
+import { DRAW_CLIPBOARD, readClipboard } from './clipboard';
 import {
   bounds,
   center,
@@ -20,6 +22,8 @@ import {
 import { shapeMarkup, contentBounds } from './render';
 type Tool = ShapeType | 'select' | 'hand' | 'erase';
 interface Options {
+  get: (id: string) => Promise<Blob>;
+  put: (blob: Blob) => Promise<string>;
   body: string;
   name: string;
   writable: boolean;
@@ -67,6 +71,9 @@ const icons: Record<string, string> = {
   redo: 'm15 5 6 6-6 6M21 11H10a6 6 0 0 0-6 6',
   delete: 'M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15',
   rotate: 'M4 9a8 8 0 1 1 0 6M4 3v6h6',
+  paste: 'M8 4H5v17h14V4h-3M8 2h8v5H8z',
+  image: 'M3 3h18v18H3z M3 16l6-6 5 5 3-3 4 4 M16 7h.01',
+  selection: 'M8 8h13v13H8z M16 8V3H3v13h5',
   copy: 'M8 8h13v13H8z M16 8V3H3v13h5',
   export: 'M12 3v12m-5-5 5 5 5-5M3 16v5h18v-5',
   fit: 'M3 9V3h6M15 3h6v6M21 15v6h-6M9 21H3v-6',
@@ -135,7 +142,7 @@ export function mountEditor(host: HTMLElement, options: Options) {
     )
     .join(
       '',
-    )}</div><div class="draw-options"><label>${t('Color', 'Warna')}<input type="color" data-color value="#17c5d5"></label><label>${t('Stroke', 'Tebal')}<select data-width><option>2</option><option selected>4</option><option>8</option><option>12</option></select></label><label>${t('Eraser', 'Penghapus')}<input data-eraser type="range" min="10" max="80" value="28"></label>${button('undo', 'Undo', 'Urungkan')}${button('redo', 'Redo', 'Ulangi')}${button('delete', 'Delete selection', 'Hapus pilihan')}<button type="button" data-action="out" aria-label="${t('Zoom out', 'Perkecil')}">−</button><button type="button" data-action="reset">100%</button><button type="button" data-action="in" aria-label="${t('Zoom in', 'Perbesar')}">+</button>${button('fit', 'Fit', 'Sesuaikan')}${button('text', 'Edit text', 'Edit teks')}${button('copy', 'Copy image', 'Salin gambar')}${button('export', 'Export PNG', 'Ekspor PNG')}</div></div><div class="draw-stage"><svg class="drawing" tabindex="0" role="application" aria-label="${t('Drawing canvas', 'Kanvas gambar')}"></svg><div class="eraser-cursor" hidden></div><button type="button" class="selection-rotate" aria-label="${t('Rotate selection', 'Putar pilihan')}" hidden>${icon('rotate')}</button><button type="button" class="selection-delete" aria-label="${t('Delete selected objects', 'Hapus objek terpilih')}" hidden>${icon('delete')}</button></div><p class="draw-caption">${t('Double-click to write · Shift to select more · Space + drag to pan', 'Klik dua kali untuk menulis · Shift untuk memilih banyak · Spasi + tarik untuk geser')}</p><div class="draw-message" role="status"></div>`;
+    )}</div><div class="draw-options"><label>${t('Color', 'Warna')}<input type="color" data-color value="#17c5d5"></label><label>${t('Stroke', 'Tebal')}<select data-width><option>2</option><option selected>4</option><option>8</option><option>12</option></select></label><label>${t('Eraser', 'Penghapus')}<input data-eraser type="range" min="10" max="80" value="28"></label>${button('undo', 'Undo', 'Urungkan')}${button('redo', 'Redo', 'Ulangi')}${button('delete', 'Delete selection', 'Hapus pilihan')}<button type="button" data-action="out" aria-label="${t('Zoom out', 'Perkecil')}">−</button><button type="button" data-action="reset">100%</button><button type="button" data-action="in" aria-label="${t('Zoom in', 'Perbesar')}">+</button>${button('fit', 'Fit', 'Sesuaikan')}${button('text', 'Edit text', 'Edit teks')}${button('selection', 'Copy selection', 'Salin pilihan')}${button('paste', 'Paste', 'Tempel')}${button('image', 'Add image', 'Tambah gambar')}${button('copy', 'Copy image', 'Salin gambar')}${button('export', 'Export PNG', 'Ekspor PNG')}</div></div><div class="draw-stage"><svg class="drawing" tabindex="0" role="application" aria-label="${t('Drawing canvas', 'Kanvas gambar')}"></svg><div class="eraser-cursor" hidden></div><button type="button" class="selection-rotate" aria-label="${t('Rotate selection', 'Putar pilihan')}" hidden>${icon('rotate')}</button><button type="button" class="selection-delete" aria-label="${t('Delete selected objects', 'Hapus objek terpilih')}" hidden>${icon('delete')}</button></div><p class="draw-caption">${t('Double-click to write · Shift to select more · Space + drag to pan', 'Klik dua kali untuk menulis · Shift untuk memilih banyak · Spasi + tarik untuk geser')}</p><div class="draw-message" role="status"></div>`;
   const q = <T extends Element>(s: string) => host.querySelector<T>(s)!;
   const svg = q<SVGSVGElement>('.drawing'),
     stage = q<HTMLDivElement>('.draw-stage');
@@ -149,6 +156,200 @@ export function mountEditor(host: HTMLElement, options: Options) {
   const message = (s: string) => {
     q<HTMLElement>('.draw-message').textContent = s;
   };
+  let importing = false;
+  const images = new Map<string, string>();
+  const loading = new Map<string, Promise<void>>();
+  async function loadImage(id: string) {
+    if (images.has(id)) return;
+    if (loading.has(id)) return loading.get(id);
+    const promise = (async () => {
+      const blob = await opts.get(id);
+      const data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(blob);
+      });
+      if (!dead) {
+        images.set(id, data);
+        paint();
+      }
+    })();
+    loading.set(id, promise);
+    try {
+      await promise;
+    } finally {
+      loading.delete(id);
+    }
+  }
+  function markup(s: Shape) {
+    return shapeMarkup(s, s.asset ? images.get(s.asset) : '');
+  }
+  function loadImages() {
+    for (const id of new Set(
+      scene.shapes.flatMap((s) => (s.asset ? [s.asset] : [])),
+    )) {
+      if (!images.has(id) && !loading.has(id))
+        void loadImage(id).catch((e) => {
+          if (!dead) message(String(e.message));
+        });
+    }
+  }
+  function clipboardText() {
+    const shapes = chosen();
+    if (!shapes.length)
+      throw Error(t('Select objects to copy.', 'Pilih objek untuk disalin.'));
+    const media = [
+      ...new Set(shapes.flatMap((s) => (s.asset ? [s.asset] : []))),
+    ].map((id) => {
+      const data = images.get(id);
+      if (!data)
+        throw Error(
+          t(
+            'Wait for images to load before copying.',
+            'Tunggu gambar dimuat sebelum menyalin.',
+          ),
+        );
+      return { id, data: data.split(',')[1] };
+    });
+    const text =
+      DRAW_CLIPBOARD + JSON.stringify({ scene: { version: 1, shapes }, media });
+    if (text.length > 16_000_000)
+      throw Error('Clipboard selection is too large');
+    return text;
+  }
+  async function insertClipboard(text = '', files: Blob[] = []) {
+    if (!opts.writable || importing || gesture) return;
+    finishText();
+    importing = true;
+    opts.busy(true);
+    try {
+      const additions: Shape[] = [];
+      if (text.startsWith(DRAW_CLIPBOARD)) {
+        const payload = await readClipboard(text);
+        for (const media of payload.media) {
+          if (dead || !opts.writable) return;
+          await opts.put(media.blob);
+          await loadImage(media.id);
+        }
+        additions.push(...payload.scene.shapes);
+      } else if (files.length) {
+        if (files.length > 20) throw Error('Paste up to 20 images at a time');
+        for (const file of files) {
+          const blob = await prepareImage(file);
+          if (dead || !opts.writable) return;
+          const asset = await opts.put(blob);
+          await loadImage(asset);
+          const bitmap = await createImageBitmap(blob);
+          const scale = Math.min(
+            1,
+            600 / Math.max(bitmap.width, bitmap.height),
+          );
+          additions.push({
+            id: crypto.randomUUID(),
+            type: 'image',
+            asset,
+            points: [
+              [additions.length * 24, additions.length * 24],
+              [
+                bitmap.width * scale + additions.length * 24,
+                bitmap.height * scale + additions.length * 24,
+              ],
+            ],
+            color: '#17c5d5',
+            width: 4,
+            angle: 0,
+            text: '',
+            fontSize: 24,
+            erased: [],
+          });
+          bitmap.close();
+        }
+      } else if (text.trim()) {
+        additions.push({
+          id: crypto.randomUUID(),
+          type: 'text',
+          points: [[0, 0]],
+          color: color.value,
+          width: 4,
+          angle: 0,
+          text: text.slice(0, 10000),
+          fontSize: 24,
+          erased: [],
+        });
+      }
+      if (!additions.length || dead || !opts.writable) return;
+      const area = union(additions.map(visualBounds));
+      const r = svg.getBoundingClientRect();
+      const dx = view.x + r.width / view.zoom / 2 - area.x - area.w / 2;
+      const dy = view.y + r.height / view.zoom / 2 - area.y - area.h / 2;
+      const copies = additions.map((s) => ({
+        ...translate(s, dx, dy),
+        id: crypto.randomUUID(),
+      }));
+      const before = snapshot();
+      parseScene(
+        JSON.stringify({ version: 1, shapes: [...scene.shapes, ...copies] }),
+      );
+      scene.shapes.push(...copies);
+      selected = new Set(copies.map((s) => s.id));
+      groupFrame = null;
+      setTool('select');
+      record(before);
+      svg.focus();
+      paint();
+    } catch (e) {
+      if (!dead) opts.error(e);
+    } finally {
+      importing = false;
+      if (!dead) opts.busy(false);
+    }
+  }
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = 'image/*';
+  fileInput.multiple = true;
+  fileInput.hidden = true;
+  host.append(fileInput);
+  fileInput.onchange = () => {
+    const files = [...(fileInput.files || [])];
+    fileInput.value = '';
+    void insertClipboard('', files);
+  };
+  host.addEventListener(
+    'copy',
+    (e) => {
+      if (pointerTarget(e).closest('input,textarea,select,[contenteditable]'))
+        return;
+      try {
+        const text = clipboardText();
+        e.preventDefault();
+        e.clipboardData?.setData('text/plain', text);
+        message(t('Selection copied.', 'Pilihan disalin.'));
+      } catch (error) {
+        message((error as Error).message);
+      }
+    },
+    { signal: abort.signal },
+  );
+  host.addEventListener(
+    'paste',
+    (e) => {
+      if (pointerTarget(e).closest('input,textarea,select,[contenteditable]'))
+        return;
+      if (!opts.writable) return;
+      const text = e.clipboardData?.getData('text/plain') || '';
+      const files = [...(e.clipboardData?.items || [])]
+        .filter(
+          (item) => item.kind === 'file' && item.type.startsWith('image/'),
+        )
+        .map((item) => item.getAsFile()!)
+        .filter(Boolean);
+      e.preventDefault();
+      void insertClipboard(text, files);
+    },
+    { signal: abort.signal },
+  );
   const chosen = () => scene.shapes.filter((s) => selected.has(s.id));
   const point = (e: { clientX: number; clientY: number }): Point => {
     const r = svg.getBoundingClientRect();
@@ -231,7 +432,7 @@ export function mountEditor(host: HTMLElement, options: Options) {
         b = gesture.last;
       controls += `<rect x="${Math.min(a[0], b[0])}" y="${Math.min(a[1], b[1])}" width="${Math.abs(a[0] - b[0])}" height="${Math.abs(a[1] - b[1])}" fill="#00d8ec18" stroke="#00d8ec" stroke-width="${stroke}" pointer-events="none"/>`;
     }
-    svg.innerHTML = `<g transform="translate(${-view.x * view.zoom} ${-view.y * view.zoom}) scale(${view.zoom})">${scene.shapes.map(shapeMarkup).join('')}${draft ? shapeMarkup(draft) : ''}${controls}</g>`;
+    svg.innerHTML = `<g transform="translate(${-view.x * view.zoom} ${-view.y * view.zoom}) scale(${view.zoom})">${scene.shapes.map(markup).join('')}${draft ? markup(draft) : ''}${controls}</g>`;
     rotation.hidden = deletion.hidden =
       !shapes.length || !!textEdit || !opts.writable;
     if (shapes.length) {
@@ -256,7 +457,9 @@ export function mountEditor(host: HTMLElement, options: Options) {
       ['undo', !history.length],
       ['redo', !redo.length],
       ['delete', !shapes.length],
-      ['text', false],
+      ['text', chosen()[0]?.type === 'image'],
+      ['paste', importing],
+      ['image', importing],
     ] as const)
       q<HTMLButtonElement>(`[data-action="${action}"]`).disabled =
         disabled || !opts.writable;
@@ -299,7 +502,7 @@ export function mountEditor(host: HTMLElement, options: Options) {
     paint();
   }
   function editText(shape: Shape | undefined, p: Point) {
-    if (!opts.writable) return;
+    if (!opts.writable || shape?.type === 'image') return;
     finishText();
     const before = snapshot();
     if (!shape) {
@@ -397,6 +600,7 @@ export function mountEditor(host: HTMLElement, options: Options) {
     paint();
   }
   svg.onpointerdown = (e) => {
+    if (importing) return;
     if (e.button !== 0 && e.button !== 1) return;
     finishText();
     svg.focus();
@@ -676,13 +880,16 @@ export function mountEditor(host: HTMLElement, options: Options) {
   );
   async function png(): Promise<Blob> {
     finishText();
+    await Promise.all(
+      scene.shapes.filter((s) => s.asset).map((s) => loadImage(s.asset!)),
+    );
     const b = union(scene.shapes.map(contentBounds)),
       x = b.x - 40,
       y = b.y - 40,
       w = Math.max(1, b.w + 80),
       h = Math.max(1, b.h + 80),
       scale = Math.min(1, 2400 / Math.max(w, h));
-    const source = `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(w * scale)}" height="${Math.ceil(h * scale)}" viewBox="${x} ${y} ${w} ${h}">${scene.shapes.map(shapeMarkup).join('')}</svg>`,
+    const source = `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(w * scale)}" height="${Math.ceil(h * scale)}" viewBox="${x} ${y} ${w} ${h}">${scene.shapes.map(markup).join('')}</svg>`,
       url = URL.createObjectURL(new Blob([source], { type: 'image/svg+xml' }));
     try {
       const img = new Image();
@@ -703,6 +910,48 @@ export function mountEditor(host: HTMLElement, options: Options) {
     }
   }
   async function action(id: string) {
+    if (id === 'image') {
+      if (opts.writable && !importing) fileInput.click();
+      return;
+    }
+    if (id === 'selection') {
+      try {
+        await navigator.clipboard.writeText(clipboardText());
+        message(t('Selection copied.', 'Pilihan disalin.'));
+      } catch (e) {
+        message(
+          t(
+            'Use Ctrl/Cmd+C to copy selected objects.',
+            'Gunakan Ctrl/Cmd+C untuk menyalin pilihan.',
+          ),
+        );
+      }
+      return;
+    }
+    if (id === 'paste') {
+      if (!opts.writable || importing) return;
+      try {
+        const items = await navigator.clipboard.read();
+        let text = '';
+        const files: Blob[] = [];
+        for (const item of items) {
+          if (item.types.includes('text/plain'))
+            text = await (await item.getType('text/plain')).text();
+          const type = item.types.find((t) => t.startsWith('image/'));
+          if (type) files.push(await item.getType(type));
+        }
+        await insertClipboard(text, files);
+      } catch {
+        message(
+          t(
+            'Use Ctrl/Cmd+V or Add image if clipboard access is unavailable.',
+            'Gunakan Ctrl/Cmd+V atau Tambah gambar jika clipboard tidak tersedia.',
+          ),
+        );
+      }
+      return;
+    }
+
     if (['undo', 'redo', 'delete', 'text'].includes(id) && !opts.writable)
       return;
     if (id === 'delete') {
@@ -789,6 +1038,7 @@ export function mountEditor(host: HTMLElement, options: Options) {
     'keydown',
     (e) => {
       if (pointerTarget(e).closest('input,textarea,select')) return;
+      if (importing) return;
       const k = e.key.toLowerCase();
       if ((e.ctrlKey || e.metaKey) && k === 'a') {
         e.preventDefault();
@@ -871,6 +1121,7 @@ export function mountEditor(host: HTMLElement, options: Options) {
     };
   const observer = new ResizeObserver(paint);
   observer.observe(stage);
+  loadImages();
   paint();
   return {
     update(next: Options) {
@@ -882,6 +1133,7 @@ export function mountEditor(host: HTMLElement, options: Options) {
       opts = next;
       if (next.body !== accepted && !gesture && !textEdit) {
         scene = parseScene(next.body);
+        loadImages();
         accepted = next.body;
         history = [];
         redo = [];
@@ -895,6 +1147,7 @@ export function mountEditor(host: HTMLElement, options: Options) {
       finishText();
       if (gesture) cancelGesture();
       dead = true;
+      images.clear();
       abort.abort();
       observer.disconnect();
       cancelAnimationFrame(frame);

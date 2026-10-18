@@ -1,3 +1,4 @@
+import { noteAssets } from './note-assets';
 import {
   readGoalState,
   validateGoals,
@@ -15,7 +16,6 @@ import {
 import {
   validateDocument,
   plainText,
-  assetsIn,
   type TextDocument,
 } from './text/document';
 import {
@@ -220,7 +220,7 @@ export function validateBackup(value: unknown): Backup {
   if (mediaIds.size !== (b.media || []).length)
     throw Error('Duplicate backup images');
   for (const n of b.notes)
-    for (const id of assetsIn(n.rich))
+    for (const id of noteAssets(n))
       if (!mediaIds.has(id)) throw Error('Missing backup image');
   if (b.goals !== undefined) validateGoals(b.goals);
   if (b.goalSetAside !== undefined) validateSetAside(b.goalSetAside);
@@ -278,7 +278,7 @@ export async function exportWorkspace(
       preferences: (await db.preferences.get('workspace')) || { ...defaults },
     }),
   );
-  const ids = [...new Set(snapshot.notes.flatMap((n) => assetsIn(n.rich)))];
+  const ids = [...new Set(snapshot.notes.flatMap((n) => noteAssets(n)))];
   const media: MediaBackup[] = [];
   for (const id of ids) {
     const m = await db.media.get(id);

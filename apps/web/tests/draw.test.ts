@@ -90,3 +90,54 @@ describe('draw document boundaries', () => {
     expect(next.erased).toHaveLength(1);
   });
 });
+
+it('stores image references separately from geometry and rejects external image URLs', () => {
+  const image = shape({ type: 'image', asset: 'a'.repeat(64) });
+  expect(
+    parseScene(JSON.stringify({ version: 1, shapes: [image] })).shapes[0].asset,
+  ).toBe('a'.repeat(64));
+  for (const asset of [
+    undefined,
+    'https://example.com/image.png',
+    'A'.repeat(64),
+  ]) {
+    expect(() =>
+      parseScene(JSON.stringify({ version: 1, shapes: [{ ...image, asset }] })),
+    ).toThrow();
+  }
+  expect(() =>
+    parseScene(
+      JSON.stringify({
+        version: 1,
+        shapes: [shape({ asset: 'a'.repeat(64) })],
+      }),
+    ),
+  ).toThrow();
+});
+
+it('rejects missing and unrelated clipboard attachments before insertion', async () => {
+  const { readClipboard, DRAW_CLIPBOARD } = await import(
+    '../src/lib/draw/clipboard'
+  );
+  await expect(
+    readClipboard(
+      DRAW_CLIPBOARD +
+        JSON.stringify({
+          scene: {
+            version: 1,
+            shapes: [shape({ type: 'image', asset: 'a'.repeat(64) })],
+          },
+          media: [],
+        }),
+    ),
+  ).rejects.toThrow('Missing clipboard image');
+  await expect(
+    readClipboard(
+      DRAW_CLIPBOARD +
+        JSON.stringify({
+          scene: { version: 1, shapes: [shape()] },
+          media: [{ id: 'a'.repeat(64), data: '' }],
+        }),
+    ),
+  ).rejects.toThrow('Missing clipboard image');
+});

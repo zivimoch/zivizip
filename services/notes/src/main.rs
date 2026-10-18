@@ -331,17 +331,25 @@ async fn create(
     let _ = app.events.send(());
     Ok(Json(n))
 }
+fn note_assets(n: &Note) -> Vec<String> {
+    if n.kind == NoteKind::Draw {
+        draw::assets(&n.body)
+    } else {
+        n.rich
+            .as_ref()
+            .map(|r| r.images.iter().map(|im| im.asset.clone()).collect())
+            .unwrap_or_default()
+    }
+}
 fn check_media(db: &Connection, n: &Note) -> Result<()> {
-    if let Some(rich) = &n.rich {
-        for image in &rich.images {
-            let exists: bool = db.query_row(
-                "SELECT EXISTS(SELECT 1 FROM media WHERE id=?)",
-                [&image.asset],
-                |r| r.get(0),
-            )?;
-            if !exists {
-                return Err(Error(StatusCode::BAD_REQUEST, "Missing image attachment"));
-            }
+    for id in note_assets(n) {
+        let exists: bool = db.query_row(
+            "SELECT EXISTS(SELECT 1 FROM media WHERE id=?)",
+            [&id],
+            |r| r.get(0),
+        )?;
+        if !exists {
+            return Err(Error(StatusCode::BAD_REQUEST, "Missing image attachment"));
         }
     }
     Ok(())

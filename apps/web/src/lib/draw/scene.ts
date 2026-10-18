@@ -1,6 +1,7 @@
 export type Point = [number, number];
 export type Erasure = [number, number, number];
 export type ShapeType =
+  | 'image'
   | 'pen'
   | 'text'
   | 'rect'
@@ -11,6 +12,7 @@ export type ShapeType =
   | 'arrow';
 export interface Shape {
   id: string;
+  asset?: string;
   type: ShapeType;
   points: Point[];
   color: string;
@@ -38,6 +40,7 @@ export interface Box {
 export const emptyScene = (): Scene => ({ version: 1, shapes: [] });
 export const MAX_BYTES = 2_000_000;
 export const shapeTypes = [
+  'image',
   'pen',
   'text',
   'rect',
@@ -68,6 +71,9 @@ export function parseScene(body: string): Scene {
       !/^[a-zA-Z0-9-]{1,64}$/.test(s.id) ||
       ids.has(s.id) ||
       !shapeTypes.includes(s.type) ||
+      (s.type === 'image'
+        ? !/^[a-f0-9]{64}$/.test(s.asset || '')
+        : s.asset !== undefined) ||
       !/^#[a-fA-F0-9]{6}$/.test(s.color) ||
       !finite(s.width, 32) ||
       s.width < 1 ||
@@ -235,3 +241,11 @@ export function escape(text: string): string {
       ]!,
   );
 }
+
+export const drawAssets = (body: string): string[] => [
+  ...new Set(
+    parseScene(body).shapes.flatMap((s) =>
+      s.type === 'image' ? [s.asset!] : [],
+    ),
+  ),
+];

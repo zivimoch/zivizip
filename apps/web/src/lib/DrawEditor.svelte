@@ -3,6 +3,8 @@
   import type { Viewport } from './draw/scene';
   import type { mountEditor } from './draw/editor';
   import './draw/editor.css';
+  export let onget: (id: string) => Promise<Blob>;
+  export let onput: (blob: Blob) => Promise<string>;
   export let body: string;
   export let name: string;
   export let writable: boolean;
@@ -16,6 +18,8 @@
   let editor: ReturnType<typeof mountEditor> | undefined;
   let failure = '';
   $: options = {
+    get: onget,
+    put: onput,
     body,
     name,
     writable,

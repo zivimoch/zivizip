@@ -87,29 +87,24 @@ pub async fn edit(
     if !editable {
         return Err(Error(StatusCode::FORBIDDEN, "This link is read-only"));
     }
-    if incoming.id != note.id || incoming.revision != note.revision {
+    if incoming.id != note.id || incoming.revision != note.revision || incoming.kind != note.kind {
         return Err(Error(
             StatusCode::CONFLICT,
             "This note changed. Keep a copy of your changes before reloading.",
         ));
     }
-    if let Some(rich) = &incoming.rich {
-        for im in &rich.images {
-            let existing = note
-                .rich
-                .as_ref()
-                .is_some_and(|r| r.images.iter().any(|old| old.asset == im.asset));
-            let uploaded: bool = db.query_row(
-                "SELECT EXISTS(SELECT 1 FROM shared_uploads WHERE token=? AND asset=?)",
-                params![token, im.asset],
-                |r| r.get(0),
-            )?;
-            if !existing && !uploaded {
-                return Err(Error(
-                    StatusCode::FORBIDDEN,
-                    "Image is not available to this note",
-                ));
-            }
+    let existing_assets = note_assets(&note);
+    for asset in note_assets(&incoming) {
+        let uploaded: bool = db.query_row(
+            "SELECT EXISTS(SELECT 1 FROM shared_uploads WHERE token=? AND asset=?)",
+            params![token, asset],
+            |r| r.get(0),
+        )?;
+        if !existing_assets.contains(&asset) && !uploaded {
+            return Err(Error(
+                StatusCode::FORBIDDEN,
+                "Image is not available to this note",
+            ));
         }
     }
     note.body = incoming.body;
@@ -129,12 +124,7 @@ pub async fn media(
         params![token, id],
         |r| r.get(0),
     )?;
-    if !note
-        .rich
-        .as_ref()
-        .is_some_and(|r| r.images.iter().any(|im| im.asset == id))
-        && !uploaded
-    {
+    if !note_assets(&note).contains(&id) && !uploaded {
         return Err(Error(StatusCode::NOT_FOUND, "Image not found"));
     }
     let bytes: Vec<u8> = db.query_row("SELECT data FROM media WHERE id=?", [id], |r| r.get(0))?;

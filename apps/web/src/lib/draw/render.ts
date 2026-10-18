@@ -25,12 +25,16 @@ function textMarkup(
     )
     .join('')}</text>`;
 }
-export function shapeMarkup(s: Shape) {
+export function shapeMarkup(s: Shape, imageUrl = '') {
   const a = s.points[0],
     b = s.points.at(-1)!,
     r = bounds(s),
     common = `stroke="${s.color}" stroke-width="${s.width}" fill="none" stroke-linecap="round" stroke-linejoin="round"`;
   let body = '';
+  if (s.type === 'image')
+    body = imageUrl
+      ? `<image href="${escape(imageUrl)}" x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" preserveAspectRatio="none"/>`
+      : `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="#23343c"/>`;
   if (s.type === 'pen')
     body = `<polyline points="${s.points.map((p) => p.join(',')).join(' ')}" ${common}/>`;
   if (s.type === 'rect')

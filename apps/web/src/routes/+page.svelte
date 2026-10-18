@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { noteAssets } from '$lib/note-assets';
   import { capitalFirst } from '$lib/capitalization';
   import {
     currencies,
@@ -21,7 +22,7 @@
   import FinancePanel from '$lib/FinancePanel.svelte';
   import { FinanceRepository, readFinanceState } from '$lib/finance';
   import { PlanningRepository, readPlanningState } from '$lib/planning';
-  import { assetsIn, type TextDocument } from '$lib/text/document';
+  import { type TextDocument } from '$lib/text/document';
   import { getMedia, putMedia, decodeMedia } from '$lib/text/media';
   import DrawEditor from '$lib/DrawEditor.svelte';
   import type { Viewport } from '$lib/draw/scene';
@@ -389,7 +390,7 @@
       for (const n of guest) {
         const key = `guest-import:${n.id}:${n.revision}`;
         if (await db.meta.get(key)) continue;
-        for (const id of assetsIn(n.rich))
+        for (const id of noteAssets(n))
           await putMedia(db, await getMedia(guestDb, id, false), true);
         const copy = await repo.copy({
           ...n,
@@ -761,7 +762,7 @@
           goalsRepo.list(),
         ]);
       }
-      for (const id of new Set(notes.flatMap((n) => assetsIn(n.rich))))
+      for (const id of new Set(notes.flatMap((n) => noteAssets(n))))
         await getMedia(db, id, !!account);
       const data = await exportWorkspace(db, notes);
       data.notes = notes.map((n) => ({ ...n }));
@@ -1174,7 +1175,19 @@
         {#if current.kind === 'draw'}
           {#key `${workspaceEpoch}:${current.id}:${prefs.language}`}
             {@const drawId = current.id}
+            {@const editorDb = db}
+            {@const epoch = workspaceEpoch}
+            {@const server = !!account}
             <DrawEditor
+              onget={(id) =>
+                getMedia(editorDb, id, server, () => epoch === workspaceEpoch)}
+              onput={(blob) =>
+                putMedia(
+                  editorDb,
+                  blob,
+                  server,
+                  () => epoch === workspaceEpoch && writable,
+                )}
               body={current.body}
               name={current.name}
               {writable}

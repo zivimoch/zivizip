@@ -11,6 +11,8 @@ struct Scene {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Shape {
     id: String,
+    #[serde(default)]
+    asset: Option<String>,
     #[serde(rename = "type")]
     kind: String,
     points: Vec<[f64; 2]>,
@@ -41,6 +43,7 @@ pub fn valid(body: &str) -> bool {
             || !s.id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
             || !ids.insert(s.id)
             || ![
+                "image",
                 "pen",
                 "text",
                 "rect",
@@ -51,6 +54,16 @@ pub fn valid(body: &str) -> bool {
                 "arrow",
             ]
             .contains(&s.kind.as_str())
+            || (if s.kind == "image" {
+                !s.asset.as_ref().is_some_and(|id| {
+                    id.len() == 64
+                        && id
+                            .bytes()
+                            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+                })
+            } else {
+                s.asset.is_some()
+            })
             || s.color.len() != 7
             || !s.color.starts_with('#')
             || !s.color[1..].bytes().all(|b| b.is_ascii_hexdigit())
@@ -79,6 +92,16 @@ pub fn valid(body: &str) -> bool {
 mod tests {
     use super::*;
     #[test]
+    fn validates_image_references() {
+        let mut scene = serde_json::json!({"version":1,"shapes":[{"id":"image-1","type":"image","asset":"a".repeat(64),"points":[[0,0],[100,80]],"color":"#17c5d5","width":4,"angle":0,"text":"","fontSize":24,"erased":[]}]});
+        assert!(valid(&scene.to_string()));
+        assert_eq!(assets(&scene.to_string()), vec!["a".repeat(64)]);
+        scene["shapes"][0]["asset"] = "https://example.com/image.png".into();
+        assert!(!valid(&scene.to_string()));
+        scene["shapes"][0].as_object_mut().unwrap().remove("asset");
+        assert!(!valid(&scene.to_string()));
+    }
+    #[test]
     fn validates_version_and_safe_geometry() {
         let mut scene = serde_json::json!({"version":1,"shapes":[{"id":"shape-1","type":"rect","points":[[0,0],[100,80]],"color":"#17c5d5","width":4,"angle":45,"text":"A < B","fontSize":24,"erased":[[0,20,5]]}]});
         assert!(valid(&scene.to_string()));
@@ -86,4 +109,15 @@ mod tests {
         assert!(!valid(&scene.to_string()));
         assert!(!valid(r#"{"version":2,"shapes":[]}"#));
     }
+}
+
+pub fn assets(body: &str) -> Vec<String> {
+    serde_json::from_str::<Scene>(body)
+        .map(|s| {
+            s.shapes
+                .into_iter()
+                .filter_map(|s| if s.kind == "image" { s.asset } else { None })
+                .collect()
+        })
+        .unwrap_or_default()
 }

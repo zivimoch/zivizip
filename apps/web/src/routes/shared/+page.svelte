@@ -154,6 +154,8 @@
       <div bind:this={toolbar}></div>
     </div>
     {#if note.kind === 'draw'}<DrawEditor
+        onput={put}
+        onget={get}
         body={note.body}
         name={note.name}
         writable={editable}
