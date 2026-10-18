@@ -426,9 +426,6 @@ test('guest-only goals require explicit copying into the account', async ({
       data: {
         ...state,
         items: state.items.filter((g: any) => g.title !== label),
-        setAside: (state.setAside || []).filter(
-          (key: string) => key !== hiddenKey,
-        ),
       },
     });
   }
