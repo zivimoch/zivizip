@@ -19,6 +19,7 @@ export interface Goal {
 export interface GoalState {
   revision: number;
   items: Goal[];
+  setAside?: string[];
 }
 export const emptyGoals = (): GoalState => ({ revision: 0, items: [] });
 export function validateGoals(items: Goal[]) {
@@ -78,12 +79,37 @@ export function validateGoals(items: Goal[]) {
   if (new TextEncoder().encode(JSON.stringify(items)).length > 2_000_000)
     throw Error('Goals exceed their limit');
 }
+export function validateSetAside(keys: unknown) {
+  if (
+    !Array.isArray(keys) ||
+    keys.length > 20000 ||
+    new Set(keys).size !== keys.length ||
+    keys.some(
+      (key) =>
+        typeof key !== 'string' ||
+        !/^(task|expense):[a-zA-Z0-9-]{1,64}$/.test(key),
+    )
+  )
+    throw Error('Invalid set-aside items');
+}
+export function remapItemKeys(
+  keys: string[],
+  tasks: Map<string, string>,
+  expenses: Map<string, string>,
+) {
+  return keys.flatMap((key) => {
+    const [type, id] = key.split(':');
+    const mapped = (type === 'task' ? tasks : expenses).get(id);
+    return mapped ? [type + ':' + mapped] : [];
+  });
+}
 export function readGoalState(value: unknown): GoalState {
   if (!value) return emptyGoals();
   const s = value as GoalState;
   if (!Number.isSafeInteger(s.revision) || s.revision < 0)
     throw Error('Invalid goals revision');
   validateGoals(s.items);
+  validateSetAside(s.setAside || []);
   return structuredClone(s);
 }
 export function goalTotals(goal: Goal, tasks: Task[], expenses: Transaction[]) {
@@ -152,14 +178,25 @@ export class GoalsRepository {
     state = readGoalState(state);
     return this.cache(state);
   }
-  async write(state: GoalState, items: Goal[]): Promise<GoalState> {
+  async write(
+    state: GoalState,
+    items: Goal[],
+    setAside = state.setAside || [],
+  ): Promise<GoalState> {
     this.check();
     validateGoals(items);
+    validateSetAside(setAside);
+    if (
+      new TextEncoder().encode(JSON.stringify({ items, setAside })).length >
+      2_000_000
+    )
+      throw Error('Goals exceed their limit');
     if (this.server) {
       const saved = readGoalState(
         await api<GoalState>('/goals', 'PUT', {
           revision: state.revision,
           items,
+          setAside,
         }),
       );
       this.check();
@@ -175,16 +212,21 @@ export class GoalsRepository {
       const saved = {
         revision: state.revision + 1,
         items: structuredClone(items),
+        setAside: [...setAside],
       };
       await this.db.meta.put({ key: 'goals', value: saved });
       return saved;
     });
   }
-  async merge(items: Goal[]) {
+  async merge(items: Goal[], setAside: string[] = []) {
     const state = await this.list();
-    return this.write(state, [
-      ...state.items,
-      ...items.filter((g) => !state.items.some((old) => old.id === g.id)),
-    ]);
+    return this.write(
+      state,
+      [
+        ...state.items,
+        ...items.filter((g) => !state.items.some((old) => old.id === g.id)),
+      ],
+      [...new Set([...(state.setAside || []), ...setAside])],
+    );
   }
 }

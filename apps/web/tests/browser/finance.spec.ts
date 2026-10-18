@@ -119,7 +119,7 @@ test('guest transactions filter, group, edit, delete, survive offline and round-
     .click();
   const file = (await (await download).path())!;
   const backup = JSON.parse(fs.readFileSync(file, 'utf8'));
-  expect(backup.version).toBe(7);
+  expect(backup.version).toBe(8);
   expect(backup.transactions).toHaveLength(2);
   const targetContext = await browser.newContext({
     viewport: { width: 1600, height: 1000 },

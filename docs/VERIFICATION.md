@@ -128,3 +128,23 @@ cancellation, return to Unassigned and native item-body scrolling at 390×667 an
 390×844. Deletion cancellation and completion verify unchanged Tasks and Finance
 snapshots. Desktop/mobile screenshots were inspected. Tests emulate Chrome touch;
 physical-device verification remains separate.
+
+## Goal completion and reversible Unassigned tray — 2026-10-18
+
+Card completion is a persisted checkbox control. Unassigned excludes active
+completed tasks, shows two rows in one horizontal scroller, and supports Clear
+and individual/all restoration through Set aside. Set aside shares Goals revision
+checks, account synchronization and backup v8 with source-ID remapping. Earlier
+backup versions remain importable. Touch uses a brief hold on the item body with
+non-passive touch-move handling; quick swipes retain native scrolling.
+
+Local production builds passed Svelte diagnostics, 42 frontend unit tests and
+Rust tests. All nine Goals browser scenarios passed, including the extended
+account synchronization/read-only scenario. Coverage includes tray persistence,
+restore, archived-only eligibility, completion toggling, two-row scroll alignment,
+backup remapping with no goals, and touch drag/cancel/return at 390×667 and 390×844.
+Screenshots were inspected; touch remains browser-emulated, not physical-device
+verification.
+
+All 22 Tasks, Finance, Planning and image browser regressions passed. The account
+Tasks scenario was rerun after clearing the local test login rate limit.

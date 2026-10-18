@@ -35,11 +35,15 @@
     touchActive = false;
   let touch: {
     id: number;
-    node: HTMLElement;
+    x: number;
+    y: number;
+    timer: ReturnType<typeof setTimeout>;
   } | null = null;
   let scrollFrame = 0;
   let pageElement: HTMLElement;
-  let dialog: HTMLDialogElement, nameField: HTMLInputElement;
+  let dialog: HTMLDialogElement,
+    tray: HTMLDialogElement,
+    nameField: HTMLInputElement;
   let editing = '',
     title = '',
     description = '',
@@ -71,10 +75,15 @@
         detail: formatMoney(tx.amount, $displayCurrency),
       })),
   ];
-  $: pool = allItems.filter(
+  $: archived = new Set(tasks.filter((t) => t.archived).map((t) => t.id));
+  $: hidden = new Set(state.setAside || []);
+  $: unlinked = allItems.filter(
     (item) =>
+      (item.type !== 'task' || archived.has(item.id)) &&
       !(item.type === 'task' ? assignedTasks : assignedExpenses).has(item.id),
   );
+  $: pool = unlinked.filter((item) => !hidden.has(item.key));
+  $: setAsideItems = unlinked.filter((item) => hidden.has(item.key));
   $: itemsByKey = new Map(allItems.map((item) => [item.key, item]));
   const linked = (goal: Goal) =>
     goalKeys(goal).flatMap((key) => {
@@ -102,25 +111,26 @@
   onMount(() => {
     ready = true;
     const change = () => refresh();
-    const preventScroll = (e: TouchEvent) => {
-      if (touchActive) e.preventDefault();
-    };
-    window.addEventListener('touchmove', preventScroll, { passive: false });
+    window.addEventListener('touchmove', moveTouch, { passive: false });
+    window.addEventListener('touchend', endTouch);
+    window.addEventListener('touchcancel', cancelDrag);
     window.addEventListener('online', change);
     return () => {
-      window.removeEventListener('touchmove', preventScroll);
+      window.removeEventListener('touchmove', moveTouch);
+      window.removeEventListener('touchend', endTouch);
+      window.removeEventListener('touchcancel', cancelDrag);
       window.removeEventListener('online', change);
       cancelDrag();
     };
   });
   $: if (ready && refreshToken >= 0) void refresh();
-  async function commit(items: Goal[]) {
+  async function commit(items: Goal[], setAside = state.setAside || []) {
     if (!writable || busy) return false;
     busy = true;
     onbusy(true);
     error = '';
     try {
-      state = await repository.write(state, items);
+      state = await repository.write(state, items, setAside);
       return true;
     } catch (e) {
       error = (e as Error).message;
@@ -197,14 +207,31 @@
     if (await commit(state.items.filter((g) => g.id !== editing)))
       dialog.close();
   }
+  async function toggleCompleted(goal: Goal) {
+    await commit(
+      state.items.map((g) =>
+        g.id === goal.id ? { ...g, completed: !g.completed } : g,
+      ),
+    );
+  }
+  async function clearPool() {
+    await commit(state.items, [
+      ...new Set([...(state.setAside || []), ...pool.map((item) => item.key)]),
+    ]);
+  }
+  async function restoreItem(key?: string) {
+    await commit(
+      state.items,
+      key ? (state.setAside || []).filter((k) => k !== key) : [],
+    );
+  }
   function startDrag(key: string, source: string) {
     if (!writable || busy) return;
     dragging = key;
     dragSource = source;
   }
   function cancelDrag() {
-    if (touch?.node.hasPointerCapture(touch.id))
-      touch.node.releasePointerCapture(touch.id);
+    if (touch) clearTimeout(touch.timer);
     touch = null;
     touchActive = false;
     dragging = '';
@@ -291,33 +318,50 @@
     hover = targetAt(ghostX, ghostY);
     scrollFrame = requestAnimationFrame(autoScroll);
   }
-  function beginTouch(e: PointerEvent, key: string, source: string) {
-    if (e.pointerType === 'mouse' || !e.isPrimary || !writable || busy) return;
-    // The handle reserves touch gestures before the browser starts scrolling.
-    e.preventDefault();
+  function beginTouch(e: TouchEvent, key: string, source: string) {
     cancelDrag();
-    const node = e.currentTarget as HTMLElement;
-    touch = { id: e.pointerId, node };
-    startDrag(key, source);
-    touchActive = true;
-    ghostX = e.clientX;
-    ghostY = e.clientY;
-    node.setPointerCapture(e.pointerId);
-    scrollFrame = requestAnimationFrame(autoScroll);
+    if (e.touches.length !== 1 || !writable || busy) return;
+    const point = e.touches[0];
+    touch = {
+      id: point.identifier,
+      x: point.clientX,
+      y: point.clientY,
+      timer: setTimeout(() => {
+        if (!touch) return;
+        startDrag(key, source);
+        touchActive = true;
+        ghostX = touch.x;
+        ghostY = touch.y;
+        scrollFrame = requestAnimationFrame(autoScroll);
+      }, 280),
+    };
   }
-  function moveTouch(e: PointerEvent) {
-    if (!touch || touch.id !== e.pointerId) return;
-    e.preventDefault();
-    ghostX = e.clientX;
-    ghostY = e.clientY;
+  function moveTouch(e: TouchEvent) {
+    if (!touch) return;
+    if (e.touches.length !== 1) {
+      cancelDrag();
+      return;
+    }
+    const point = Array.from(e.touches).find((p) => p.identifier === touch?.id);
+    if (!point) return;
+    if (!touchActive) {
+      if (Math.hypot(point.clientX - touch.x, point.clientY - touch.y) > 9)
+        cancelDrag();
+      return;
+    }
+    if (e.cancelable) e.preventDefault();
+    ghostX = point.clientX;
+    ghostY = point.clientY;
     hover = targetAt(ghostX, ghostY);
   }
-  function endTouch(e: PointerEvent) {
-    if (!touch || touch.id !== e.pointerId) return;
-    if (touchActive) {
-      e.preventDefault();
-      finish(targetAt(e.clientX, e.clientY));
-    } else cancelDrag();
+  function endTouch(e: TouchEvent) {
+    if (!touch) return;
+    const point = Array.from(e.changedTouches).find(
+      (p) => p.identifier === touch?.id,
+    );
+    if (!point) return;
+    if (touchActive) finish(targetAt(point.clientX, point.clientY));
+    else cancelDrag();
   }
   function keyboard(e: KeyboardEvent, key: string, source: string) {
     if (e.key === 'Escape') {
@@ -339,11 +383,6 @@
 </script>
 
 <svelte:window
-  onpointermove={moveTouch}
-  onpointerup={endTouch}
-  onpointercancel={() => {
-    if (touch) cancelDrag();
-  }}
   onkeydown={(e) => {
     if (e.key === 'Escape') cancelDrag();
   }}
@@ -397,6 +436,8 @@
             generatorVersion={goal.generatorVersion || 1}
             completed={goal.completed || false}
             {language}
+            disabled={!writable || busy}
+            oncomplete={() => toggleCompleted(goal)}
           /><button
             class="edit"
             aria-label={t('Edit goal', 'Edit target') + ': ' + goal.title}
@@ -467,12 +508,15 @@
         <h2>
           {t('Unassigned', 'Belum ditetapkan')} <small>{pool.length}</small>
         </h2>
-        <p>
-          {t(
-            'Drag tasks and expenses to a goal. On touch screens, drag the grip; swipe the item to scroll.',
-            'Tarik tugas dan pengeluaran ke target. Di layar sentuh, tarik pegangannya; usap item untuk menggulir.',
-          )}
-        </p>
+      </div>
+      <div class="pool-actions">
+        <button onclick={() => tray.showModal()}
+          >{t('Set aside', 'Disisihkan')}
+          <small>{setAsideItems.length}</small></button
+        >
+        <button disabled={!writable || busy || !pool.length} onclick={clearPool}
+          >{t('Clear', 'Kosongkan')}</button
+        >
       </div>
     </header>
     <div class="pool-strip">
@@ -486,13 +530,51 @@
           onkeyboard={keyboard}
         />{:else}<p class="empty-pool">
           {t(
-            'All caught up. Completed tasks and new expenses will appear here.',
-            'Semua sudah ditetapkan. Tugas selesai dan pengeluaran baru akan muncul di sini.',
+            'Archived tasks and new expenses will appear here.',
+            'Tugas yang diarsipkan dan pengeluaran baru akan muncul di sini.',
           )}
         </p>{/each}
     </div>
   </section>
 </section>
+<dialog
+  bind:this={tray}
+  class="set-aside-dialog"
+  aria-label={t('Set aside', 'Disisihkan')}
+>
+  <header>
+    <h2>{t('Set aside', 'Disisihkan')}</h2>
+    <button onclick={() => tray.close()}>{t('Close', 'Tutup')}</button>
+  </header>
+  <p class="tray-explanation">
+    {t(
+      'Items kept out of Unassigned. Your tasks and transactions are unchanged.',
+      'Item yang disisihkan dari Belum ditetapkan. Tugas dan transaksimu tidak berubah.',
+    )}
+  </p>
+  <div class="aside-items">
+    {#each setAsideItems as item (item.key)}
+      <div class="aside-item">
+        <div><strong>{item.title}</strong><small>{item.detail}</small></div>
+        <button
+          disabled={!writable || busy}
+          onclick={() => restoreItem(item.key)}
+          >{t('Restore', 'Kembalikan')}</button
+        >
+      </div>
+    {:else}<p>
+        {t('No items set aside.', 'Belum ada item yang disisihkan.')}
+      </p>{/each}
+  </div>
+  {#if error}<p role="alert">{error}</p>{/if}
+  <footer>
+    <button
+      disabled={!writable || busy || !setAsideItems.length}
+      onclick={() => restoreItem()}
+      >{t('Restore all', 'Kembalikan semua')}</button
+    >
+  </footer>
+</dialog>
 <dialog bind:this={dialog}>
   <form
     onsubmit={(e) => {
@@ -750,8 +832,62 @@
     border-radius: 20px;
   }
   .pool-strip {
-    margin-top: 16px;
+    margin-top: 12px;
+    display: grid;
+    grid-template-rows: repeat(2, minmax(80px, auto));
+    grid-auto-flow: column;
+    grid-auto-columns: 210px;
+    overflow-y: hidden;
+    gap: 10px;
   }
+  .pool-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .unassigned > header {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .pool-actions {
+    margin-left: auto;
+  }
+  .pool-actions button {
+    font-size: 12px;
+    min-height: 36px;
+  }
+  .pool-actions small {
+    padding: 2px 5px;
+  }
+  .aside-items {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 18px;
+  }
+  .aside-item {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .aside-item > div {
+    min-width: 0;
+  }
+  .aside-item strong {
+    display: block;
+    overflow-wrap: anywhere;
+  }
+  .aside-item small {
+    display: block;
+    margin-top: 4px;
+    color: var(--muted);
+  }
+  .tray-explanation {
+    margin-top: 12px;
+    font-size: 13px;
+  }
+
   .linked-items {
     display: flex;
     flex-direction: column;

@@ -208,7 +208,7 @@ test('monthly planning matches transactions, supports row controls and copies on
     .click();
   const path = (await (await pending).path())!,
     backup = JSON.parse(fs.readFileSync(path, 'utf8'));
-  expect(backup.version).toBe(7);
+  expect(backup.version).toBe(8);
   expect(backup.planning.months).toHaveLength(2);
   const otherContext = await browser.newContext(),
     other = await otherContext.newPage();

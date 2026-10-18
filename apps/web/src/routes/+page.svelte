@@ -11,7 +11,12 @@
   import ShareSettings from '$lib/ShareSettings.svelte';
   import NoteLibrary from '$lib/NoteLibrary.svelte';
   import TasksPanel from '$lib/TasksPanel.svelte';
-  import { GoalsRepository, readGoalState, remapGoals } from '$lib/goals';
+  import {
+    GoalsRepository,
+    readGoalState,
+    remapGoals,
+    remapItemKeys,
+  } from '$lib/goals';
   import { TasksRepository, readTaskState } from '$lib/tasks';
   import FinancePanel from '$lib/FinancePanel.svelte';
   import { FinanceRepository, readFinanceState } from '$lib/finance';
@@ -456,9 +461,10 @@
         (await guestDb.meta.get('planning'))?.value,
       );
       if (guestPlans.months.length) await planningRepo.merge(guestPlans);
-      const guestGoals = readGoalState(
+      const guestGoalState = readGoalState(
         (await guestDb.meta.get('goals'))?.value,
-      ).items;
+      );
+      const guestGoals = guestGoalState.items;
       const goalCopies = remapGoals(guestGoals, goalTaskIds, goalExpenseIds);
       for (let i = 0; i < goalCopies.length; i++) {
         const digest = await crypto.subtle.digest(
@@ -469,7 +475,15 @@
           .map((byte) => byte.toString(16).padStart(2, '0'))
           .join('');
       }
-      if (goalCopies.length) await goalsRepo.merge(goalCopies);
+      if (goalCopies.length || guestGoalState.setAside?.length)
+        await goalsRepo.merge(
+          goalCopies,
+          remapItemKeys(
+            guestGoalState.setAside || [],
+            goalTaskIds,
+            goalExpenseIds,
+          ),
+        );
       notes = await repo.list();
       taskRefresh++;
       migration.close();
@@ -817,8 +831,11 @@
             })),
           ]);
         }
-        if (backup.goals?.length)
-          await goalsRepo.merge(remapGoals(backup.goals, taskIds, expenseIds));
+        if (backup.goals?.length || backup.goalSetAside?.length)
+          await goalsRepo.merge(
+            remapGoals(backup.goals || [], taskIds, expenseIds),
+            remapItemKeys(backup.goalSetAside || [], taskIds, expenseIds),
+          );
         if (backup.planning) await planningRepo.merge(backup.planning);
         taskRefresh++;
       } else {

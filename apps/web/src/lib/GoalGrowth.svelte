@@ -2,6 +2,8 @@
   import { onMount } from 'svelte';
   import type { WorldTheme } from './world-dna';
   export let count = 0;
+  export let disabled = false;
+  export let oncomplete = () => {};
   export let seed = '';
   export let completed = false;
   export let theme: WorldTheme = 'island';
@@ -72,20 +74,22 @@
           {completed}
           {language}
         />{/if}
-      <span class="caption"
-        >{completed
-          ? t('Completed', 'Selesai')
-          : t('A growing world', 'Dunia bertumbuh')}<small
-          >{count.toLocaleString(language)}
-          {t('contributions', 'kontribusi')} · {t('Region', 'Kawasan')}
-          {latest + 1}</small
-        ></span
-      >
       <button class="explore" onclick={open} disabled={!Scene}
         >{t('Explore', 'Jelajahi')}</button
       >
     </div>
   {/if}
+  <button
+    class="complete-toggle"
+    role="checkbox"
+    aria-checked={completed}
+    {disabled}
+    onclick={oncomplete}
+  >
+    <span class:checked={completed} aria-hidden="true"
+      >{completed ? '✓' : ''}</span
+    >{t('Completed', 'Selesai')}
+  </button>
   {#if failure}<button class="retry" onclick={load}
       >{t('Retry world', 'Coba lagi')}</button
     >{/if}
@@ -164,6 +168,29 @@
     min-height: 32px;
     cursor: pointer;
   }
+  .complete-toggle {
+    position: absolute;
+    top: 8px;
+    left: 10px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 40px;
+    font-size: 12px;
+  }
+  .complete-toggle span {
+    width: 16px;
+    height: 16px;
+    border: 1px solid #89a6aa;
+    border-radius: 4px;
+    display: grid;
+    place-items: center;
+  }
+  .complete-toggle .checked {
+    background: var(--accent);
+    color: #06242a;
+    border-color: var(--accent);
+  }
   .explore {
     position: absolute;
     right: 10px;
@@ -200,6 +227,29 @@
     font-size: 13px;
   }
   @media (pointer: coarse) {
+    .complete-toggle {
+      position: absolute;
+      top: 8px;
+      left: 10px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 40px;
+      font-size: 12px;
+    }
+    .complete-toggle span {
+      width: 16px;
+      height: 16px;
+      border: 1px solid #89a6aa;
+      border-radius: 4px;
+      display: grid;
+      place-items: center;
+    }
+    .complete-toggle .checked {
+      background: var(--accent);
+      color: #06242a;
+      border-color: var(--accent);
+    }
     .explore {
       min-height: 40px;
     }

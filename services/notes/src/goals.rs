@@ -29,6 +29,8 @@ pub struct Goal {
 pub struct GoalState {
     revision: i64,
     items: Vec<Goal>,
+    #[serde(default, rename = "setAside", skip_serializing_if = "Option::is_none")]
+    set_aside: Option<Vec<String>>,
 }
 fn validate(state: &GoalState) -> Result<()> {
     let mut ids = HashSet::new();
@@ -37,10 +39,23 @@ fn validate(state: &GoalState) -> Result<()> {
             && id.len() <= 64
             && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
     };
-    if state.revision < 0
+    let mut hidden = HashSet::new();
+    let invalid_hidden = state.set_aside.as_ref().is_some_and(|keys| {
+        keys.len() > 20000
+            || keys.iter().any(|key| {
+                let Some((kind, id)) = key.split_once(':') else {
+                    return true;
+                };
+                !["task", "expense"].contains(&kind)
+                    || !valid_id(&id.to_string())
+                    || !hidden.insert(key)
+            })
+    });
+    if invalid_hidden
+        || state.revision < 0
         || state.revision >= 9_007_199_254_740_991
         || state.items.len() > 1000
-        || serde_json::to_vec(&state.items).unwrap().len() > 2_000_000
+        || serde_json::to_vec(state).unwrap().len() > 2_000_000
         || state.items.iter().any(|g| {
             let mut order = HashSet::new();
             let keys: HashSet<String> = g
@@ -91,9 +106,13 @@ pub async fn list(State(app): State<App>, headers: HeaderMap) -> Result<Json<Goa
     Ok(Json(read(&app.db.lock().unwrap())?))
 }
 fn write(db: &mut Connection, mut state: GoalState) -> Result<GoalState> {
-    validate(&state)?;
     let tx = db.transaction()?;
-    if read(&tx)?.revision != state.revision {
+    let current = read(&tx)?;
+    if state.set_aside.is_none() {
+        state.set_aside = current.set_aside;
+    }
+    validate(&state)?;
+    if current.revision != state.revision {
         return Err(Error(
             StatusCode::CONFLICT,
             "Goals changed on another device. Reload the list and try again.",
@@ -140,6 +159,7 @@ mod tests {
             GoalState {
                 revision: 0,
                 items: vec![goal],
+                set_aside: None,
             },
         )
         .unwrap();
@@ -174,15 +194,38 @@ mod tests {
         second.id = "other".into();
         assert!(validate(&GoalState {
             revision: 1,
-            items: vec![goal.clone(), second]
+            items: vec![goal.clone(), second],
+            set_aside: None,
         })
         .is_ok());
         let mut duplicate = goal;
         duplicate.tasks.push("task".into());
         assert!(validate(&GoalState {
             revision: 1,
-            items: vec![duplicate]
+            items: vec![duplicate],
+            set_aside: None,
         })
         .is_err());
+    }
+    #[test]
+    fn set_aside_is_validated_persisted_and_preserved_for_older_clients() {
+        let mut db = Connection::open_in_memory().unwrap();
+        super::super::schema(&db).unwrap();
+        let mut state = read(&db).unwrap();
+        state.set_aside = Some(vec!["task:archived".into(), "expense:receipt".into()]);
+        let saved = write(&mut db, state).unwrap();
+        assert_eq!(read(&db).unwrap().set_aside, saved.set_aside);
+        let mut older = saved.clone();
+        older.set_aside = None;
+        let kept = write(&mut db, older).unwrap();
+        assert_eq!(kept.set_aside, saved.set_aside);
+        for keys in [vec!["task:a", "task:a"], vec!["note:a"], vec!["expense:"]] {
+            let mut invalid = kept.clone();
+            invalid.set_aside = Some(keys.into_iter().map(String::from).collect());
+            assert!(validate(&invalid).is_err());
+        }
+        let mut restored = kept;
+        restored.set_aside = Some(vec![]);
+        assert_eq!(write(&mut db, restored).unwrap().set_aside, Some(vec![]));
     }
 }

@@ -1,4 +1,11 @@
-import { readGoalState, validateGoals, remapGoals, type Goal } from './goals';
+import {
+  readGoalState,
+  validateGoals,
+  remapGoals,
+  remapItemKeys,
+  validateSetAside,
+  type Goal,
+} from './goals';
 import {
   readPlanningState,
   validatePlanning,
@@ -52,8 +59,9 @@ export interface Preferences {
 }
 export interface Backup {
   format: 'zivizip';
-  version: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
   goals?: Goal[];
+  goalSetAside?: string[];
   planning?: PlanningData;
   tasks?: Task[];
   transactions?: Transaction[];
@@ -168,7 +176,7 @@ export function validateBackup(value: unknown): Backup {
   const b = value as Backup;
   if (
     b.format !== 'zivizip' ||
-    ![1, 2, 3, 4, 5, 6, 7].includes(b.version) ||
+    ![1, 2, 3, 4, 5, 6, 7, 8].includes(b.version) ||
     !Array.isArray(b.notes) ||
     b.notes.length > 10000
   )
@@ -215,6 +223,7 @@ export function validateBackup(value: unknown): Backup {
     for (const id of assetsIn(n.rich))
       if (!mediaIds.has(id)) throw Error('Missing backup image');
   if (b.goals !== undefined) validateGoals(b.goals);
+  if (b.goalSetAside !== undefined) validateSetAside(b.goalSetAside);
   const p = b.preferences;
   if (
     !p ||
@@ -251,8 +260,10 @@ export async function exportWorkspace(
     db.meta,
     async () => ({
       format: 'zivizip' as const,
-      version: 7 as const,
+      version: 8 as const,
       goals: readGoalState((await db.meta.get('goals'))?.value).items,
+      goalSetAside:
+        readGoalState((await db.meta.get('goals'))?.value).setAside || [],
       planning: await (async () => {
         const { months, items } = readPlanningState(
           (await db.meta.get('planning'))?.value,
@@ -334,16 +345,23 @@ export async function importWorkspace(db: WorkspaceDB, input: unknown) {
           value: { revision: current.revision + 1, items },
         });
       }
-      if (b.goals?.length) {
+      if (b.goals?.length || b.goalSetAside?.length) {
         const current = readGoalState((await db.meta.get('goals'))?.value);
         const items = [
           ...current.items,
-          ...remapGoals(b.goals, taskIds, expenseIds),
+          ...remapGoals(b.goals || [], taskIds, expenseIds),
         ];
         validateGoals(items);
+        const setAside = [
+          ...new Set([
+            ...(current.setAside || []),
+            ...remapItemKeys(b.goalSetAside || [], taskIds, expenseIds),
+          ]),
+        ];
+        validateSetAside(setAside);
         await db.meta.put({
           key: 'goals',
-          value: { revision: current.revision + 1, items },
+          value: { revision: current.revision + 1, items, setAside },
         });
       }
       await db.media.bulkPut(media);

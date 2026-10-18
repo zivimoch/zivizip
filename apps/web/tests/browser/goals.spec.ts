@@ -123,12 +123,12 @@ test('goals support drag assignment, shared links, persistence and return items 
   await expect(other.locator('.totals strong').first()).toHaveText('1');
   await card
     .getByRole('button', { name: task.title, exact: true })
-    .dragTo(page.locator('.unassigned'));
+    .dragTo(page.locator('.unassigned > header'));
   await expect(card.locator('.totals strong').first()).toHaveText('0');
   await expect(page.locator('.pool-strip .goal-item')).toHaveCount(1);
   await other
     .getByRole('button', { name: task.title, exact: true })
-    .dragTo(page.locator('.unassigned'));
+    .dragTo(page.locator('.unassigned > header'));
   await expect(page.locator('.pool-strip .goal-item')).toHaveCount(2);
   await page
     .locator('.pool-strip')
@@ -281,6 +281,7 @@ test('account goals synchronize between sessions and become read-only offline', 
   const headers = { Origin: 'http://127.0.0.1:4174', 'X-Zivizip': '1' };
   const other = await browser.newContext({ baseURL: 'http://127.0.0.1:4174' });
   const label = 'Goal sync ' + Date.now();
+  const hiddenKey = 'task:sync-' + Date.now();
   try {
     for (const ctx of [context, other])
       expect(
@@ -295,6 +296,50 @@ test('account goals synchronize between sessions and become read-only offline', 
     await expect(
       second.getByRole('heading', { name: label, exact: true }),
     ).toBeVisible();
+    await page
+      .getByRole('region', { name: label, exact: true })
+      .getByRole('checkbox', { name: 'Completed', exact: true })
+      .click();
+    await expect(
+      second
+        .getByRole('region', { name: label, exact: true })
+        .getByRole('checkbox', { name: 'Completed', exact: true }),
+    ).toBeChecked();
+    const current = await (await context.request.get('/api/goals')).json();
+    expect(
+      (
+        await context.request.put('/api/goals', {
+          headers,
+          data: {
+            ...current,
+            setAside: [...(current.setAside || []), hiddenKey],
+          },
+        })
+      ).ok(),
+    ).toBeTruthy();
+    await expect
+      .poll(() =>
+        second.evaluate(async (key) => {
+          return new Promise<boolean>((resolve) => {
+            const databases = indexedDB.databases();
+            databases.then((all) => {
+              const req = indexedDB.open(
+                all.find((db) => db.name?.startsWith('zivizip-account-'))!
+                  .name!,
+              );
+              req.onsuccess = () => {
+                const db = req.result,
+                  get = db.transaction('meta').objectStore('meta').get('goals');
+                get.onsuccess = () => {
+                  resolve(get.result?.value.setAside?.includes(key) || false);
+                  db.close();
+                };
+              };
+            });
+          });
+        }, hiddenKey),
+      )
+      .toBe(true);
     await second.evaluate(() => navigator.serviceWorker.ready.then(() => true));
     await other.setOffline(true);
     await expect(
@@ -302,6 +347,11 @@ test('account goals synchronize between sessions and become read-only offline', 
     ).toBeDisabled();
     await expect(
       second.getByRole('button', { name: 'Edit goal: ' + label, exact: true }),
+    ).toBeDisabled();
+    await expect(
+      second
+        .getByRole('region', { name: label, exact: true })
+        .getByRole('checkbox', { name: 'Completed', exact: true }),
     ).toBeDisabled();
     await other.setOffline(false);
   } finally {
@@ -311,6 +361,9 @@ test('account goals synchronize between sessions and become read-only offline', 
       data: {
         ...state,
         items: state.items.filter((g: any) => g.title !== label),
+        setAside: (state.setAside || []).filter(
+          (key: string) => key !== hiddenKey,
+        ),
       },
     });
     await other.close();
@@ -373,12 +426,15 @@ test('guest-only goals require explicit copying into the account', async ({
       data: {
         ...state,
         items: state.items.filter((g: any) => g.title !== label),
+        setAside: (state.setAside || []).filter(
+          (key: string) => key !== hiddenKey,
+        ),
       },
     });
   }
 });
 for (const height of [667, 844])
-  test(`mobile grip drag assigns, cancels and returns contributions at ${height}px`, async ({
+  test(`mobile hold drag assigns, cancels and returns contributions at ${height}px`, async ({
     browser,
   }) => {
     const context = await browser.newContext({
@@ -467,8 +523,13 @@ for (const height of [667, 844])
       await page.getByRole('button', { name: 'Cancel', exact: true }).click();
       async function touchDrag(source: any, target: any, cancel = false) {
         await source.scrollIntoViewIfNeeded();
-        const from = await source.locator('.drag-handle').boundingBox();
-        const to = await target.boundingBox();
+        const from = await source.boundingBox();
+        const dropSurface = (await target.getAttribute('class'))?.includes(
+          'goal-card',
+        )
+          ? target.locator('.drop-label')
+          : target.locator('header');
+        const to = await dropSurface.boundingBox();
         const point = {
           x: from.x + from.width / 2,
           y: from.y + from.height / 2,
@@ -484,7 +545,9 @@ for (const height of [667, 844])
             touchPoints: [
               {
                 x: point.x + ((to.x + 80 - point.x) * step) / 12,
-                y: point.y + ((to.y + 25 - point.y) * step) / 12,
+                y:
+                  point.y +
+                  ((to.y + Math.min(to.height / 2, 25) - point.y) * step) / 12,
               },
             ],
           });
@@ -587,9 +650,10 @@ test('growth reflects contributions and keeps long contribution lists bounded', 
   await expect(page.locator('.construction').last()).toHaveCSS('opacity', '1');
   const card = page.locator('.goal-card').last();
   const before = await card.locator('svg[role=img]').innerHTML();
-  await card.getByRole('button', { name: 'Edit goal' }).click();
-  await page.getByLabel('Completed', { exact: true }).check();
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await card.getByRole('checkbox', { name: 'Completed', exact: true }).click();
+  await expect(
+    card.getByRole('checkbox', { name: 'Completed', exact: true }),
+  ).toBeChecked();
   await expect(card.locator('[data-completed]')).toHaveAttribute(
     'data-completed',
     'true',
@@ -622,9 +686,10 @@ test('growth reflects contributions and keeps long contribution lists bounded', 
     'data-completed',
     'true',
   );
-  await card.getByRole('button', { name: 'Edit goal' }).click();
-  await page.getByLabel('Completed', { exact: true }).uncheck();
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await card.getByRole('checkbox', { name: 'Completed', exact: true }).click();
+  await expect(
+    card.getByRole('checkbox', { name: 'Completed', exact: true }),
+  ).not.toBeChecked();
   await expect(card.locator('.landmark')).toHaveCount(0);
   expect(await card.locator('svg[role=img]').innerHTML()).toBe(before);
   await page.screenshot({
@@ -741,4 +806,112 @@ test('world themes persist, limit detail and stop rendering offscreen cards', as
     path: '/tmp/zivizip-dna-mobile.png',
     fullPage: true,
   });
+});
+
+test('Unassigned uses archived tasks, shared two-row scrolling and a reversible tray', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await page
+    .getByRole('button', { name: 'Continue as guest', exact: true })
+    .click();
+  await page.evaluate(
+    async ({ task, expense }) => {
+      await new Promise<void>((resolve) => {
+        const req = indexedDB.open('zivizip-guest-v1');
+        req.onsuccess = () => {
+          const db = req.result,
+            tx = db.transaction('meta', 'readwrite');
+          tx.objectStore('meta').put({
+            key: 'tasks',
+            value: {
+              revision: 1,
+              items: [
+                ...Array.from({ length: 6 }, (_, i) => ({
+                  ...task,
+                  id: 'archived-' + i,
+                  title: 'Archived ' + i,
+                })),
+                {
+                  ...task,
+                  id: 'active-done',
+                  title: 'Completed but active',
+                  archived: false,
+                },
+              ],
+            },
+          });
+          tx.objectStore('meta').put({
+            key: 'finance',
+            value: { revision: 1, items: [expense] },
+          });
+          tx.oncomplete = () => {
+            db.close();
+            resolve();
+          };
+        };
+      });
+    },
+    { task, expense },
+  );
+  await goals(page);
+  await create(page, 'Focus');
+  const pool = page.locator('.pool-strip');
+  await expect(pool.locator('.goal-item')).toHaveCount(7);
+  await expect(pool).not.toContainText('Completed but active');
+  await expect(page.locator('.drag-handle')).toHaveCount(0);
+  await expect(page.getByText('A growing world', { exact: true })).toHaveCount(
+    0,
+  );
+  const boxes = await pool.locator('.goal-item').evaluateAll((items) =>
+    items.slice(0, 3).map((el) => {
+      const r = el.getBoundingClientRect();
+      return { x: r.x, y: r.y };
+    }),
+  );
+  expect(boxes[0].x).toBe(boxes[1].x);
+  expect(boxes[1].y).toBeGreaterThan(boxes[0].y);
+  expect(boxes[2].x).toBeGreaterThan(boxes[0].x);
+  await pool.evaluate((el) => {
+    el.scrollLeft = 100;
+  });
+  await expect
+    .poll(() => pool.evaluate((el) => el.scrollLeft))
+    .toBeGreaterThan(0);
+  const moved = await pool
+    .locator('.goal-item')
+    .evaluateAll((items) =>
+      items.slice(0, 2).map((el) => el.getBoundingClientRect().x),
+    );
+  expect(moved[0]).toBe(moved[1]);
+  const card = page.getByRole('region', { name: 'Focus', exact: true });
+  await card.getByRole('checkbox', { name: 'Completed', exact: true }).click();
+  await expect(
+    card.getByRole('checkbox', { name: 'Completed', exact: true }),
+  ).toBeChecked();
+  await page.getByRole('button', { name: 'Clear', exact: true }).click();
+  await expect(pool.locator('.goal-item')).toHaveCount(0);
+  await page.reload();
+  await goals(page);
+  await expect(pool.locator('.goal-item')).toHaveCount(0);
+  await expect(
+    card.getByRole('checkbox', { name: 'Completed', exact: true }),
+  ).toBeChecked();
+  await page.getByRole('button', { name: /^Set aside/ }).click();
+  const tray = page.getByRole('dialog', { name: 'Set aside', exact: true });
+  await expect(tray.locator('.aside-item')).toHaveCount(7);
+  await tray
+    .getByRole('button', { name: 'Restore', exact: true })
+    .first()
+    .click();
+  await expect(tray.locator('.aside-item')).toHaveCount(6);
+  await tray.getByRole('button', { name: 'Restore all', exact: true }).click();
+  await expect(tray.locator('.aside-item')).toHaveCount(0);
+  await tray.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(pool.locator('.goal-item')).toHaveCount(7);
+  await pool.evaluate((el) => {
+    el.scrollLeft = 0;
+  });
+  await page.screenshot({ path: '/tmp/zivizip-goals-tray-mobile.png' });
 });

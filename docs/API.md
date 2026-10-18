@@ -99,3 +99,23 @@ Owners manage a note's capability link with `GET`, `PUT` (`{"editable":false}`) 
 `GET /api/shared/{token}` returns the permitted note and its `editable` flag without an account session. `PUT` accepts content changes only when editing is enabled; owner metadata is preserved, and stale revisions return 409 rather than overwriting newer content. Clients retain unsaved changes on conflict. Shared image reads and uploads use `/api/shared/{token}/media/{asset}` and are restricted to the note or uploads made through that link. Links have upload and request limits. These endpoints do not grant workspace, task or finance access.
 
 Shared pages carry `noindex,nofollow` and use a URL fragment for the capability token. API responses remain `no-store`. Treat the link as a credential: anyone holding it has its configured access until revoked.
+
+## Goals and Set aside
+
+`GET /api/goals` and `PUT /api/goals` use an authenticated revisioned document:
+`{ revision, items, setAside? }`. `setAside` is an optional list of unique source
+keys (`task:<id>` or `expense:<id>`), bounded to 20,000 entries and the existing
+2 MB document/request limit. Clear and Restore change only this list. They never
+delete tasks or transactions. Missing `setAside` on a legacy write preserves the
+stored list; an explicit empty list restores all items. Stale revisions are
+rejected and successful writes publish the existing workspace refresh event.
+
+The card Completed control updates the goal's existing boolean `completed` field.
+Backup v8 includes `goalSetAside`; imports remap source IDs, including tray-only
+workspaces with no goals. Guest-to-account copying transfers tray state only with
+the user's existing explicit workspace-copy action.
+
+Rollback note: once the new field is stored, older API images that reject unknown
+GoalState fields cannot read that document. Roll back only to a compatible API
+image, or perform a separately reviewed, backed-up conversion that preserves the
+tray data; do not restore the entire database just to change the frontend.

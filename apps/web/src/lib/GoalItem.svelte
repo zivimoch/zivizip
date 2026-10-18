@@ -1,12 +1,12 @@
 <script lang="ts">
-  import Icon from './Icon.svelte';
   export let item: { key: string; title: string; detail: string; type: string };
   export let source = '';
+  let touchInput = false;
   export let disabled = false;
   export let language: 'en' | 'id' = 'en';
   export let onstart: (key: string, source: string) => void;
   export let onend: () => void;
-  export let ontouch: (e: PointerEvent, key: string, source: string) => void;
+  export let ontouch: (e: TouchEvent, key: string, source: string) => void;
   export let onkeyboard: (
     e: KeyboardEvent,
     key: string,
@@ -17,7 +17,7 @@
 <div
   class="goal-item"
   class:compact={!!source}
-  draggable={!disabled}
+  draggable={!disabled && !touchInput}
   tabindex={disabled ? -1 : 0}
   role="button"
   aria-roledescription={language === 'id'
@@ -33,15 +33,11 @@
     if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copyMove';
   }}
   ondragend={onend}
+  onpointerdown={(e) => (touchInput = e.pointerType !== 'mouse')}
+  ontouchstart={(e) => ontouch(e, item.key, source)}
   onkeydown={(e) => onkeyboard(e, item.key, source)}
   oncontextmenu={(e) => e.preventDefault()}
 >
-  <span
-    class="drag-handle"
-    aria-hidden="true"
-    onpointerdown={(e) => ontouch(e, item.key, source)}
-    ><Icon name="grip" /></span
-  >
   <small
     >{item.type === 'task'
       ? 'To do'
@@ -68,31 +64,6 @@
     flex: 0 0 210px;
     scroll-snap-align: start;
     touch-action: pan-x pan-y;
-  }
-  .drag-handle {
-    display: none;
-  }
-  @media (any-pointer: coarse) {
-    .goal-item,
-    .goal-item.compact {
-      padding-right: 52px;
-    }
-    .goal-item .drag-handle {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: absolute;
-      right: 0;
-      top: 0;
-      bottom: 0;
-      width: 44px;
-      min-height: 44px;
-      max-width: none;
-      touch-action: none;
-      color: var(--accent);
-      border-left: 1px solid #30464b;
-      cursor: grab;
-    }
   }
   .goal-item:active {
     cursor: grabbing;

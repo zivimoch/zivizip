@@ -162,7 +162,7 @@ it('preserves plans in backups, merges without overwriting budgets and rejects s
   await source.write(initial, data());
   await expect(source.write(initial, data())).rejects.toThrow('another tab');
   const backup = await exportWorkspace(source.db);
-  expect(backup.version).toBe(7);
+  expect(backup.version).toBe(8);
   expect(backup.planning?.items).toHaveLength(3);
   await importWorkspace(target.db, backup);
   expect((await target.list()).items[0].id).not.toBe('Salary');

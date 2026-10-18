@@ -115,11 +115,14 @@ This document describes the target interaction model. The [verification scope](.
 - The edit dialog exposes Delete goal with confirmation explaining that Tasks and Finance records are retained. Its action footer remains reachable on short mobile screens.
 - Cards have bounded responsive heights (460–540px desktop, 340–400px mobile) and independently scrollable contribution lists.
 - Create, edit and delete goals with a required title and optional description. A lightweight procedural island world replaces photo covers: it develops with the number of linked contributions, never the amount spent. Legacy cover identifiers remain accepted in backups.
-- Completed tasks (including archived tasks) and expense transactions can be assigned; income is excluded. Cards show totals and a compact, vertically scrollable contribution list. Long titles use ellipsis with the full title available on hover/focus.
-- Assignment uses drag only, without Move to goal buttons. Desktop uses native dragging; touch uses a dedicated 44px grip with edge scrolling, while swiping the item body scrolls normally. Keyboard users can pick up an item with Space/Enter, Tab to a drop region and press Enter; Escape cancels.
+- Unassigned accepts archived completed tasks and expense transactions; active completed tasks and income are excluded. Existing linked tasks remain referenced when restored from the task archive. Cards show totals and a compact, vertically scrollable contribution list. Long titles use ellipsis with the full title available on hover/focus.
+- Assignment uses drag only, without Move to goal buttons. Desktop uses native dragging; touch uses a brief hold on the item body followed by dragging, with edge scrolling and no grip icon. A quick swipe scrolls normally. Keyboard users can pick up an item with Space/Enter, Tab to a drop region and press Enter; Escape cancels.
 - Dropping onto another goal adds a reference without removing the source goal reference. The same source may belong to several goals, but never twice in one goal. Unassigned contains only sources with no goal references.
 - Dropping an assigned item into Unassigned removes only its source-goal reference. It reappears in the pool when no remaining goals reference it. Deleting a goal follows the same rule and preserves source records.
-- Source changes update totals; removed sources and incomplete tasks no longer contribute. Goal cards scroll horizontally above the horizontal Unassigned strip on desktop and mobile.
+- Source changes update totals; removed sources and incomplete tasks no longer contribute. Goal cards scroll horizontally above Unassigned on desktop and mobile. Unassigned has two rows in one horizontal scroll container; both rows move together.
+
+- Clear, aligned to the right of Unassigned, moves all currently unassigned items to Set aside without modifying source records or goal links. The Set aside dialog restores individual items or all items. Its revisioned state persists for guest and account workspaces, syncs across devices and is included in backup v8 (v1–v7 remain importable).
+- Omit the instructional paragraph beneath Unassigned.
 
 ## Accounts, offline and privacy
 
@@ -174,7 +177,7 @@ This document describes the target interaction model. The [verification scope](.
 - Each completed-task or expense reference contributes one point, independent of its monetary value. Shared references count once in each linked goal.
 - A stable procedural seed gives each goal distinct island terrain, placement and settlement details. Legacy goals derive their seed from their ID; imports preserve the original world's seed while remapping record IDs.
 - Contributions construct vegetation, paths and homes, then additional islands and regions. The renderer displays the active region with bounded detail rather than allocating one rendered object per lifetime contribution. Explore opens a larger view with an active-island focus and navigation through earlier regions.
-- Completion is an explicit, reversible setting in the goal form, independent of point totals. Completed goals receive a landmark; motion respects reduced-motion preferences.
+- Completion is an explicit, reversible setting available from a checked Completed button in the card cover and from the edit form, independent of point totals. The cover does not display the previous growing-world/contribution/region caption. Completed goals receive a landmark; motion respects reduced-motion preferences.
 - World settings persist in guest/account storage and backups. Rendering large point totals does not raise the existing workspace record or payload limits.
 
 ### Versioned world DNA and goal layout

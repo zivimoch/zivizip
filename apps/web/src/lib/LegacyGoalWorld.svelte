@@ -129,15 +129,17 @@
       </g>
     {/if}
   </svg>
-  <span class="caption"
-    >{label}<small
-      >{count.toLocaleString(language)}
-      {language === 'id' ? 'kontribusi' : 'contributions'} · {language === 'id'
-        ? 'Kawasan'
-        : 'Region'}
-      {world.region + 1}</small
-    ></span
-  >
+  {#if expanded}<span class="caption"
+      >{label}<small
+        >{count.toLocaleString(language)}
+        {language === 'id' ? 'kontribusi' : 'contributions'} · {language ===
+        'id'
+          ? 'Kawasan'
+          : 'Region'}
+        {world.region + 1}</small
+      ></span
+    >
+  {/if}
   <div class="controls">
     {#if expanded && world.latestRegion > 0}
       <button

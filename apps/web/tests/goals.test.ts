@@ -11,6 +11,8 @@ import {
   goalTotals,
   goalKeys,
   validateGoals,
+  readGoalState,
+  validateSetAside,
   type Goal,
 } from '../src/lib/goals';
 const goal: Goal = {
@@ -61,7 +63,7 @@ it('rejects stale goal writes and remaps links when importing backups', async ()
     target = new WorkspaceDB(crypto.randomUUID());
   try {
     const repo = new GoalsRepository(db, false);
-    await repo.write(emptyGoals(), [goal]);
+    await repo.write(emptyGoals(), [goal], ['task:task', 'expense:expense']);
     await expect(repo.write(emptyGoals(), [])).rejects.toThrow('another tab');
     await db.meta.put({
       key: 'tasks',
@@ -101,6 +103,10 @@ it('rejects stale goal writes and remaps links when importing backups', async ()
     const backup = await exportWorkspace(db);
     await importWorkspace(target, backup);
     const restored = await exportWorkspace(target);
+    expect(restored.goalSetAside).toEqual([
+      'task:' + restored.tasks?.[0].id,
+      'expense:' + restored.transactions?.[0].id,
+    ]);
     expect(restored.goals?.[0].theme).toBe('garden');
     expect(restored.goals?.[0].generatorVersion).toBe(2);
     expect(restored.goals?.[0].order).toEqual([
@@ -118,6 +124,14 @@ it('rejects stale goal writes and remaps links when importing backups', async ()
     expect(restored.goals?.[1].expenses).toEqual(restored.goals?.[0].expenses);
     await importWorkspace(target, backup);
     expect((await exportWorkspace(target)).goals).toHaveLength(4);
+    await repo.write(await repo.list(), [], ['task:task']);
+    const trayOnly = await exportWorkspace(db);
+    await importWorkspace(target, trayOnly);
+    const withTray = await exportWorkspace(target);
+    expect(withTray.goals).toHaveLength(4);
+    expect(withTray.goalSetAside).toContain(
+      'task:' + withTray.tasks?.at(-1)?.id,
+    );
   } finally {
     await db.delete();
     await target.delete();
@@ -136,4 +150,28 @@ it('validates theme and mixed contribution order', () => {
   expect(() =>
     validateGoals([{ ...goal, theme: 'invalid' as 'garden' }]),
   ).toThrow();
+});
+
+it('validates the reversible tray and keeps it through unrelated goal writes', async () => {
+  expect(readGoalState({ revision: 0, items: [] }).setAside).toBeUndefined();
+  for (const keys of [['task:a', 'task:a'], ['note:a'], ['expense:'], [null]])
+    expect(() => validateSetAside(keys)).toThrow();
+  const db = new WorkspaceDB(crypto.randomUUID());
+  try {
+    const repo = new GoalsRepository(db, false);
+    const old = emptyGoals();
+    const saved = await repo.write(old, [], ['task:archived']);
+    await expect(repo.write(old, [], [])).rejects.toThrow('another tab');
+    await repo.write(saved, [goal]);
+    expect((await repo.list()).setAside).toEqual(['task:archived']);
+    await repo.merge([], ['expense:receipt']);
+    expect((await repo.list()).setAside).toEqual([
+      'task:archived',
+      'expense:receipt',
+    ]);
+    await repo.write(await repo.list(), [], []);
+    expect((await repo.list()).setAside).toEqual([]);
+  } finally {
+    await db.delete();
+  }
 });
