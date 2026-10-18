@@ -1,6 +1,10 @@
 import { test, expect, type Page } from '@playwright/test';
 import fs from 'node:fs';
 async function create(page: Page, name: string) {
+  if ((page.viewportSize()?.width || 1280) > 700) {
+    await page.mouse.move(650, 300);
+    await expect(page.locator('.sidebar')).toHaveCSS('width', '72px');
+  }
   await page.getByRole('button', { name: 'New note', exact: true }).click();
   await page.getByLabel('Name', { exact: true }).fill(name);
   await page.getByRole('radio', { name: 'Draw', exact: true }).check();
@@ -106,7 +110,9 @@ test('Draw clipboard preserves editable objects, image bytes, undo, export and o
   );
   expect(pixels).toBeGreaterThan(1000);
   await page.locator('.sidebar').hover();
+  await expect(page.locator('.sidebar')).toHaveCSS('width', '240px');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
   const backupDownload = page.waitForEvent('download');
   await page
     .getByRole('button', { name: 'Download backup', exact: true })
