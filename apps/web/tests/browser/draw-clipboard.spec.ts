@@ -9,6 +9,8 @@ async function create(page: Page, name: string) {
   await page.getByLabel('Name', { exact: true }).fill(name);
   await page.getByRole('radio', { name: 'Draw', exact: true }).check();
   await page.getByRole('button', { name: 'Create', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('.breadcrumb-path')).toContainText(name);
   await expect(page.locator('.drawing')).toBeVisible();
 }
 async function pasteImage(page: Page, count = 1, color = '#ff0000') {
