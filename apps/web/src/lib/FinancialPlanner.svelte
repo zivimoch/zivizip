@@ -27,7 +27,6 @@
   export let language: 'en' | 'id';
   export let refreshToken = 0;
   export let onbusy: (value: boolean) => void = () => {};
-  export let onmonth: (month: string) => void = () => {};
   export let oncategories: (values: string[]) => void = () => {};
   export let ontransaction: (
     item?: Transaction,
@@ -44,6 +43,27 @@
     seenRefresh = refreshToken,
     readEpoch = 0;
   let root: HTMLElement, modal: HTMLDialogElement, focusInput: HTMLInputElement;
+  let monthDialog: HTMLDialogElement;
+  let deletingMonth = '';
+  function showMonthActions(month: string) {
+    if (busy || formOpen) return;
+    deletingMonth = month;
+    message = '';
+    formOpen = true;
+    monthDialog.showModal();
+  }
+  async function deleteMonth() {
+    const month = deletingMonth;
+    if (
+      await commit({
+        months: state.months.filter((entry) => entry.month !== month),
+        items: state.items.filter((plan) => plan.month !== month),
+      })
+    ) {
+      closeMonth(month);
+      monthDialog.close();
+    }
+  }
   let mode: 'create' | 'budget' | 'delete' | 'note' | 'category' = 'create',
     formOpen = false;
   let editing: Budget | null = null,
@@ -241,7 +261,6 @@
     lastTap = { id: '', time: 0 };
     if (!tabs.includes(month)) tabs = [...tabs, month];
     active = month;
-    onmonth(month);
     remember();
   }
   function closeMonth(month: string) {
@@ -497,7 +516,6 @@
         : [];
       active =
         view?.active && tabs.includes(view.active) ? view.active : 'analysis';
-      if (active !== 'analysis') onmonth(active);
       await refresh();
     })().catch((error) => (message = error.message));
     const changes = new BroadcastChannel(`planning-${repository.db.name}`);
@@ -545,6 +563,7 @@
         <button
           aria-current={active === month ? 'page' : undefined}
           onclick={() => openMonth(month)}
+          ondblclick={() => showMonthActions(month)}
           ><Icon name="calendar" />{monthLabel(month)}</button
         ><button
           class="close-month"
@@ -913,6 +932,32 @@
 </section>
 
 <dialog
+  class="month-actions"
+  bind:this={monthDialog}
+  aria-label={t('Delete monthly plan', 'Hapus rencana bulanan')}
+  onclose={() => {
+    formOpen = false;
+    deletingMonth = '';
+  }}
+>
+  <header>
+    <h2>{deletingMonth ? monthLabel(deletingMonth) : ''}</h2>
+    <button aria-label={t('Close', 'Tutup')} onclick={() => monthDialog.close()}
+      >×</button
+    >
+  </header>
+  <p>
+    {t(
+      'Delete this monthly plan? Recorded transactions are kept.',
+      'Hapus rencana bulan ini? Transaksi yang sudah dicatat tetap tersimpan.',
+    )}
+  </p>
+  {#if message}<p role="alert">{message}</p>{/if}
+  <button class="danger" disabled={busy || !writable} onclick={deleteMonth}
+    >{t('Delete', 'Hapus')}</button
+  >
+</dialog>
+<dialog
   class="finance-dialog"
   bind:this={modal}
   oncancel={(event) => {
@@ -1084,6 +1129,26 @@
 </dialog>
 
 <style>
+  .month-actions {
+    width: min(400px, calc(100vw - 32px));
+    padding: 20px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--panel, #142126);
+    color: var(--text, #fff);
+  }
+  .month-actions header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .month-actions p {
+    margin: 16px 0;
+  }
+  .month-actions::backdrop {
+    background: #0009;
+  }
   .financial-plan {
     min-width: 0;
     height: 100%;

@@ -246,10 +246,10 @@
     background: #142f39e8;
     color: #eef3e7;
     border-radius: 6px;
-    padding: 5px 8px;
+    padding: 3px 6px;
     font-size: 10px;
     cursor: pointer;
-    min-height: 32px;
+    min-height: 26px;
   }
   .expanded button {
     min-height: 40px;

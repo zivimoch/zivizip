@@ -85,7 +85,7 @@ test('monthly planning matches transactions, supports row controls and copies on
     .click();
   await expect(
     page.getByLabel('Transaction month', { exact: true }),
-  ).toHaveValue('2026-10');
+  ).toHaveValue('2026-09');
   await addBudget(page, 'recurring', 'Food', '1500000');
   await addBudget(page, 'recurring', 'Rent', '1000000');
   await addBudget(page, 'recurring', 'Transport', '300000');

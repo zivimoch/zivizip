@@ -188,3 +188,9 @@ This document describes the target interaction model. The [verification scope](.
 - Completion adds a theme-specific landmark without requiring a point threshold. Respect reduced motion; no continuous idle animation.
 - Goal descriptions occupy a single line with ellipsis and full-text hover. Contribution lists receive the remaining card height, with at least 240px. New contributions appear first across both task and expense types, and their order survives reload, account sync and backup remapping.
 - Resetting Goals is a one-time maintenance operation requested explicitly by the owner, never a startup routine, schema migration, or feature that resets other workspace records.
+
+## Compact goal controls and independent Finance months
+
+- Goal card Completed, edit and Explore controls use a compact visual size; expanded world controls remain larger.
+- The transaction ledger starts on the current calendar month when the workspace opens. Opening or creating a monthly plan never changes the ledger month. Manual ledger month selection remains independent of planning tabs.
+- Double-clicking a monthly plan tab opens a delete-only dialog. Deleting removes that month's saved plan and budgets, closes its tab, and preserves all recorded transactions. Closing a tab alone does not delete its plan. Analysis cannot be deleted; offline account plans remain read-only.

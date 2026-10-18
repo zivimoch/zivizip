@@ -148,3 +148,7 @@ verification.
 
 All 22 Tasks, Finance, Planning and image browser regressions passed. The account
 Tasks scenario was rerun after clearing the local test login rate limit.
+
+## Finance plan controls — 2026-10-18
+
+Local preview checks passed: Svelte/TypeScript with no diagnostics, 42 unit tests, the production frontend image build, nine Goals browser scenarios, six existing planning scenarios, and the new Finance plan-controls regression. The latter verifies the current-month ledger default, independence from opened plans, reload behavior, cancellation, tab closing without deletion, and plan deletion preserving transactions. It is included in Jenkins browser verification. Goals coverage includes desktop and simulated mobile touch; physical-device testing remains separate.

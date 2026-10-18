@@ -21,7 +21,6 @@
   export let onbusy: (value: boolean) => void = () => {};
   export let ondata: (items: Transaction[]) => void = () => {};
   export let categoryOptions: string[] = [];
-  export let selectedMonth = '';
   export let planningRepository: PlanningRepository | undefined = undefined;
   let plannedCategories: string[] = [];
   let state = emptyFinance(),
@@ -64,7 +63,6 @@
     ),
   );
   $: ondata(state.items);
-  $: if (selectedMonth) month = selectedMonth;
   $: categories = [
     ...new Set([
       ...categoryOptions,
@@ -128,12 +126,8 @@
   }
   function remember() {
     void repository.db.meta
-      .put({ key: 'finance-view', value: { month, grouped } })
+      .put({ key: 'finance-view', value: { grouped } })
       .catch((error) => (message = error.message));
-  }
-  export function selectMonth(value: string) {
-    month = value;
-    remember();
   }
   export async function openTransaction(
     item?: Transaction,
@@ -217,12 +211,6 @@
         | { month?: string; grouped?: boolean }
         | undefined;
       if (!alive) return;
-      if (
-        !selectedMonth &&
-        view?.month &&
-        /^\d{4}-(0[1-9]|1[0-2])$/.test(view.month)
-      )
-        month = view.month;
       grouped = view?.grouped === true;
       await refresh();
     })().catch((error) => (message = error.message));

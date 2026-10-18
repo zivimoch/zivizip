@@ -758,9 +758,9 @@
     top: 12px;
     background: #102026dd;
     color: white;
-    width: 34px;
-    height: 34px;
-    padding: 6px;
+    width: 26px;
+    height: 26px;
+    padding: 4px;
   }
   .goal-body {
     padding: 20px;
@@ -1013,8 +1013,8 @@
       padding: 8px;
     }
     .edit {
-      width: 44px;
-      height: 44px;
+      width: 28px;
+      height: 28px;
     }
     dialog {
       padding: 16px;

@@ -12,8 +12,7 @@
   export let onplanbusy: (value: boolean) => void = () => {};
   let ledger: FinancePanel;
   let transactions: Transaction[] = [],
-    categories: string[] = [],
-    month = '';
+    categories: string[] = [];
 </script>
 
 <div class="finance-detail">
@@ -25,10 +24,6 @@
     {refreshToken}
     onbusy={onplanbusy}
     oncategories={(values) => (categories = values)}
-    onmonth={(value) => {
-      month = value;
-      ledger?.selectMonth(value);
-    }}
     ontransaction={(item, defaults) => ledger.openTransaction(item, defaults)}
   />
   <aside
@@ -45,7 +40,6 @@
       onbusy={onfinancebusy}
       ondata={(items) => (transactions = items)}
       categoryOptions={categories}
-      selectedMonth={month}
     />
   </aside>
 </div>

@@ -163,9 +163,9 @@
     background: #142f39ed;
     color: #eef3e7;
     border-radius: 6px;
-    padding: 5px 8px;
+    padding: 3px 6px;
     font-size: 10px;
-    min-height: 32px;
+    min-height: 26px;
     cursor: pointer;
   }
   .complete-toggle {
@@ -174,13 +174,13 @@
     left: 10px;
     display: flex;
     align-items: center;
-    gap: 7px;
-    min-height: 40px;
-    font-size: 12px;
+    gap: 5px;
+    min-height: 26px;
+    font-size: 10px;
   }
   .complete-toggle span {
-    width: 16px;
-    height: 16px;
+    width: 12px;
+    height: 12px;
     border: 1px solid #89a6aa;
     border-radius: 4px;
     display: grid;
@@ -225,33 +225,5 @@
     min-height: 44px;
     min-width: 44px;
     font-size: 13px;
-  }
-  @media (pointer: coarse) {
-    .complete-toggle {
-      position: absolute;
-      top: 8px;
-      left: 10px;
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      min-height: 40px;
-      font-size: 12px;
-    }
-    .complete-toggle span {
-      width: 16px;
-      height: 16px;
-      border: 1px solid #89a6aa;
-      border-radius: 4px;
-      display: grid;
-      place-items: center;
-    }
-    .complete-toggle .checked {
-      background: var(--accent);
-      color: #06242a;
-      border-color: var(--accent);
-    }
-    .explore {
-      min-height: 40px;
-    }
   }
 </style>
