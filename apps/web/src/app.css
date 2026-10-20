@@ -1047,3 +1047,15 @@ a.content-link {
     flex: 1;
   }
 }
+
+.visitor-choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.visitor-choice input[type='checkbox'] {
+  width: 18px;
+  min-height: 18px;
+  margin: 0;
+  flex: 0 0 18px;
+}

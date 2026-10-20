@@ -56,18 +56,7 @@
   class="tasks-detail"
   aria-label={t('To do overview', 'Ringkasan To do')}
 >
-  <header>
-    <div>
-      <p class="eyebrow">{t('YOUR MOMENTUM', 'PROGRESMU')}</p>
-      <h1>To do<span>.</span></h1>
-    </div>
-    <p>
-      {t(
-        'A clear view of what is done and what comes next.',
-        'Lihat yang sudah selesai dan yang perlu dikerjakan berikutnya.',
-      )}
-    </p>
-  </header>
+  <header><h1>To do<span>.</span></h1></header>
   <div class="analysis">
     <section
       class="progress-card"
@@ -174,23 +163,11 @@
     margin-bottom: 24px;
   }
   h1 {
-    font-size: 30px;
+    font-size: 28px;
     margin: 0;
   }
   h1 span {
     color: var(--accent);
-  }
-  .eyebrow {
-    font-size: 10px;
-    letter-spacing: 0.16em;
-    margin: 0 0 8px;
-    color: var(--accent);
-  }
-  header > p {
-    font-size: 13px;
-    margin: 0 0 5px;
-    max-width: 340px;
-    line-height: 1.5;
   }
   .analysis,
   .task-cards {
@@ -325,14 +302,14 @@
     }
   }
   @media (max-width: 800px) {
+    h1 {
+      font-size: 24px;
+    }
     .tasks-detail {
       padding: 18px 12px;
     }
     header {
       display: block;
-    }
-    header > p {
-      margin-top: 10px;
     }
     .analysis,
     .task-cards {

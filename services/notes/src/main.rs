@@ -1,3 +1,4 @@
+mod admin;
 mod draw;
 mod finance;
 mod goals;
@@ -536,7 +537,8 @@ fn schema(db: &Connection) -> rusqlite::Result<()> {
  CREATE TABLE IF NOT EXISTS note_shares(note_id TEXT PRIMARY KEY,token TEXT UNIQUE NOT NULL,editable INTEGER NOT NULL);
  CREATE TABLE IF NOT EXISTS shared_uploads(token TEXT NOT NULL,asset TEXT NOT NULL,PRIMARY KEY(token,asset));
  CREATE TABLE IF NOT EXISTS interests(id INTEGER PRIMARY KEY,email TEXT NOT NULL,message TEXT NOT NULL,created_at INTEGER NOT NULL);
- PRAGMA user_version=1;")
+ PRAGMA user_version=1;")?;
+    admin::schema(db)
 }
 #[tokio::main]
 async fn main() {
@@ -603,6 +605,20 @@ async fn main() {
         .route(
             "/api/health",
             get(|| async { Json(serde_json::json!({"status":"ok"})) }),
+        )
+        .route("/api/visits", post(admin::visit).delete(admin::forget))
+        .route("/api/admin", get(admin::overview))
+        .route(
+            "/api/admin/sessions",
+            axum::routing::delete(admin::revoke_others),
+        )
+        .route(
+            "/api/admin/visitors/{id}",
+            axum::routing::delete(admin::remove_visitor),
+        )
+        .route(
+            "/api/admin/interests/{id}",
+            axum::routing::delete(admin::remove_interest),
         )
         .route("/api/session", get(me).post(login).delete(logout))
         .route("/api/notes", get(list).post(create))

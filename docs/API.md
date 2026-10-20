@@ -127,3 +127,45 @@ Draw scene v1 now accepts `type: "image"` with a required lowercase SHA-256 `ass
 Workspace backup v8 deduplicates both Text and Draw attachments. Guest-to-account copying and account backup prefetch include both document kinds. No database migration is required. A server/client predating Draw image support will reject image-bearing Draw documents; do not roll back to such a release without reviewing affected notes and taking a backup. Geometry-only Draw notes remain compatible.
 
 Draw clipboard objects use a `zivizip-draw-v1:` JSON payload containing a validated scene and base64 WebP attachments. Payloads are limited to 16 MB and 100 distinct attachments; each attachment is hash-checked. File/image paste accepts up to 20 images per operation, using the existing 15 MB input, 1,600px edge and 1 MB compressed-image limits. Raster bytes are not embedded in saved scene JSON or undo revisions. Unreferenced media retention follows the existing attachment policy.
+
+## Owner administration and visit summaries
+
+`GET /api/admin` requires the existing owner session and returns the owner name,
+active-session count, total retained visitor profiles and at most the latest 500
+profiles. It does not return session tokens, password hashes or guest workspace
+content. `DELETE /api/admin/sessions` revokes every session except the caller.
+`DELETE /api/admin/visitors/{id}` and `DELETE /api/admin/interests/{id}` remove
+individual records. All mutations retain the same-origin and custom-header guard.
+Registration remains closed; this release does not create a multi-user workspace
+or expose credential changes. `/admin/` is an unindexed interface, not an access
+control boundary: every data endpoint checks the owner session.
+
+`POST /api/visits` accepts `{id, name}`: a random browser-local UUID and an optional
+name of at most 80 characters. The server stores a hash of that ID, a coarse
+browser/OS classification, estimated country, first/last visit timestamps and a
+visit count. A new visit requires a gap of 30 minutes. A reload updates last seen
+without incrementing that count. Names and user-agent strings are self-reported,
+not verified identity. Profiles are separate across browsers and may disappear
+when site data is cleared. No device fingerprint, GPS, raw IP or workspace content
+is stored in this table. Origin validation and rate limits apply, but this is not
+an anti-fraud or exact unique-user analytics system.
+
+The first guest notice explains these metadata requests and offers an opt-out;
+Settings allows later opt-out and removal through `DELETE /api/visits` with the
+original local ID. Failed reporting never blocks offline work. An offline first
+visit is reported only on a later online launch. Removal requires connectivity.
+Inactive records expire after 90 days and storage is capped at 20,000 profiles.
+Operational proxy logs and backups have independent retention; removal from the
+live visitor table does not rewrite backups.
+
+Country lookup uses an optional local, read-only SQLite file at
+`GEOIP_DATABASE` (default `/data/geoip.sqlite`). Prepare it with
+`scripts/prepare-geoip.py` from the current [DB-IP Country Lite CSV](https://db-ip.com/db/download/ip-to-country-lite).
+The database is CC BY 4.0; the admin page includes attribution. Install/replace the
+lookup file atomically, readable by UID 10001, separately from application data.
+No visitor IP is sent to DB-IP. Refresh the database monthly as an explicit
+maintenance operation. Missing data returns an unavailable country, never an
+invented location. The gateway must overwrite `X-Real-IP` and the API must remain
+private; an untrusted direct connection can spoof the header. VPN and mobile
+network locations are approximate. The lookup file is server-only and is not
+shipped in frontend assets or guest backups.

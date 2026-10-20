@@ -1,4 +1,17 @@
 <script lang="ts">
+  import { reportVisit, saveVisitor, type VisitorProfile } from '$lib/visits';
+  let visitorName = '';
+  let visitorEnabled = true;
+  let visitorSaved = false;
+  async function saveVisitorSettings() {
+    visitorSaved = false;
+    try {
+      await saveVisitor(guestDb, visitorName, visitorEnabled);
+      visitorSaved = true;
+    } catch (e) {
+      problem(e);
+    }
+  }
   import { noteAssets } from '$lib/note-assets';
   import { capitalFirst } from '$lib/capitalization';
   import {
@@ -527,7 +540,13 @@
     document.documentElement.lang = prefs.language;
     measure = `${Math.round(performance.now() - start)} ms`;
     performance.mark('zivizip-workspace-ready');
-    if (!account && !(await guestDb.meta.get('guest-notice'))) {
+    const visitor = (await guestDb.meta.get('visitor-profile'))?.value as
+      | VisitorProfile
+      | undefined;
+    visitorName = visitor?.name || '';
+    visitorEnabled = visitor?.enabled ?? true;
+    if (!account && visitor) void reportVisit(guestDb);
+    if (!account && !visitor) {
       await tick();
       welcome.showModal();
     }
@@ -1055,7 +1074,7 @@
                 ? account.username
                 : t('Guest workspace', 'Workspace tamu')}
             </p>
-            {#if account}<button
+            {#if account}<a href="/admin/">{t('Admin', 'Admin')}</a><button
                 disabled={workspaceBusy ||
                   switching ||
                   pending > 0 ||
@@ -1482,6 +1501,34 @@
           'Data tamu tersimpan di browser ini. Penghapusan data situs atau browser berbeda dapat membuatnya tidak tersedia. Unduh cadangan secara berkala.',
         )}
   </p>
+  <fieldset>
+    <legend>{t('Visitor profile', 'Profil pengunjung')}</legend>
+    <label
+      >{t('Name (optional)', 'Nama (opsional)')}<input
+        bind:value={visitorName}
+        maxlength="80"
+        autocomplete="nickname"
+      /></label
+    >
+    <label class="visitor-choice"
+      ><input type="checkbox" bind:checked={visitorEnabled} />{t(
+        'Share basic visit statistics',
+        'Bagikan statistik kunjungan dasar',
+      )}</label
+    >
+    <p>
+      {t(
+        'Your optional name, browser/OS, approximate country and visit times are sent to Zivizip, separately from your local workspace. Country is estimated on our server without sending your IP to a location provider. Turning this off removes your visitor record when online.',
+        'Nama opsional, browser/OS, perkiraan negara, dan waktu kunjungan dikirim ke Zivizip, terpisah dari workspace lokal. Negara diperkirakan di server kami tanpa mengirim IP ke penyedia lokasi. Menonaktifkannya menghapus catatan pengunjung saat online.',
+      )}
+    </p>
+    <button onclick={saveVisitorSettings}
+      >{t('Save visitor preferences', 'Simpan preferensi pengunjung')}</button
+    >
+    {#if visitorSaved}<p role="status">
+        {t('Visitor preferences saved.', 'Preferensi pengunjung tersimpan.')}
+      </p>{/if}
+  </fieldset>
   <label
     >Language / Bahasa<select
       value={prefs.language}
@@ -1592,9 +1639,29 @@
       'Jika mengirim formulir minat akun, hanya email dan pesan yang kamu isi yang dikirim ke Zivizip.',
     )}
   </p>
+  <label
+    >{t('Name (optional)', 'Nama (opsional)')}<input
+      bind:value={visitorName}
+      maxlength="80"
+      autocomplete="nickname"
+    /></label
+  >
+  <label class="visitor-choice"
+    ><input type="checkbox" bind:checked={visitorEnabled} />{t(
+      'Share basic visit statistics',
+      'Bagikan statistik kunjungan dasar',
+    )}</label
+  >
+  <p>
+    {t(
+      'If enabled, your optional name, browser/OS, approximate country and visit times are sent to Zivizip. Your notes stay local. Country is estimated from IP on our server, without GPS or sharing your IP with a location provider. You can turn this off in Settings. Records expire after 90 days of inactivity.',
+      'Jika aktif, nama opsional, browser/OS, perkiraan negara, dan waktu kunjungan dikirim ke Zivizip. Catatanmu tetap lokal. Negara diperkirakan dari IP di server kami, tanpa GPS atau membagikan IP ke penyedia lokasi. Kamu dapat menonaktifkannya di Pengaturan. Catatan kunjungan dihapus setelah 90 hari tidak aktif.',
+    )}
+  </p>
   <button
     class="primary"
     onclick={async () => {
+      await saveVisitor(guestDb, visitorName, visitorEnabled);
       await guestDb.meta.put({ key: 'guest-notice', value: true });
       welcome.close();
     }}>{t('Continue as guest', 'Lanjut sebagai tamu')}</button

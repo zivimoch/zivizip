@@ -34,7 +34,7 @@
 
 <section class="note-library" aria-label={t('Your notes', 'Catatanmu')}>
   <header>
-    <h1>{t('Your notes', 'Catatanmu')}</h1>
+    <h1>{t('Note', 'Catatan')}<span>.</span></h1>
     <div class="library-controls">
       <input
         type="search"
@@ -87,20 +87,27 @@
   .note-library {
     height: 100%;
     overflow: auto;
-    padding: 28px 32px;
+    padding: 28px;
   }
   header {
-    margin-bottom: 24px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
   }
   h1 {
-    margin: 0 0 20px;
-    font-size: 24px;
+    margin: 0;
+    font-size: 28px;
+  }
+  h1 span {
+    color: var(--accent);
   }
   .library-controls {
     display: flex;
-    align-items: end;
-    gap: 16px;
-    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
   }
   input {
     flex: 1;
@@ -108,15 +115,19 @@
     max-width: 520px;
   }
   label {
+    margin: 0;
+    white-space: nowrap;
     display: flex;
-    flex-direction: column;
-    gap: 6px;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
     color: var(--muted);
     font-size: 12px;
   }
   select,
   input {
-    min-height: 40px;
+    min-height: 36px;
+    margin: 0;
   }
   .note-grid {
     display: grid;
@@ -170,15 +181,28 @@
     margin-top: auto;
   }
   @media (max-width: 800px) {
+    h1 {
+      font-size: 24px;
+    }
     .note-library {
       padding: 20px;
     }
     .library-controls {
-      align-items: stretch;
-    }
-    input,
-    label {
+      align-items: center;
       width: 100%;
+      gap: 8px;
+    }
+    input {
+      min-width: 0;
+      width: 40%;
+    }
+    label {
+      min-width: 0;
+      flex: 1;
+    }
+    select {
+      width: 100%;
+      min-width: 0;
     }
   }
 </style>

@@ -160,3 +160,20 @@ Svelte/TypeScript checks, 44 unit tests and the production frontend image build 
 ## Draw clipboard and images — 2026-10-18
 
 Svelte/TypeScript checks, 47 frontend unit tests, 14 Rust tests and local frontend/API image builds passed. Twenty Draw/Text-image/shared browser scenarios passed. The three focused clipboard scenarios also passed after extending shared-image upload coverage. Checks cover editable object copying between notes, image paste, undo/redo, PNG pixel content, attachment backup, offline reload, owner persistence, shared media access, read-only links and the mobile file-picker alternative. Storage tests round-trip Draw attachments and reject backups missing their bytes. These clipboard browser scenarios are included in Jenkins. Clipboard events and mobile viewport/file selection are automated; physical-device clipboard permissions remain browser-dependent.
+
+## Owner administration and compact headers — 2026-10-20
+
+Local production builds passed Svelte checks without diagnostics, 47 frontend
+unit tests and 15 Rust tests. Seven browser scenarios passed across Notes, To do
+and the new administration checks. Admin coverage verifies anonymous denial,
+mutation origin enforcement, session revocation preserving the current session,
+visitor-name persistence, reload deduplication, opt-out removal, and mobile layout.
+Header checks assert search/sort row alignment at 1440px and 390px. Screenshots
+were inspected; this is viewport testing, not physical-device verification.
+
+The initial admin check caught a missing trailing-slash prerender configuration;
+`/admin/` now has its own static index. A sort-control locator was corrected to
+use its accessible combobox role. Guest reporting remains optional and separate
+from workspace content. The generated country database passed SQLite integrity
+checks and an example public-IP lookup. Country accuracy and unique-person
+identification are not guaranteed by these checks.

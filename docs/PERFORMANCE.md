@@ -4,7 +4,7 @@
 
 - `pnpm build` reports production JavaScript/CSS and gzip estimates. These are asset sizes, not RAM or server latency.
 - Settings shows the current workspace read time: elapsed time from browser component mount through IndexedDB loading; it excludes network boot and is not LCP.
-- A `zivizip-workspace-ready` performance mark is available in DevTools. No telemetry leaves this browser.
+- A `zivizip-workspace-ready` performance mark is available in DevTools. This performance measurement stays in the browser; optional visitor metadata is documented separately in docs/API.md.
 - Browser tests verify desktop persistence/backup and mobile-sized offline reload/editing. Viewport simulation is not physical-phone testing.
 
 ## Initial budgets (targets, not achieved claims)

@@ -401,7 +401,6 @@
   <header>
     <div>
       <h1>{t('Goals', 'Target')}<span>.</span></h1>
-      <p>{t('Make room for what matters.', 'Wujudkan hal yang berarti.')}</p>
     </div>
     <button class="primary" disabled={!writable || busy} onclick={() => open()}
       ><Icon name="plus" />{t('New goal', 'Target baru')}</button
@@ -689,10 +688,6 @@
   h1 span {
     color: var(--accent);
   }
-  header p {
-    margin-top: 8px;
-    font-size: 13px;
-  }
   button {
     display: inline-flex;
     align-items: center;
@@ -967,9 +962,6 @@
     }
     .goal-card {
       flex-basis: calc(100vw - 52px);
-    }
-    header p {
-      max-width: 220px;
     }
     .goal-strip {
       height: clamp(340px, 46dvh, 400px);

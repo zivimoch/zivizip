@@ -212,3 +212,19 @@ This document describes the target interaction model. The [verification scope](.
 - Paste screenshot/image files directly into Draw. Add image provides a file-picker alternative for touch devices or unavailable clipboard access; Paste and Copy selection are also available in the toolbar. Browser permission failures explain the keyboard/file alternatives.
 - Images are separate content-hashed WebP attachments, shared with Text Notes storage. They support selection, dragging, resize, rotation, erasing, deletion and undo. Copy image and PNG export include raster images; backup, import, guest-to-account copying and shared-note permissions include Draw attachments.
 - Clipboard payloads validate object geometry and image hashes before inserting; unsupported or invalid payloads do not replace the drawing. Account/shared read-only states prevent paste and image uploads.
+
+## Compact detail headers and owner administration
+
+- Goals and To do detail omit introductory taglines. Notes detail is titled
+  `Note.` in English, with a matching accent dot and compact header typography.
+  Search and sort controls share a row; Finance detail remains unchanged.
+- `/admin/` uses the existing owner session. It shows the owner account, allows
+  revoking other sessions, lists/removes registration interests, and lists/removes
+  visit summaries. Registration remains closed.
+- First-time guests may enter an optional name and disable basic visit statistics.
+  Preferences persist per browser and are editable in Settings. Visitor records
+  contain coarse browser/OS, approximate country and visit times, separately from
+  local workspace data. They do not identify physical devices or verify names.
+- Country lookup runs locally on the server without GPS permission or third-party
+  IP queries. Missing lookup data is explicitly unavailable. Inactive visitor
+  records expire after 90 days; opting out removes the live profile when online.
