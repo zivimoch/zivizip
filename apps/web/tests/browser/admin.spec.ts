@@ -21,10 +21,23 @@ test('admin protects records, retains visitor preferences and revokes other sess
     .getByRole('dialog')
     .getByLabel('Name (optional)', { exact: true })
     .fill('Browser test visitor');
+  const recorded = page.waitForResponse(
+    (response) =>
+      response.url().endsWith('/api/visits') &&
+      response.request().method() === 'POST',
+  );
   await page
     .getByRole('button', { name: 'Continue as guest', exact: true })
     .click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect((await recorded).status()).toBe(204);
+  const revisited = page.waitForResponse(
+    (response) =>
+      response.url().endsWith('/api/visits') &&
+      response.request().method() === 'POST',
+  );
   await page.reload();
+  expect((await revisited).status()).toBe(204);
   await expect(
     page.getByRole('button', { name: 'Continue as guest', exact: true }),
   ).toHaveCount(0);
