@@ -1,4 +1,5 @@
 <script lang="ts">
+  import TouchGrip from './TouchGrip.svelte';
   export let item: { key: string; title: string; detail: string; type: string };
   export let source = '';
   let touchInput = false;
@@ -34,10 +35,17 @@
   }}
   ondragend={onend}
   onpointerdown={(e) => (touchInput = e.pointerType !== 'mouse')}
-  ontouchstart={(e) => ontouch(e, item.key, source)}
   onkeydown={(e) => onkeyboard(e, item.key, source)}
   oncontextmenu={(e) => e.preventDefault()}
 >
+  <TouchGrip
+    label={`${language === 'id' ? 'Geser item' : 'Drag item'} ${item.title}`}
+    {disabled}
+    ontouchstart={(e) => {
+      e.stopPropagation();
+      ontouch(e, item.key, source);
+    }}
+  />
   <small
     >{item.type === 'task'
       ? 'To do'
@@ -64,6 +72,17 @@
     flex: 0 0 210px;
     scroll-snap-align: start;
     touch-action: pan-x pan-y;
+  }
+  .goal-item :global(.touch-grip) {
+    position: absolute;
+    right: 0;
+    top: 0;
+  }
+  @media (pointer: coarse), (max-width: 800px) {
+    .goal-item,
+    .compact {
+      padding-right: 48px;
+    }
   }
   .goal-item:active {
     cursor: grabbing;

@@ -37,7 +37,6 @@
     id: number;
     x: number;
     y: number;
-    timer: ReturnType<typeof setTimeout>;
   } | null = null;
   let scrollFrame = 0;
   let pageElement: HTMLElement;
@@ -231,7 +230,6 @@
     dragSource = source;
   }
   function cancelDrag() {
-    if (touch) clearTimeout(touch.timer);
     touch = null;
     touchActive = false;
     dragging = '';
@@ -326,16 +324,15 @@
       id: point.identifier,
       x: point.clientX,
       y: point.clientY,
-      timer: setTimeout(() => {
-        if (!touch) return;
-        startDrag(key, source);
-        touchActive = true;
-        ghostX = touch.x;
-        ghostY = touch.y;
-        scrollFrame = requestAnimationFrame(autoScroll);
-      }, 280),
     };
+    e.preventDefault();
+    startDrag(key, source);
+    touchActive = true;
+    ghostX = point.clientX;
+    ghostY = point.clientY;
+    scrollFrame = requestAnimationFrame(autoScroll);
   }
+
   function moveTouch(e: TouchEvent) {
     if (!touch) return;
     if (e.touches.length !== 1) {

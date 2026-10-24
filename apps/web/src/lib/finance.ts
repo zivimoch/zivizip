@@ -154,3 +154,30 @@ export class FinanceRepository {
     ]);
   }
 }
+
+// Count usage rather than amounts; deterministic ties use the newest transaction.
+export function preferredCategory(
+  items: Transaction[],
+  type: Transaction['type'],
+): string {
+  const counts = new Map<
+    string,
+    { name: string; count: number; date: string }
+  >();
+  for (const item of items
+    .filter((item) => item.type === type)
+    .sort((a, b) => b.date.localeCompare(a.date))) {
+    const key = item.category.trim().toLowerCase();
+    const entry = counts.get(key);
+    if (entry) entry.count++;
+    else counts.set(key, { name: item.category, count: 1, date: item.date });
+  }
+  return (
+    [...counts.values()].sort(
+      (a, b) =>
+        b.count - a.count ||
+        b.date.localeCompare(a.date) ||
+        a.name.localeCompare(b.name),
+    )[0]?.name || ''
+  );
+}

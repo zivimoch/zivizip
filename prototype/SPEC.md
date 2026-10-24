@@ -71,7 +71,7 @@ This document describes the target interaction model. The [verification scope](.
 - With Tasks focused, Delete opens one confirmation for the complete selection. The contextual Delete button provides the same action without a keyboard. Only the selected IDs are removed in one revision-checked write; cancelling preserves every task. Delete while editing a text field is ordinary text editing.
 - Selection highlight extends 12px left without moving text or completion controls.
 - Completed text keeps its normal color with no strikethrough; the completion control indicates state.
-- On mobile, double-tap edits. Tap to select before touch-dragging; unselected rows allow normal vertical scrolling. Keyboard users can focus rows, press F2/Enter to edit, Shift+Space to select and Alt+Arrow to reorder.
+- On mobile, double-tap edits. Drag using the six-dot handle; row bodies allow normal vertical scrolling, including selected rows. Keyboard users can focus rows, press F2/Enter to edit, Shift+Space to select and Alt+Arrow to reorder.
 - Guest tasks persist offline in IndexedDB; account tasks use revision-checked server storage and SSE, with a read-only offline cache. Version 4 workspace backups include active and archived tasks. Guest copying remains explicit.
 - Background refreshes leave existing Tasks controls enabled and retain unchanged rows, selection and scroll position. Saving a note must not make Tasks flash or fade.
 - Tasks and Finance are independent. Tasks have no amount field or transaction link; previously stored task amounts remain preserved for compatibility but are not displayed.
@@ -116,7 +116,7 @@ This document describes the target interaction model. The [verification scope](.
 - Cards have bounded responsive heights (460–540px desktop, 340–400px mobile) and independently scrollable contribution lists.
 - Create, edit and delete goals with a required title and optional description. A lightweight procedural island world replaces photo covers: it develops with the number of linked contributions, never the amount spent. Legacy cover identifiers remain accepted in backups.
 - Unassigned accepts archived completed tasks and expense transactions; active completed tasks and income are excluded. Existing linked tasks remain referenced when restored from the task archive. Cards show totals and a compact, vertically scrollable contribution list. Long titles use ellipsis with the full title available on hover/focus.
-- Assignment uses drag only, without Move to goal buttons. Desktop uses native dragging; touch uses a brief hold on the item body followed by dragging, with edge scrolling and no grip icon. A quick swipe scrolls normally. Keyboard users can pick up an item with Space/Enter, Tab to a drop region and press Enter; Escape cancels.
+- Assignment uses drag only, without Move to goal buttons. Desktop uses native dragging; touch dragging starts from a six-dot handle, with edge scrolling. Item-body swipes scroll normally and holding the body does not initiate dragging. Keyboard users can pick up an item with Space/Enter, Tab to a drop region and press Enter; Escape cancels.
 - Dropping onto another goal adds a reference without removing the source goal reference. The same source may belong to several goals, but never twice in one goal. Unassigned contains only sources with no goal references.
 - Dropping an assigned item into Unassigned removes only its source-goal reference. It reappears in the pool when no remaining goals reference it. Deleting a goal follows the same rule and preserves source records.
 - Source changes update totals; removed sources and incomplete tasks no longer contribute. Goal cards scroll horizontally above Unassigned on desktop and mobile. Unassigned has two rows in one horizontal scroll container; both rows move together.
@@ -228,3 +228,10 @@ This document describes the target interaction model. The [verification scope](.
 - Country lookup runs locally on the server without GPS permission or third-party
   IP queries. Missing lookup data is explicitly unavailable. Inactive visitor
   records expire after 90 days; opting out removes the live profile when online.
+
+### Finance defaults, bulk Notes, and touch dragging
+
+- Income includes unplanned income categories from that month's transactions. Automatic Income and monthly expense budgets follow actual totals, retain category controls, and disappear when their matching transactions are removed. Explicit nonzero budgets remain unchanged.
+- New Finance transactions suggest the most frequently used category for their direction across the workspace ledger. Ties use the latest transaction date, then category name. Changing direction updates the suggestion until the user explicitly changes the category; editing a transaction preserves its category.
+- Detail Notes provides individual checkboxes, select-all filtered results, clearing selection, and confirmed bulk deletion. Opening a card still opens Main. Failed deletions retain undeleted notes and selection for retry.
+- Mobile/coarse-pointer reorder handles use six dots with 44px touch targets for Goals contributions, Tasks, planning categories, and Notes tabs. Item bodies retain scrolling/tapping; Goals no longer starts drag after holding an item body. Desktop row dragging remains available. Canvas object manipulation and native text selection keep their editor-specific gestures.

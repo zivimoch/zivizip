@@ -12,6 +12,7 @@
     dateInMonth,
     monthlyTransactions,
     totals,
+    preferredCategory,
     type Transaction,
   } from './finance';
   export let repository: FinanceRepository;
@@ -23,6 +24,7 @@
   export let categoryOptions: string[] = [];
   export let planningRepository: PlanningRepository | undefined = undefined;
   let plannedCategories: string[] = [];
+  let categoryEdited = false;
   let state = emptyFinance(),
     initialized = false,
     busy = false,
@@ -139,7 +141,8 @@
     const values = item || defaults;
     type = values?.type || 'expense';
     title = values?.title || '';
-    category = values?.category || '';
+    category = values?.category ?? preferredCategory(state.items, type);
+    categoryEdited = !!values?.category;
     date = values?.date || dateInMonth(month);
     amount = values?.amount ? String(values.amount) : '';
     deleting = false;
@@ -379,6 +382,10 @@
           ><input
             type="radio"
             bind:group={type}
+            onchange={() => {
+              if (!editing && !categoryEdited)
+                category = preferredCategory(state.items, type);
+            }}
             value="expense"
             disabled={busy}
           />{t('Expense', 'Pengeluaran')}</label
@@ -387,6 +394,10 @@
           ><input
             type="radio"
             bind:group={type}
+            onchange={() => {
+              if (!editing && !categoryEdited)
+                category = preferredCategory(state.items, type);
+            }}
             value="income"
             disabled={busy}
           />{t('Income', 'Pemasukan')}</label
@@ -394,6 +405,7 @@
       </fieldset>
       <label
         >{t('Category', 'Kategori')}<SuggestionField
+          onedit={() => (categoryEdited = true)}
           id="transaction-category"
           label={t('Category', 'Kategori')}
           options={categories}

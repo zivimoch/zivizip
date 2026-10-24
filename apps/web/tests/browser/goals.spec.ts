@@ -431,7 +431,7 @@ test('guest-only goals require explicit copying into the account', async ({
   }
 });
 for (const height of [667, 844])
-  test(`mobile hold drag assigns, cancels and returns contributions at ${height}px`, async ({
+  test(`mobile grip drag assigns, cancels and returns contributions at ${height}px`, async ({
     browser,
   }) => {
     const context = await browser.newContext({
@@ -520,7 +520,7 @@ for (const height of [667, 844])
       await page.getByRole('button', { name: 'Cancel', exact: true }).click();
       async function touchDrag(source: any, target: any, cancel = false) {
         await source.scrollIntoViewIfNeeded();
-        const from = await source.boundingBox();
+        const from = await source.locator('[data-touch-grip]').boundingBox();
         const dropSurface = (await target.getAttribute('class'))?.includes(
           'goal-card',
         )

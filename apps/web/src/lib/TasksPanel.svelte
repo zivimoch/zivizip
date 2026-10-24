@@ -1,4 +1,5 @@
 <script lang="ts">
+  import TouchGrip from './TouchGrip.svelte';
   import { capitalizeField } from './capitalization';
   import LinkedText from './LinkedText.svelte';
   import { onMount, tick } from 'svelte';
@@ -245,7 +246,8 @@
   function pointerDown(event: PointerEvent, task: Task) {
     if (
       event.button !== 0 ||
-      (event.target as Element).closest('button,a') ||
+      ((event.target as Element).closest('button,a') &&
+        !(event.target as Element).closest('[data-touch-grip]')) ||
       busy
     )
       return;
@@ -259,6 +261,11 @@
     const already = selected.has(task.id);
     if (!already) selected = new Set([task.id]);
     if (!writable) return;
+    if (
+      event.pointerType !== 'mouse' &&
+      !(event.target as Element).closest('[data-touch-grip]')
+    )
+      return;
     if (event.pointerType !== 'touch' || already) event.preventDefault();
     drag = {
       id: task.id,
@@ -568,6 +575,10 @@
             >{#if task.done}<Icon name="tick" />{/if}</button
           >
         </div>
+        <TouchGrip
+          label={`${t('Drag task', 'Geser tugas')} ${task.title}`}
+          disabled={!writable || busy}
+        />
         <div class="task-copy" role="gridcell">
           <span class="task-title"><LinkedText text={task.title} /></span
           >{#if task.date}<div class="task-date">
@@ -781,9 +792,7 @@
     border-left: 3px solid transparent;
     z-index: 0;
   }
-  .task-row.selected {
-    touch-action: none;
-  }
+
   .task-row.selected::before {
     background: #00d8ec12;
     border-color: var(--accent);

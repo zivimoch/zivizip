@@ -36,6 +36,7 @@
   }
   import InstallApp from '$lib/InstallApp.svelte';
   import ShareSettings from '$lib/ShareSettings.svelte';
+  import TouchGrip from '$lib/TouchGrip.svelte';
   import NoteLibrary from '$lib/NoteLibrary.svelte';
   import TasksPanel from '$lib/TasksPanel.svelte';
   import {
@@ -783,6 +784,29 @@
       problem(e);
     }
   }
+  async function removeNotes(ids: string[]) {
+    if (!writable || workspaceBusy)
+      throw Error(
+        t(
+          'Notes are currently read only.',
+          'Catatan saat ini hanya dapat dibaca.',
+        ),
+      );
+    const currentRepo = repo;
+    await queue;
+    for (const id of ids) {
+      if (repo !== currentRepo || !writable)
+        throw Error(
+          t(
+            'Workspace changed. Please try again.',
+            'Workspace berubah. Silakan coba lagi.',
+          ),
+        );
+      await currentRepo.remove(id);
+      notes = notes.filter((note) => note.id !== id);
+      closeNote(id);
+    }
+  }
   async function removeNote() {
     if (
       !writable ||
@@ -978,12 +1002,18 @@
     target.addEventListener('pointercancel', stop);
   }
   function moveTab(e: PointerEvent, id: string) {
-    if (e.button !== 0) return;
+    if (
+      e.button !== 0 ||
+      (e.pointerType !== 'mouse' &&
+        !(e.target as Element).closest('[data-touch-grip]'))
+    )
+      return;
     const target = e.currentTarget as HTMLElement;
     const x = e.clientX;
     let moved = false;
     target.setPointerCapture(e.pointerId);
     const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== e.pointerId) return;
       if (Math.abs(ev.clientX - x) < 8 && !moved) return;
       moved = true;
       dragId = id;
@@ -996,16 +1026,19 @@
         prefs.open = next;
       }
     };
-    const stop = () => {
-      target.removeEventListener('pointermove', move);
-      target.removeEventListener('pointerup', stop);
-      target.removeEventListener('pointercancel', stop);
+    const stop = (ev: PointerEvent) => {
+      if (ev.pointerId !== e.pointerId) return;
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', stop);
+      window.removeEventListener('pointercancel', stop);
+      if (target.hasPointerCapture(e.pointerId))
+        target.releasePointerCapture(e.pointerId);
       if (moved) remember();
       setTimeout(() => (dragId = null), 0);
     };
-    target.addEventListener('pointermove', move);
-    target.addEventListener('pointerup', stop);
-    target.addEventListener('pointercancel', stop);
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', stop);
+    window.addEventListener('pointercancel', stop);
   }
 </script>
 
@@ -1194,6 +1227,8 @@
   {:else if view === 'notes'}
     <NoteLibrary
       {notes}
+      {writable}
+      ondelete={removeNotes}
       language={prefs.language}
       onopen={(id) => {
         openNote(id);
@@ -1208,6 +1243,10 @@
             class:active={prefs.active === note.id}
             data-note-id={note.id}
           >
+            <TouchGrip
+              label={`${t('Drag tab', 'Geser tab')} ${note.name}`}
+              onpointerdown={(event) => moveTab(event, note.id)}
+            />
             <button
               class="tab-select"
               onpointerdown={(e) => moveTab(e, note.id)}

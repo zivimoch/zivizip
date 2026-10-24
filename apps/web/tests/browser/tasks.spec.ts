@@ -286,11 +286,13 @@ test('mobile tasks open from navigation, edit with double tap and reorder with t
   await row(page, 'First').tap();
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
-  const box = (await row(page, 'First').boundingBox())!,
+  const box = (await row(page, 'First')
+      .locator('[data-touch-grip]')
+      .boundingBox())!,
     target = (await row(page, 'Second').boundingBox())!;
   await row(page, 'First').tap();
   const client = await context.newCDPSession(page);
-  const point = { x: box.x + 65, y: box.y + box.height / 2 };
+  const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
   await client.send('Input.dispatchTouchEvent', {
     type: 'touchStart',
     touchPoints: [point],

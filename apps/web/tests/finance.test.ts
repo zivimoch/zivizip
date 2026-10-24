@@ -11,6 +11,7 @@ import {
   validateTransactions,
   monthlyTransactions,
   totals,
+  preferredCategory,
   type Transaction,
 } from '../src/lib/finance';
 const dbs: WorkspaceDB[] = [];
@@ -122,4 +123,16 @@ it('allows an omitted description while retaining required category and amount',
       },
     ]),
   ).not.toThrow();
+});
+
+it('suggests the most frequently used category per direction, not largest amount', () => {
+  const rows = [
+    item('a'),
+    item('b'),
+    { ...item('c', 'expense', 999999), category: 'Travel' },
+    { ...item('d', 'income'), category: 'Salary' },
+  ];
+  expect(preferredCategory(rows, 'expense')).toBe('Food');
+  expect(preferredCategory(rows, 'income')).toBe('Salary');
+  expect(preferredCategory([], 'income')).toBe('');
 });

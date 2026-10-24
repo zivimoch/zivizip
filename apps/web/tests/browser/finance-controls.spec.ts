@@ -27,6 +27,9 @@ test('finance suggestions, optional description, formatted money and daily total
   await expect(page.locator('.transaction-name')).toHaveText('Food');
   await expect(page.locator('.daily-totals')).toContainText('1.250.000');
   await add.click();
+  await expect(
+    page.getByRole('combobox', { name: 'Category', exact: true }),
+  ).toHaveValue('Food');
   await page.getByRole('combobox', { name: 'Category', exact: true }).fill('F');
   const option = page.getByRole('option', { name: 'Food', exact: true });
   await expect(option).toBeVisible();

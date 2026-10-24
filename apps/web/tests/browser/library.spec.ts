@@ -53,3 +53,49 @@ test('note cards search, sort and open directly in Main', async ({ page }) => {
       .getByRole('button', { name: 'Notes', exact: true }),
   ).toHaveAttribute('aria-current', 'page');
 });
+
+test('bulk deletion selects notes without opening them and keeps unselected notes', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page
+    .getByRole('button', { name: 'Continue as guest', exact: true })
+    .click();
+  for (const name of ['Keep', 'Remove one', 'Remove two']) {
+    await page.getByRole('button', { name: 'New note', exact: true }).click();
+    await page.getByLabel('Name', { exact: true }).fill(name);
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
+  }
+  await page.getByRole('button', { name: 'Detail', exact: true }).click();
+  await page
+    .locator('.sidebar .detail')
+    .getByRole('button', { name: 'Notes', exact: true })
+    .click();
+  await page.mouse.move(650, 300);
+  await page
+    .getByRole('checkbox', { name: 'Select note Remove one', exact: true })
+    .check();
+  await page
+    .getByRole('checkbox', { name: 'Select note Remove two', exact: true })
+    .check();
+  await page
+    .getByRole('button', { name: 'Delete selected', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(page.locator('.note-card')).toHaveCount(3);
+  await page
+    .getByRole('button', { name: 'Delete selected', exact: true })
+    .click();
+  await page
+    .getByRole('button', { name: 'Confirm deletion', exact: true })
+    .click();
+  await expect(page.locator('.note-card')).toHaveCount(1);
+  await expect(page.locator('.note-card')).toContainText('Keep');
+  await page.reload();
+  await page.getByRole('button', { name: 'Detail', exact: true }).click();
+  await page
+    .locator('.sidebar .detail')
+    .getByRole('button', { name: 'Notes', exact: true })
+    .click();
+  await expect(page.locator('.note-card')).toHaveCount(1);
+});

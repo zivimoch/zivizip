@@ -4,6 +4,33 @@
   export let notes: Note[];
   export let language: 'en' | 'id';
   export let onopen: (id: string) => void;
+  export let writable = true;
+  export let ondelete: (ids: string[]) => Promise<void>;
+  let selected = new Set<string>();
+  let deleting = false;
+  let confirmDelete = false;
+  let failure = '';
+  $: selected = new Set(
+    [...selected].filter((id) => notes.some((note) => note.id === id)),
+  );
+  function toggle(id: string) {
+    selected = new Set(selected);
+    if (selected.has(id)) selected.delete(id);
+    else selected.add(id);
+  }
+  async function removeSelected() {
+    deleting = true;
+    failure = '';
+    try {
+      await ondelete([...selected]);
+      selected = new Set();
+      confirmDelete = false;
+    } catch (error) {
+      failure = error instanceof Error ? error.message : String(error);
+    } finally {
+      deleting = false;
+    }
+  }
   let search = '';
   let sort = 'updated';
   const t = (en: string, id: string) => (language === 'id' ? id : en);
@@ -57,21 +84,80 @@
       >
     </div>
   </header>
+  <div class="selection-controls">
+    <button
+      disabled={!visible.length || deleting}
+      onclick={() => (selected = new Set(visible.map((note) => note.id)))}
+      >{t('Select all results', 'Pilih semua hasil')}</button
+    >
+    {#if selected.size}
+      <span>{selected.size} {t('selected', 'dipilih')}</span>
+      <button
+        disabled={deleting}
+        onclick={() => {
+          selected = new Set();
+          confirmDelete = false;
+        }}>{t('Clear selection', 'Batalkan pilihan')}</button
+      >
+      <button
+        class="danger"
+        disabled={!writable || deleting}
+        onclick={() => (confirmDelete = true)}
+        ><Icon name="trash" />{t('Delete selected', 'Hapus pilihan')}</button
+      >
+    {/if}
+  </div>
+  {#if confirmDelete && selected.size}
+    <div class="delete-confirmation" role="alert">
+      <p>
+        {t('Permanently delete', 'Hapus permanen')}
+        {selected.size}
+        {t(
+          'notes? This cannot be undone.',
+          'catatan? Tindakan ini tidak dapat dibatalkan.',
+        )}
+      </p>
+      <button disabled={deleting} onclick={() => (confirmDelete = false)}
+        >{t('Cancel', 'Batal')}</button
+      >
+      <button
+        class="danger"
+        disabled={!writable || deleting}
+        onclick={removeSelected}
+        >{t('Confirm deletion', 'Konfirmasi hapus')}</button
+      >
+    </div>
+  {/if}
+  {#if failure}<p role="alert">{failure}</p>{/if}
   <div class="note-grid">
     {#each visible as note (note.id)}
-      <button class="note-card" onclick={() => onopen(note.id)}>
-        <span class="card-heading"
-          ><Icon name={note.icon} /><strong>{note.name}</strong></span
+      <div class="note-card-wrap" class:selected={selected.has(note.id)}>
+        <input
+          class="note-select"
+          type="checkbox"
+          aria-label={`${t('Select note', 'Pilih catatan')} ${note.name}`}
+          checked={selected.has(note.id)}
+          disabled={deleting}
+          onchange={() => toggle(note.id)}
+        />
+        <button
+          class="note-card"
+          disabled={deleting}
+          onclick={() => onopen(note.id)}
         >
-        <span class="category">{note.category}</span>
-        <span class="preview-text"
-          >{note.kind === 'draw'
-            ? t('Drawing', 'Gambar')
-            : note.body.trim().slice(0, 180) ||
-              t('Empty note', 'Catatan kosong')}</span
-        >
-        <small>{t('Updated', 'Diperbarui')} {date(note.updatedAt)}</small>
-      </button>
+          <span class="card-heading"
+            ><Icon name={note.icon} /><strong>{note.name}</strong></span
+          >
+          <span class="category">{note.category}</span>
+          <span class="preview-text"
+            >{note.kind === 'draw'
+              ? t('Drawing', 'Gambar')
+              : note.body.trim().slice(0, 180) ||
+                t('Empty note', 'Catatan kosong')}</span
+          >
+          <small>{t('Updated', 'Diperbarui')} {date(note.updatedAt)}</small>
+        </button>
+      </div>
     {:else}<p class="library-empty">
         {query
           ? t('No matching notes.', 'Tidak ada catatan yang cocok.')
@@ -84,6 +170,41 @@
 </section>
 
 <style>
+  .selection-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .selection-controls button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .delete-confirmation {
+    padding: 12px;
+    border: 1px solid var(--line);
+    margin-bottom: 16px;
+  }
+  .note-card-wrap {
+    position: relative;
+    min-width: 0;
+  }
+  .note-card-wrap.selected .note-card {
+    border-color: var(--accent);
+  }
+  .note-select {
+    position: absolute;
+    z-index: 1;
+    top: 12px;
+    right: 12px;
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    min-height: 24px;
+  }
+
   .note-library {
     height: 100%;
     overflow: auto;
@@ -141,6 +262,8 @@
     gap: 12px;
     min-width: 0;
     min-height: 190px;
+    width: 100%;
+    height: 100%;
     padding: 18px;
     text-align: left;
     border: 1px solid var(--line);
@@ -153,6 +276,7 @@
   .card-heading {
     display: flex;
     gap: 10px;
+    padding-right: 28px;
     align-items: center;
   }
   strong {

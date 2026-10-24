@@ -247,3 +247,29 @@ it('keeps an empty manually planned monthly category until spending occurs', () 
     ),
   ).toMatchObject({ amount: 40, automatic: true });
 });
+
+it('derives unexpected income independently of expense categories and follows ledger edits', () => {
+  const ledger = [
+    transaction('Bonus', 'income', 200),
+    transaction('bonus', 'income', 50),
+    transaction('Bonus', 'expense', 20),
+  ];
+  const rows = monthBudgets(data(), ledger, '2026-10');
+  expect(
+    rows.find((row) => row.category === 'Bonus' && row.group === 'income')
+      ?.amount,
+  ).toBe(250);
+  expect(
+    rows.find((row) => row.category === 'Bonus' && row.group === 'monthly')
+      ?.amount,
+  ).toBe(20);
+  expect(
+    monthBudgets(data(), [], '2026-10').some((row) => row.category === 'Bonus'),
+  ).toBe(false);
+  const automatic = { ...budget('Bonus', 'income', 0), automatic: true };
+  validatePlanning({ ...data(), items: [...data().items, automatic] });
+  expect(
+    monthBudgets({ ...data(), items: [automatic] }, ledger, '2026-10')[0]
+      .amount,
+  ).toBe(250);
+});

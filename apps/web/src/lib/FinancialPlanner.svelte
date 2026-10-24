@@ -1,4 +1,5 @@
 <script lang="ts">
+  import TouchGrip from './TouchGrip.svelte';
   import { capitalizeField } from './capitalization';
   import { displayCurrency, formatMoney } from './currency';
   import MoneyField from './MoneyField.svelte';
@@ -356,7 +357,9 @@
             amount: Number(amount),
             group,
             automatic:
-              current.automatic && Number(amount) === 0 && group === 'monthly',
+              current.automatic &&
+              Number(amount) === 0 &&
+              ['monthly', 'income'].includes(group),
           });
       }
       if (await commit(data)) {
@@ -407,7 +410,12 @@
     }
     const already = selected.has(plan.id);
     if (!already) selected = new Set([plan.id]);
-    if (event.pointerType !== 'touch' || already) event.preventDefault();
+    if (
+      event.pointerType !== 'mouse' &&
+      !(event.target as Element).closest('[data-touch-grip]')
+    )
+      return;
+    event.preventDefault();
     const row = event.currentTarget as HTMLElement,
       list = row.closest<HTMLElement>('.plan-items-scroll')!;
     drag = {
@@ -419,7 +427,7 @@
       category: !!(event.target as Element).closest('.plan-category'),
       list,
     };
-    row.setPointerCapture(event.pointerId);
+    list.setPointerCapture(event.pointerId);
     row.focus({ preventScroll: true });
   }
   function pointerMove(event: PointerEvent) {
@@ -454,10 +462,8 @@
       order = draft;
     drag = null;
     draft = null;
-    if ((event.currentTarget as HTMLElement).hasPointerCapture(event.pointerId))
-      (event.currentTarget as HTMLElement).releasePointerCapture(
-        event.pointerId,
-      );
+    if (current.list.hasPointerCapture(event.pointerId))
+      current.list.releasePointerCapture(event.pointerId);
     if (current.moving) {
       if (order) await reorder(order);
       return;
@@ -529,6 +535,15 @@
     };
   });
 </script>
+
+<svelte:window
+  onpointermove={pointerMove}
+  onpointerup={pointerUp}
+  onpointercancel={() => {
+    drag = null;
+    draft = null;
+  }}
+/>
 
 <svelte:document
   onpointerdown={(event) => {
@@ -798,19 +813,28 @@
                         class:excluded={!plan.enabled}
                         tabindex="0"
                         onpointerdown={(event) => pointerDown(event, plan)}
-                        onpointermove={pointerMove}
-                        onpointerup={pointerUp}
-                        onpointercancel={() => {
-                          drag = null;
-                          draft = null;
+                        ondblclick={(event) => {
+                          if (
+                            matchMedia('(pointer: coarse)').matches &&
+                            !(event.target as Element).closest(
+                              '[data-touch-grip],[data-row-action]',
+                            )
+                          )
+                            void show('budget', plan);
                         }}
                         onkeydown={(event) => rowKey(event, plan)}
                       >
                         <td
-                          ><button
+                          ><TouchGrip
+                            label={`${t('Drag category', 'Geser kategori')} ${plan.category}`}
+                            disabled={!writable || busy}
+                          /><button
                             class="plan-category"
                             onclick={(event) => {
-                              if (event.detail === 0)
+                              if (
+                                event.detail === 0 ||
+                                matchMedia('(pointer: coarse)').matches
+                              )
                                 void show('category', plan);
                             }}>{plan.category}</button
                           >
@@ -1529,7 +1553,6 @@
   [data-plan-row].selected {
     background: #00d8ec18;
     box-shadow: inset 3px 0 var(--accent);
-    touch-action: none;
   }
   [data-plan-row].excluded {
     color: #89979f;

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { capitalFirst, capitalizeField } from './capitalization';
   export let capitalize = false;
+  export let onedit: () => void = () => {};
   import { onMount, tick } from 'svelte';
   export let id: string;
   export let label: string;
@@ -49,6 +50,7 @@
   }
   function choose(option: string) {
     value = capitalize ? capitalFirst(option) : option;
+    onedit();
     close();
     input.focus();
   }
@@ -104,7 +106,10 @@
     : undefined}
   autocomplete="off"
   onclick={show}
-  oninput={show}
+  oninput={() => {
+    onedit();
+    void show();
+  }}
   onkeydown={key}
   onblur={close}
 />

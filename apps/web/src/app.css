@@ -247,7 +247,7 @@ small {
   padding-inline: 10px;
   align-items: center;
   min-width: 110px;
-  touch-action: none;
+  touch-action: pan-x pan-y;
   user-select: none;
 }
 .tab.active .tab-select svg {

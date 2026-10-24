@@ -70,7 +70,8 @@ fn validate(state: &PlanningState) -> Result<()> {
                 || plan.category.encode_utf16().count() > 60
                 || !(0..=1_000_000_000_000).contains(&plan.amount)
                 || plan.note.encode_utf16().count() > 2000
-                || (plan.automatic && (plan.group != "monthly" || plan.amount != 0))
+                || (plan.automatic
+                    && (!["monthly", "income"].contains(&plan.group.as_str()) || plan.amount != 0))
                 || !categories.insert(key)
                 || total > 9_007_199_254_740_991
         });
@@ -127,6 +128,34 @@ pub async fn update(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn automatic_income_accepts_zero_storage_amount_only() {
+        let mut db = Connection::open_in_memory().unwrap();
+        super::super::schema(&db).unwrap();
+        let mut state = read(&db).unwrap();
+        state.months.push(PlanMonth {
+            month: "2026-10".into(),
+            opening: 0,
+        });
+        state.items.push(Budget {
+            id: "bonus".into(),
+            month: "2026-10".into(),
+            category: "Bonus".into(),
+            group: "income".into(),
+            amount: 0,
+            note: "".into(),
+            enabled: false,
+            automatic: true,
+        });
+        let saved = write(&mut db, state).unwrap();
+        assert_eq!(read(&db).unwrap().items[0].group, "income");
+        let mut invalid = saved.clone();
+        invalid.items[0].amount = 100;
+        assert!(write(&mut db, invalid).is_err());
+        let mut invalid = saved;
+        invalid.items[0].group = "recurring".into();
+        assert!(write(&mut db, invalid).is_err());
+    }
     #[test]
     fn plans_validate_unique_categories_months_and_revisions() {
         let mut db = Connection::open_in_memory().unwrap();

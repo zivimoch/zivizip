@@ -195,3 +195,9 @@ Finance, Goals, exports, navigation and account-isolation scenarios also passed.
 
 Viewport/touch simulation is not physical-device validation. Production and CI
 verification are separate from these local results.
+
+## Finance defaults, Notes bulk deletion, and mobile grips — 2026-10-24
+
+Local validation passed 54 frontend unit tests, 19 Rust tests, Svelte/TypeScript diagnostics, and 28 unique browser scenarios across targeted batches. Coverage includes unplanned Income budgets and category controls, frequency-based category suggestions without replacing manual choices, cancelled/confirmed bulk Notes deletion and reload persistence, desktop/task/planning regressions, and mobile six-dot handles for Goals, Tasks, planning categories and Notes tabs. Touch checks cover body scrolling, edge scrolling, cancellation and persisted order. Browser viewport/touch emulation is not physical-device verification.
+
+The CI suite includes dedicated Finance-default, Notes-library and mobile-reorder scenarios. Automatic Income changes validation only, without changing the stored snapshot shape; see the compatibility note in API.md before rolling back.

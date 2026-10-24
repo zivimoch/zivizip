@@ -76,7 +76,8 @@ export function validatePlanning(data: PlanningData) {
       plan.note.length > 2000 ||
       typeof plan.enabled !== 'boolean' ||
       typeof plan.automatic !== 'boolean' ||
-      (plan.automatic && (plan.group !== 'monthly' || plan.amount !== 0))
+      (plan.automatic &&
+        (!['monthly', 'income'].includes(plan.group) || plan.amount !== 0))
     )
       throw Error('Invalid budget');
     const key = `${plan.month}:${planType(plan)}:${categoryKey(plan.category)}`;
@@ -122,23 +123,16 @@ export function monthBudgets(
       (!plan.automatic || actualAmount(plan, transactions) > 0),
   );
   const known = new Set(
-    rows
-      .filter((plan) => planType(plan) === 'expense')
-      .map((plan) => categoryKey(plan.category)),
+    rows.map((plan) => `${planType(plan)}:${categoryKey(plan.category)}`),
   );
   for (const item of transactions) {
-    const key = categoryKey(item.category);
-    if (
-      item.type !== 'expense' ||
-      !item.date.startsWith(month + '-') ||
-      known.has(key)
-    )
-      continue;
+    const key = `${item.type}:${categoryKey(item.category)}`;
+    if (!item.date.startsWith(month + '-') || known.has(key)) continue;
     rows.push({
       id: `automatic:${month}:${key}`,
       month,
       category: item.category.trim(),
-      group: 'monthly',
+      group: item.type === 'income' ? 'income' : 'monthly',
       amount: 0,
       note: '',
       enabled: true,
@@ -147,7 +141,7 @@ export function monthBudgets(
     known.add(key);
   }
   return rows.map((plan) =>
-    plan.group === 'monthly' &&
+    ['monthly', 'income'].includes(plan.group) &&
     (plan.automatic ||
       (plan.amount === 0 && actualAmount(plan, transactions) > 0))
       ? { ...plan, amount: actualAmount(plan, transactions), automatic: true }
