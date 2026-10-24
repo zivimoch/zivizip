@@ -4,7 +4,8 @@ RUN corepack enable && corepack prepare pnpm@10.28.2 --activate
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/package.json
 RUN pnpm install --frozen-lockfile
-RUN PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT=180000 pnpm --dir apps/web exec playwright install --with-deps chromium
+RUN PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT=180000 pnpm --dir apps/web exec playwright install --with-deps --no-shell chromium
+ENV PLAYWRIGHT_CHROMIUM_CHANNEL=chromium
 COPY apps/web apps/web
 RUN pnpm build && mkdir -p /app/.local
 WORKDIR /app/apps/web
