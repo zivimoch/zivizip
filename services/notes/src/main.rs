@@ -1,4 +1,5 @@
 mod admin;
+mod collaboration;
 mod draw;
 mod finance;
 mod goals;
@@ -401,6 +402,17 @@ async fn get_media(
         .into_response())
 }
 fn write_note(db: &mut Connection, mut n: Note) -> Result<Note> {
+    let collaborative: bool = db.query_row(
+        "SELECT EXISTS(SELECT 1 FROM note_collaboration WHERE note_id=?)",
+        [&n.id],
+        |r| r.get(0),
+    )?;
+    if collaborative {
+        return Err(Error(
+            StatusCode::CONFLICT,
+            "Refresh this page to use collaborative editing",
+        ));
+    }
     validate(&n)?;
     check_media(db, &n)?;
     let tx = db.transaction()?;
@@ -534,6 +546,7 @@ fn schema(db: &Connection) -> rusqlite::Result<()> {
  INSERT OR IGNORE INTO finance_workspace VALUES(1,'{\"revision\":0,\"items\":[]}');
  INSERT OR IGNORE INTO task_workspace VALUES(1,'{\"revision\":0,\"items\":[]}');
  CREATE TABLE IF NOT EXISTS notes(id TEXT PRIMARY KEY,revision INTEGER NOT NULL,created_at INTEGER NOT NULL,data TEXT NOT NULL);
+ CREATE TABLE IF NOT EXISTS note_collaboration(note_id TEXT PRIMARY KEY REFERENCES notes(id) ON DELETE CASCADE,state BLOB NOT NULL);
  CREATE TABLE IF NOT EXISTS note_shares(note_id TEXT PRIMARY KEY,token TEXT UNIQUE NOT NULL,editable INTEGER NOT NULL);
  CREATE TABLE IF NOT EXISTS shared_uploads(token TEXT NOT NULL,asset TEXT NOT NULL,PRIMARY KEY(token,asset));
  CREATE TABLE IF NOT EXISTS interests(id INTEGER PRIMARY KEY,email TEXT NOT NULL,message TEXT NOT NULL,created_at INTEGER NOT NULL);
@@ -630,6 +643,15 @@ async fn main() {
             get(planning::list).put(planning::update),
         )
         .route("/api/notes/{id}", put(update).delete(remove))
+        .route(
+            "/api/notes/{id}/sync",
+            post(collaboration::owner).layer(DefaultBodyLimit::max(12_000_000)),
+        )
+        .route("/api/notes/{id}/metadata", put(collaboration::metadata))
+        .route(
+            "/api/shared/{token}/sync",
+            post(collaboration::shared).layer(DefaultBodyLimit::max(12_000_000)),
+        )
         .route(
             "/api/notes/{id}/share",
             get(sharing::settings)

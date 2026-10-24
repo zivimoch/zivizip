@@ -87,13 +87,13 @@ test('mobile navigation and offline reload', async ({ page, context }) => {
   await expect(page.getByRole('textbox', { name: 'Note content' })).toHaveText(
     'Offline works',
   );
-  await page
-    .getByRole('textbox', { name: 'Note content' })
-    .fill('Edited offline');
+  await expect(
+    page.getByRole('textbox', { name: 'Note content' }),
+  ).toHaveAttribute('contenteditable', 'false');
   await page.waitForTimeout(300);
   await page.reload();
   await expect(page.getByRole('textbox', { name: 'Note content' })).toHaveText(
-    'Edited offline',
+    'Offline works',
   );
   await expect(page.locator('body')).toHaveJSProperty('scrollWidth', 390);
 });

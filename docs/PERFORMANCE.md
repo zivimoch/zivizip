@@ -65,3 +65,19 @@ Large-count generator support does not change storage limits: each goal still ac
 New worlds use addressable seed hashes and 256-contribution regions. Responsive card budgets are 24–40 construction samples; Explore budgets are 72–128. These are representative detail samples, not total stored entities or total SVG-node counts. Terrain and focal plants/planets have separately bounded geometry. A 32-entry LRU cache retains generated scenes, and offscreen cards unmount their SVG renderers. The scene module loads on demand; PWA shell precaching still downloads it for offline use.
 
 Only seed, theme, generator version, completion and ordered contribution references are persisted. No procedural scenery or per-frame snapshots are stored. Existing per-goal reference and workspace payload limits remain in force. Species and climate labels describe stylized illustrations, not biological or physical simulations.
+
+## Collaborative Notes — 2026-10-24
+
+Local Docker preview: 42 emitted JavaScript/CSS files total 649,096 bytes,
+226,679 bytes summed gzip (221.4 KiB). This counts all application chunks, not
+only the initial route; HTML, icons, service-worker code and user attachments
+are excluded. The collaboration engine is loaded on demand and included in PWA
+precaching. These are transfer-size measurements, not RAM or interaction-latency
+measurements.
+
+Only an open account/shared Note polls, at one-second intervals, with local
+updates debounced by 450 ms. Responses contain CRDT differences and metadata,
+not repeated full Note snapshots. Unchanged polls and duplicate updates do not
+rewrite SQLite records. Canonical document and CRDT history limits remain
+separate; see ADR 0003. Large-document concurrency and physical-phone performance
+still require dedicated measurement.

@@ -130,7 +130,7 @@ This document describes the target interaction model. The [verification scope](.
 - Register opens an email/message interest form; submission sends only those fields and does not create an account.
 - First-visit guest onboarding explains browser-local storage, backup and the interest-form exception. Persist acknowledgement by browser/origin, never by IP.
 - Normal browser/device restarts preserve login. Explicit logout, cookie deletion, expiry/revocation or credential changes can require authentication again.
-- Guest notes remain editable offline. Account cache is separate and read-only offline, and is cleared on logout. Copying guest notes to the account requires explicit choice.
+- Guest Text and Draw notes are read-only offline. Account cache is separate and read-only offline, and is cleared on logout. Copying guest notes to the account requires explicit choice.
 - Public pages may be indexed, but workspace contents must never be exposed for SEO.
 
 - Mobile bottom navigation selects the Notes, To do or Finance panel within Main. It does not open the note library or monthly financial planning; those remain accessible through Detail. Switching panels preserves the mounted note editor and panel state.
@@ -152,8 +152,8 @@ This document describes the target interaction model. The [verification scope](.
 - List markers followed by a space convert automatically. Lists use hanging indentation; Enter continues or exits an empty item, Shift+Enter inserts a line within the current item, and Tab/Shift+Tab change nesting.
 - Continuation and wrapped lines align with the first content character after the list marker, using its rendered width rather than inserted whitespace or a fixed character-width estimate.
 - Only account notes can create share links. Anyone holding a link can read the note without login. Editing is opt-in and enforced by the API. Owners can revoke the link. Guest workspaces are never uploaded as part of sharing.
-- Shared-note edits preserve owner metadata and reject stale revisions without overwriting either editor's unsaved content. Shared pages do not expose the rest of the account workspace.
-- Shared pages have no language dropdown or manual Save button. Text and Draw edits save automatically after a short pause, without interrupting editing. A status indicates pending, saved or failed writes; temporary connection failures retry, while revision conflicts preserve the local draft and stop automatic writes.
+- Account and shared Notes merge concurrent edits through CRDT updates without creating conflict-copy Notes. Shared edits preserve owner metadata and do not expose the rest of the account workspace.
+- Shared pages have no language dropdown or manual Save button. Text and Draw edits save automatically after a short pause, without interrupting editing. A status indicates pending, saved or failed writes; temporary connection failures retry idempotently while retaining pending changes. Offline editors are read-only; Ctrl/Cmd+S flushes autosave.
 - Autosave acknowledgements preserve the live editor's caret, selection and undo history, including formatted paragraphs and nested lists.
 
 - Nested list markers align with the parent content start (the same position as a Shift+Enter continuation), without adding manual spaces.

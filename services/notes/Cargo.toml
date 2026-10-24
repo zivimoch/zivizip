@@ -14,3 +14,5 @@ rand = "0.8"
 sha2 = "0.10"
 uuid = { version = "1", features = ["v4"] }
 async-stream = "0.3"
+yrs = "0.28"
+base64 = "0.22"

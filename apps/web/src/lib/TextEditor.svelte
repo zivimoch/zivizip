@@ -3,6 +3,7 @@
   import type { TextDocument } from './text/document';
   import type { mountText } from './text/editor';
   import './text/editor.css';
+  export let onhistory: ((forward: boolean) => void) | undefined = undefined;
   export let body: string;
   export let toolbar: HTMLElement | undefined = undefined;
   export let rich: TextDocument | undefined = undefined;
@@ -18,6 +19,7 @@
   $: options = {
     toolbar,
     body,
+    history: onhistory,
     rich,
     writable,
     language,

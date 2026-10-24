@@ -177,3 +177,21 @@ use its accessible combobox role. Guest reporting remains optional and separate
 from workspace content. The generated country database passed SQLite integrity
 checks and an example public-IP lookup. Country accuracy and unique-person
 identification are not guaranteed by these checks.
+
+## Collaborative Notes — 2026-10-24
+
+Local verification passed Svelte/TypeScript diagnostics, formatting, 52 frontend
+unit tests, 18 Rust tests, and all 76 browser scenarios across isolated batches.
+The local API process was restarted between batches to avoid sharing the normal
+login rate counter across unrelated tests; production limits were not changed.
+
+Coverage includes concurrent anonymous shared editors, owner/shared propagation,
+caret preservation during remote insertions and paragraph merges, local-only
+Undo, formatted text, image uploads, Draw reload, Ctrl/Cmd+S, typing during an
+in-flight save, idempotent retry after a lost response, live permission changes,
+revocation, and offline read-only Text/Draw. A unit regression checks that a late
+sync response cannot recreate an invalidated account cache. Existing Tasks,
+Finance, Goals, exports, navigation and account-isolation scenarios also passed.
+
+Viewport/touch simulation is not physical-device validation. Production and CI
+verification are separate from these local results.

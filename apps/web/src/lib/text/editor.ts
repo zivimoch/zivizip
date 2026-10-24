@@ -1,3 +1,4 @@
+import { delta } from '../collaboration/document';
 import { linkify } from '../links';
 import { readRuns, renderRuns } from './format';
 import {
@@ -13,6 +14,7 @@ import { listItem, listPrefix, nestedPrefix } from './lists';
 import { prepareImage } from './media';
 import { turn, type Point } from '../draw/scene';
 interface Options {
+  history?: (forward: boolean) => void;
   body: string;
   rich?: TextDocument;
   writable: boolean;
@@ -304,6 +306,120 @@ export function mountText(host: HTMLElement, options: Options) {
     p.setAttribute('aria-label', t('Image', 'Gambar'));
     return p;
   }
+  let composing = false;
+  editor.addEventListener('compositionstart', () => {
+    composing = true;
+    opts.busy(true);
+  });
+  editor.addEventListener('compositionend', () => {
+    composing = false;
+    persist();
+    opts.busy(false);
+  });
+  function selectionOffset(node: Node, offset: number): number {
+    let total = 0;
+    for (const child of editor.childNodes) {
+      if (node === editor) {
+        if ([...editor.childNodes].indexOf(child) >= offset) break;
+      } else if (child === node || child.contains(node)) {
+        const r = document.createRange();
+        r.setStart(child, 0);
+        r.setEnd(node, offset);
+        const container = document.createElement('div');
+        container.append(r.cloneContents());
+        return (
+          total +
+          readRuns(container)
+            .map((r) => r.text)
+            .join('').length
+        );
+      }
+      total +=
+        child instanceof HTMLElement && child.dataset.imageAnchor
+          ? 1
+          : (child instanceof HTMLElement
+              ? readRuns(child)
+                  .map((r) => r.text)
+                  .join('').length
+              : (child.textContent || '').length) + 1;
+    }
+    return total;
+  }
+  function selectionPoint(index: number): [Node, number] {
+    for (const child of editor.childNodes) {
+      const image = child instanceof HTMLElement && child.dataset.imageAnchor;
+      const length = image
+        ? 0
+        : child instanceof HTMLElement
+          ? readRuns(child)
+              .map((r) => r.text)
+              .join('').length
+          : (child.textContent || '').length;
+      if (index <= length && !image) {
+        const walk = document.createTreeWalker(
+          child,
+          NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+        );
+        let node: Node | null;
+        while ((node = walk.nextNode())) {
+          if (node.nodeType === Node.TEXT_NODE) {
+            if (index <= (node.textContent || '').length) return [node, index];
+            index -= (node.textContent || '').length;
+          } else if (node instanceof HTMLBRElement) {
+            if (index <= 0)
+              return [
+                node.parentNode!,
+                [...node.parentNode!.childNodes].indexOf(node),
+              ];
+            index--;
+          }
+        }
+        return [child, child.childNodes.length];
+      }
+      index -= length + 1;
+    }
+    return [editor, editor.childNodes.length];
+  }
+  function reconcile(next: TextDocument) {
+    const selection = getSelection();
+    const focused =
+      selection?.anchorNode &&
+      selection.focusNode &&
+      editor.contains(selection.anchorNode) &&
+      editor.contains(selection.focusNode);
+    const difference = delta(doc).diff(delta(next));
+    const positions = focused
+      ? [
+          selectionOffset(selection!.anchorNode!, selection!.anchorOffset),
+          selectionOffset(selection!.focusNode!, selection!.focusOffset),
+        ].map((p) => difference.transformPosition(p, false))
+      : null;
+    const savedPositions =
+      savedRange &&
+      editor.contains(savedRange.startContainer) &&
+      editor.contains(savedRange.endContainer)
+        ? [
+            selectionOffset(savedRange.startContainer, savedRange.startOffset),
+            selectionOffset(savedRange.endContainer, savedRange.endOffset),
+          ].map((p) => difference.transformPosition(p, false))
+        : null;
+    const scroll = host.scrollTop;
+    doc = next;
+    render();
+    if (positions && selection) {
+      const [a, ao] = selectionPoint(positions[0]);
+      const [b, bo] = selectionPoint(positions[1]);
+      selection.setBaseAndExtent(a, ao, b, bo);
+    }
+    if (savedPositions) {
+      const [a, ao] = selectionPoint(savedPositions[0]);
+      const [b, bo] = selectionPoint(savedPositions[1]);
+      savedRange = document.createRange();
+      savedRange.setStart(a, ao);
+      savedRange.setEnd(b, bo);
+    }
+    host.scrollTop = scroll;
+  }
   function render() {
     editor.replaceChildren(
       ...doc.blocks.map((b) =>
@@ -550,6 +666,10 @@ export function mountText(host: HTMLElement, options: Options) {
     paint();
   }
   function undo(forward: boolean) {
+    if (opts.history) {
+      opts.history(forward);
+      return;
+    }
     const from = forward ? redo : history,
       to = forward ? history : redo;
     if (!from.length) return;
@@ -935,11 +1055,6 @@ export function mountText(host: HTMLElement, options: Options) {
     }
     paint();
   });
-  editor.addEventListener('compositionstart', () => opts.busy(true));
-  editor.addEventListener('compositionend', () => {
-    persist(before);
-    opts.busy(false);
-  });
   host.addEventListener('keydown', (e) => {
     if (
       !opts.writable ||
@@ -963,6 +1078,10 @@ export function mountText(host: HTMLElement, options: Options) {
     }
     if (cmd && e.key.toLowerCase() === 'z') {
       e.preventDefault();
+      if (opts.history) {
+        opts.history(e.shiftKey);
+        return;
+      }
       const from = e.shiftKey ? redo : history,
         to = e.shiftKey ? history : redo;
       if (from.length) {
@@ -1173,13 +1292,13 @@ export function mountText(host: HTMLElement, options: Options) {
       editor.setAttribute('aria-readonly', String(!opts.writable));
       add.disabled = !opts.writable || uploading;
       const nextDoc = documentSnapshot(next.rich || fromText(next.body));
-      if (nextDoc !== accepted && !gesture && !uploading) {
-        doc = JSON.parse(nextDoc);
-        validateDocument(doc);
+      if (nextDoc !== accepted && !gesture && !uploading && !composing) {
+        const incoming = JSON.parse(nextDoc);
+        validateDocument(incoming);
         accepted = nextDoc;
         history = [];
         redo = [];
-        render();
+        reconcile(incoming);
       }
     },
     destroy() {

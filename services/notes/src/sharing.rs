@@ -1,6 +1,6 @@
 use super::*;
 
-fn shared(db: &Connection, token: &str) -> Result<(Note, bool)> {
+pub(super) fn shared(db: &Connection, token: &str) -> Result<(Note, bool)> {
     if token.len() != 64 {
         return Err(Error(StatusCode::NOT_FOUND, "Shared note not found"));
     }

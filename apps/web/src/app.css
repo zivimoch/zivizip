@@ -1059,3 +1059,9 @@ a.content-link {
   margin: 0;
   flex: 0 0 18px;
 }
+
+.note-save-status {
+  font-size: 11px;
+  white-space: nowrap;
+  margin-left: auto;
+}

@@ -21,6 +21,19 @@
   } from '$lib/currency';
   import { onMount, tick } from 'svelte';
   import TextEditor from '$lib/TextEditor.svelte';
+  import CollaborativeEditor from '$lib/CollaborativeEditor.svelte';
+  import type { SaveState } from '$lib/collaboration/room';
+  let collaborativeEditor: CollaborativeEditor | undefined;
+  let saveState: SaveState = 'connecting';
+  function syncStatus(state: SaveState, unsaved: boolean) {
+    saveState = state;
+    if (state === 'saved') error = '';
+    if (current) {
+      if (unsaved) dirty.add(current.id);
+      else dirty.delete(current.id);
+      dirty = new Set(dirty);
+    }
+  }
   import InstallApp from '$lib/InstallApp.svelte';
   import ShareSettings from '$lib/ShareSettings.svelte';
   import NoteLibrary from '$lib/NoteLibrary.svelte';
@@ -326,6 +339,7 @@
       ) {
         if (repo instanceof AccountNotes) repo.deactivate();
         eventSource?.close();
+        workspaceEpoch++;
         await db.delete();
         await activate(null);
         notice = t(
@@ -589,6 +603,7 @@
           if (account) {
             if (repo instanceof AccountNotes) repo.deactivate();
             eventSource?.close();
+            workspaceEpoch++;
             await db.delete();
           }
           await activate(null);
@@ -604,7 +619,26 @@
       window.removeEventListener('beforeunload', leave);
     };
   });
+  async function saveShortcut(event: KeyboardEvent) {
+    if (
+      (event.ctrlKey || event.metaKey) &&
+      event.key.toLowerCase() === 's' &&
+      current &&
+      (view === 'main' || view === 'notes')
+    ) {
+      event.preventDefault();
+      if (!account && online) {
+        await queue;
+        if (dirty.size) await retrySave();
+      }
+    }
+  }
   async function retrySave() {
+    if (account) {
+      await collaborativeEditor?.flush();
+      return;
+    }
+    await queue;
     if (!online && account) return;
     try {
       if (account) {
@@ -629,12 +663,14 @@
     }
   }
 
-  function openNote(id: string) {
+  async function openNote(id: string) {
+    if (id !== prefs.active) await collaborativeEditor?.flush();
     if (!prefs.open.includes(id)) prefs.open = [...prefs.open, id];
     prefs.active = id;
     remember();
   }
-  function closeNote(id: string) {
+  async function closeNote(id: string) {
+    if (id === prefs.active) await collaborativeEditor?.flush();
     const index = prefs.open.indexOf(id);
     prefs.open = prefs.open.filter((n) => n !== id);
     if (prefs.active === id)
@@ -642,7 +678,7 @@
     remember();
   }
   function editBody(body: string, original = current?.id, rich?: TextDocument) {
-    if (!original || !writable) return;
+    if (!original || !writable || !online) return;
     dirty.add(original);
     notes = notes.map((n) => (n.id === original ? { ...n, body, rich } : n));
     pending++;
@@ -695,6 +731,7 @@
   async function showNote(n?: Note) {
     if (!writable) return;
     await queue;
+    await collaborativeEditor?.flush();
     editing = n?.id || null;
     let number = prefs.counter + 1;
     while (notes.some((n) => n.name === `Note${number}`)) number++;
@@ -715,12 +752,18 @@
     try {
       if (editing) {
         const n = notes.find((n) => n.id === editing)!;
-        const saved = await repo.write({
-          ...n,
-          name: formName.trim(),
-          category: formCategory.trim(),
-          icon: formIcon,
-        });
+        const saved = await (account
+          ? api<Note>(`/notes/${n.id}/metadata`, 'PUT', {
+              name: formName.trim(),
+              category: formCategory.trim(),
+              icon: formIcon,
+            })
+          : repo.write({
+              ...n,
+              name: formName.trim(),
+              category: formCategory.trim(),
+              icon: formIcon,
+            }));
         notes = notes.filter((n) => n.id !== saved.id);
         notes = [...notes, saved];
         openNote(saved.id);
@@ -873,9 +916,14 @@
     }
   }
   function navigate(next: string) {
-    view = next;
-    if (next === 'main') mobileSection = 'notes';
-    mobileMenu = false;
+    const show = () => {
+      view = next;
+      if (next === 'main') mobileSection = 'notes';
+      mobileMenu = false;
+    };
+    if (next !== 'main' && collaborativeEditor)
+      void collaborativeEditor.flush().then(show);
+    else show();
   }
   let collapseFinanceNext = true;
   function toggleSide() {
@@ -960,6 +1008,8 @@
     target.addEventListener('pointercancel', stop);
   }
 </script>
+
+<svelte:window onkeydown={saveShortcut} />
 
 <svelte:head
   ><title>Zivizip — Personal workspace</title><meta
@@ -1186,12 +1236,62 @@
           <span class="breadcrumb-path"
             >{current.category}<span>/</span>{current.name}</span
           >
+          <span class="note-save-status" role="status"
+            >{!online
+              ? t('Offline · Read only', 'Offline · Hanya baca')
+              : account
+                ? saveState === 'saved'
+                  ? t('Saved', 'Tersimpan')
+                  : saveState === 'saving'
+                    ? t('Saving…', 'Menyimpan…')
+                    : saveState === 'connecting'
+                      ? t('Connecting…', 'Menghubungkan…')
+                      : t(
+                          'Not saved · Reconnecting…',
+                          'Belum tersimpan · Menghubungkan…',
+                        )
+                : pending || dirty.size
+                  ? t('Saving…', 'Menyimpan…')
+                  : t('Saved', 'Tersimpan')}</span
+          >
           {#if current.kind !== 'draw'}<div
               class="breadcrumb-tools"
               bind:this={textTools}
             ></div>{/if}
         </div>
-        {#if current.kind === 'draw'}
+        {#if account}
+          {#key `${workspaceEpoch}:${current.id}:${prefs.language}`}
+            {@const editorDb = db}
+            {@const epoch = workspaceEpoch}
+            <CollaborativeEditor
+              bind:this={collaborativeEditor}
+              iscurrent={() => epoch === workspaceEpoch}
+              note={current}
+              path={`/notes/${current.id}/sync`}
+              {db}
+              language={prefs.language}
+              toolbar={textTools}
+              view={drawViews[current.id]}
+              onviewport={(value) =>
+                current && rememberDrawView(current.id, value)}
+              onget={(id) =>
+                getMedia(editorDb, id, true, () => epoch === workspaceEpoch)}
+              onput={(blob) =>
+                putMedia(
+                  editorDb,
+                  blob,
+                  true,
+                  () => epoch === workspaceEpoch && writable && online,
+                )}
+              onchange={(value) => {
+                notes = notes.map((n) => (n.id === value.id ? value : n));
+              }}
+              onstatus={syncStatus}
+              onbusy={(value) => (drawBusy = value)}
+              onerror={problem}
+            />
+          {/key}
+        {:else if current.kind === 'draw'}
           {#key `${workspaceEpoch}:${current.id}:${prefs.language}`}
             {@const drawId = current.id}
             {@const editorDb = db}
@@ -1209,7 +1309,7 @@
                 )}
               body={current.body}
               name={current.name}
-              {writable}
+              writable={writable && online}
               language={prefs.language}
               view={drawViews[drawId]}
               onchange={(body) => editBody(body, drawId)}
@@ -1228,7 +1328,7 @@
               toolbar={textTools}
               body={current.body}
               rich={current.rich}
-              {writable}
+              writable={writable && online}
               language={prefs.language}
               onchange={(body, rich) => editBody(body, textId, rich)}
               onget={(id) =>

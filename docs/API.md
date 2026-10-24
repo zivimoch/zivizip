@@ -42,7 +42,7 @@ The registration modal collects an email and a message. Submitting sends those f
 
 SQLite lives in the `notes-data` Docker volume. Normal container recreation preserves notes and sessions. Removing the volume destroys server data.
 
-Stale updates produce conflict copies. Stale deletes return `409`. Authentication failures return `401`, invalid mutation origins return `403`, and rate limits return `429`. Account writes are not queued offline. Failed pending edits remain available for retry or download.
+Legacy stale updates produce conflict copies only before a Note initializes collaboration; afterward snapshot writes return `409` with a refresh instruction. Current clients use collaborative updates instead. Stale deletes return `409`. Authentication failures return `401`, invalid mutation origins return `403`, and rate limits return `429`. Account writes are not queued offline. Failed pending edits remain available for retry or download.
 
 ## Note documents
 
@@ -68,7 +68,7 @@ Removing an image removes its document reference. Unreferenced attachment bytes 
 
 `GET /api/tasks` returns `{ "revision": 0, "items": [] }` for a new account workspace. Each task contains `id`, `title`, `date` (empty or `YYYY-MM-DD`), `amount` (integer IDR), `done`, `archived`, and `createdAt` (milliseconds). The UI sorts dated tasks chronologically before undated tasks. Array order breaks ties for equal dates and determines undated order.
 
-`PUT /api/tasks` accepts the same shape with the last-read revision. One transaction validates and replaces the snapshot, increments the revision and emits an SSE invalidation. A stale revision returns `409` without changing server data. Client drafts remain available for reload/retry. This differs from Notes conflict copies: no duplicate tasks are created automatically.
+`PUT /api/tasks` accepts the same shape with the last-read revision. One transaction validates and replaces the snapshot, increments the revision and emits an SSE invalidation. A stale revision returns `409` without changing server data. Client drafts remain available for reload/retry. No duplicate tasks are created automatically.
 
 Limits: 10,000 tasks, 2 MB serialized items, unique alphanumeric/hyphen IDs up to 64 characters, nonempty titles up to 150 UTF-16 units, valid calendar dates and integer amounts from zero through 1 trillion whole currency units. Authentication and mutation-origin rules apply to both endpoints. Existing account-local tasks are migrated before their browser cache is replaced; guest tasks are only copied with explicit consent.
 
@@ -169,3 +169,11 @@ invented location. The gateway must overwrite `X-Real-IP` and the API must remai
 private; an untrusted direct connection can spoof the header. VPN and mobile
 network locations are approximate. The lookup file is server-only and is not
 shipped in frontend assets or guest backups.
+
+## Collaborative Notes
+
+`POST /api/notes/{id}/sync` requires the owner session. `POST /api/shared/{token}/sync` checks the current capability on every request. Both accept `{vector, update?}` as base64 Yjs v1 state-vector/update bytes and return `{metadata, editable, state, vector}`. `metadata` contains Note fields except body/rich; document content is reconstructed from CRDT state instead of resending the whole snapshot on every poll. `state` contains the server diff against the supplied vector; `vector` acknowledges server-integrated operations. Omitting `update` polls without writing content. Read-only links may poll but cannot submit updates.
+
+Updates merge inside a SQLite transaction, project to validated Text/Draw content and preserve note identity. Duplicate updates do not increment the revision. Unknown document roots, invalid content, unauthorized media, oversized state and revoked permissions are rejected atomically. Full state is capped at 8 MB and sync request bodies at 12 MB.
+
+`PUT /api/notes/{id}/metadata` accepts `{name, category, icon}` and changes only those owner-controlled fields without overwriting concurrently edited content. Note deletion still requires a current revision. See ADR 0003 for storage, retry and compatibility details.

@@ -152,7 +152,7 @@ test('arrow endpoint and shape label remain editable; eraser removes part of a s
   await expect(page.locator('[data-shape]')).toHaveCount(2);
 });
 
-test('mobile touch draw, double-tap text, resize and offline editing', async ({
+test('mobile touch draw, double-tap text, resize and offline read-only', async ({
   browser,
 }) => {
   const context = await browser.newContext({
@@ -228,11 +228,13 @@ test('mobile touch draw, double-tap text, resize and offline editing', async ({
     await page.screenshot({ path: '/tmp/zivizip-draw-mobile.png' });
     await page.evaluate(() => navigator.serviceWorker.ready.then(() => true));
     await page.waitForTimeout(300);
+    await cdp.detach();
     await context.setOffline(true);
     await page.reload();
     await expect(page.locator('[data-shape]')).toHaveCount(2);
-    await draw(page, 'Ellipse', [40, 40], [90, 90]);
-    await expect(page.locator('[data-shape]')).toHaveCount(3);
+    await expect(
+      page.getByRole('button', { name: 'Ellipse', exact: true }),
+    ).toBeDisabled();
   } finally {
     await context.close();
   }
@@ -295,7 +297,7 @@ test('owner Draw sync, offline read-only and API validation', async ({
           data: { ...note, body: '{"version":1,"shapes":[{"id":"bad"}]}' },
         })
       ).status(),
-    ).toBe(400);
+    ).toBe(409);
     await context.setOffline(true);
     await expect(
       page.getByRole('button', { name: 'Rectangle', exact: true }),

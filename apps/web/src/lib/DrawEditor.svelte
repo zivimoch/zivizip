@@ -5,6 +5,7 @@
   import './draw/editor.css';
   export let onget: (id: string) => Promise<Blob>;
   export let onput: (blob: Blob) => Promise<string>;
+  export let onhistory: ((forward: boolean) => void) | undefined = undefined;
   export let body: string;
   export let name: string;
   export let writable: boolean;
@@ -21,6 +22,7 @@
     get: onget,
     put: onput,
     body,
+    history: onhistory,
     name,
     writable,
     language,

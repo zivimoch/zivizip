@@ -1,106 +1,38 @@
 <script lang="ts">
   import '../../app.css';
   import { onMount } from 'svelte';
-  import { api, ApiError } from '$lib/account';
+  import { api } from '$lib/account';
   import type { Note } from '$lib/storage';
-  import type { TextDocument } from '$lib/text/document';
-  import TextEditor from '$lib/TextEditor.svelte';
-  import DrawEditor from '$lib/DrawEditor.svelte';
+  import CollaborativeEditor from '$lib/CollaborativeEditor.svelte';
+  import { WorkspaceDB } from '$lib/storage';
+  import type { SaveState } from '$lib/collaboration/room';
   let note: Note | null = null,
     editable = false,
     token = '',
     error = '',
-    dirty = false,
-    saving = false,
     busy = false;
+  let state: SaveState = 'connecting';
   let language: 'en' | 'id' = 'en';
   let toolbar: HTMLElement;
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  let version = 0,
-    blocked = false,
-    active = true;
+  let db: WorkspaceDB | undefined;
   const t = (en: string, id: string) => ({ en, id })[language];
   function fail(e: unknown) {
     error = e instanceof Error ? e.message : String(e);
   }
-  async function load() {
-    try {
-      const result = await api<{ note: Note; editable: boolean }>(
-        `/shared/${token}`,
-      );
-      note = result.note;
-      editable = result.editable;
-      error = '';
-      dirty = false;
-    } catch (e) {
-      fail(e);
-      editable = false;
-    }
-  }
   onMount(() => {
     token = location.hash.slice(1);
-    if (/^[a-f0-9]{64}$/.test(token)) void load();
-    else error = 'Invalid share link';
-    const warn = (e: BeforeUnloadEvent) => {
-      if (dirty || busy) {
-        e.preventDefault();
-        e.returnValue = '';
-      }
-    };
-    window.addEventListener('beforeunload', warn);
-    const reconnect = () => schedule();
-    window.addEventListener('online', reconnect);
-    return () => {
-      active = false;
-      clearTimeout(timer);
-      window.removeEventListener('beforeunload', warn);
-      window.removeEventListener('online', reconnect);
-    };
-  });
-  function schedule(delay = 600) {
-    clearTimeout(timer);
-    if (active && dirty && editable && !blocked)
-      timer = setTimeout(save, delay);
-  }
-  function setBusy(value: boolean) {
-    busy = value;
-    if (!busy) schedule();
-  }
-  function change(body: string, rich?: TextDocument) {
-    if (note && editable) {
-      note = { ...note, body, rich };
-      version++;
-      dirty = true;
-      schedule();
-    }
-  }
-  async function save() {
-    if (!active || !note || !editable || !dirty || saving || busy || blocked)
+    if (!/^[a-f0-9]{64}$/.test(token)) {
+      error = 'Invalid share link';
       return;
-    const sentVersion = version;
-    const draft = note;
-    saving = true;
-    error = '';
-    try {
-      const saved = await api<Note>(`/shared/${token}`, 'PUT', draft);
-      if (!active) return;
-      // The server acknowledges this draft; it does not replace the live editor.
-      // Re-serialized rich text can reset selection and undo even when unchanged.
-      note = { ...note, revision: saved.revision, updatedAt: saved.updatedAt };
-      dirty = version !== sentVersion;
-    } catch (e) {
-      if (!active) return;
-      blocked =
-        e instanceof ApiError &&
-        e.status >= 400 &&
-        e.status < 500 &&
-        e.status !== 429;
-      fail(e);
-    } finally {
-      saving = false;
-      schedule(error ? 3000 : 600);
     }
-  }
+    db = new WorkspaceDB(`zivizip-shared-${token}`);
+    void api<{ note: Note; editable: boolean }>(`/shared/${token}`)
+      .then((result) => {
+        note = result.note;
+        editable = result.editable;
+      })
+      .catch(fail);
+  });
   async function put(blob: Blob) {
     const bytes = await blob.arrayBuffer();
     const id = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))]
@@ -139,13 +71,20 @@
       >{editable
         ? t('Editing allowed', 'Boleh mengedit')
         : t('Read only', 'Hanya baca')}</span
-    >{#if editable}<span role="status"
-        >{error
-          ? t('Not saved', 'Belum tersimpan')
-          : saving || busy || dirty
+    ><span role="status"
+      >{state === 'offline'
+        ? t('Offline · Read only', 'Offline · Hanya baca')
+        : state === 'saved'
+          ? t('Saved', 'Tersimpan')
+          : state === 'saving' || busy
             ? t('Saving…', 'Menyimpan…')
-            : t('Saved', 'Tersimpan')}</span
-      >{/if}
+            : state === 'connecting'
+              ? t('Connecting…', 'Menghubungkan…')
+              : t(
+                  'Not saved · Reconnecting…',
+                  'Belum tersimpan · Menghubungkan…',
+                )}</span
+    >
   </header>
   {#if error}<p role="alert">{error}</p>{/if}
   {#if note}
@@ -153,30 +92,23 @@
       <span>{note.category} / {note.name}</span>
       <div bind:this={toolbar}></div>
     </div>
-    {#if note.kind === 'draw'}<DrawEditor
-        onput={put}
-        onget={get}
-        body={note.body}
-        name={note.name}
-        writable={editable}
-        {language}
-        onchange={(body) => change(body)}
-        onviewport={() => {}}
-        onbusy={setBusy}
-        onerror={fail}
-      />
-    {:else}<TextEditor
-        body={note.body}
-        rich={note.rich}
-        {toolbar}
-        writable={editable}
-        {language}
-        onchange={change}
-        onput={put}
-        onget={get}
-        onbusy={setBusy}
-        onerror={fail}
-      />{/if}
+    <CollaborativeEditor
+      {note}
+      path={`/shared/${token}/sync`}
+      {db}
+      {language}
+      {toolbar}
+      onput={put}
+      onget={get}
+      onchange={(value) => (note = value)}
+      onstatus={(value, _pending, allowed) => {
+        editable = allowed;
+        state = value;
+        if (value === 'saved') error = '';
+      }}
+      onbusy={(value) => (busy = value)}
+      onerror={fail}
+    />
   {/if}
 </main>
 

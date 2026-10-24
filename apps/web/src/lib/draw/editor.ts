@@ -22,6 +22,7 @@ import {
 import { shapeMarkup, contentBounds } from './render';
 type Tool = ShapeType | 'select' | 'hand' | 'erase';
 interface Options {
+  history?: (forward: boolean) => void;
   get: (id: string) => Promise<Blob>;
   put: (blob: Blob) => Promise<string>;
   body: string;
@@ -454,8 +455,8 @@ export function mountEditor(host: HTMLElement, options: Options) {
     q<HTMLButtonElement>('[data-action="reset"]').textContent =
       `${Math.round(view.zoom * 100)}%`;
     for (const [action, disabled] of [
-      ['undo', !history.length],
-      ['redo', !redo.length],
+      ['undo', !opts.history && !history.length],
+      ['redo', !opts.history && !redo.length],
       ['delete', !shapes.length],
       ['text', chosen()[0]?.type === 'image'],
       ['paste', importing],
@@ -968,6 +969,10 @@ export function mountEditor(host: HTMLElement, options: Options) {
     }
     finishText();
     if (id === 'undo' || id === 'redo') {
+      if (opts.history) {
+        opts.history(id === 'redo');
+        return;
+      }
       const from = id === 'undo' ? history : redo,
         to = id === 'undo' ? redo : history;
       if (from.length) {
