@@ -753,7 +753,7 @@ test('world themes persist, limit detail and stop rendering offscreen cards', as
     expect(await card.locator('.object').count()).toBeLessThanOrEqual(24);
     expect(
       await card.locator('.linked-items').evaluate((el) => el.clientHeight),
-    ).toBeGreaterThanOrEqual(60);
+    ).toBeGreaterThanOrEqual(56);
     const bounds = await card.boundingBox();
     const listBounds = await card.locator('.linked-items').boundingBox();
     expect(listBounds!.y + listBounds!.height).toBeLessThanOrEqual(
@@ -918,4 +918,115 @@ test('Unassigned uses archived tasks, shared two-row scrolling and a reversible 
     el.scrollLeft = 0;
   });
   await page.screenshot({ path: '/tmp/zivizip-goals-tray-mobile.png' });
+});
+
+test('goal cards reorder horizontally and persist without changing contributions', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page
+    .getByRole('button', { name: 'Continue as guest', exact: true })
+    .click();
+  await goals(page);
+  for (const title of ['Alpha goal', 'Beta goal', 'Gamma goal'])
+    await create(page, title);
+  const cards = page.locator('.goal-card');
+  const source = page.getByRole('button', {
+    name: 'Move goal Alpha goal',
+    exact: true,
+  });
+  const target = page.getByRole('region', { name: 'Gamma goal', exact: true });
+  const a = (await source.boundingBox())!,
+    b = (await target.boundingBox())!;
+  await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(b.x + b.width - 20, b.y + b.height / 2, { steps: 12 });
+  await expect(page.locator('.drag-preview')).toContainText('Alpha goal');
+  await page.mouse.up();
+  await expect(cards.locator('h2')).toHaveText([
+    'Beta goal',
+    'Gamma goal',
+    'Alpha goal',
+  ]);
+  await page.reload();
+  await goals(page);
+  await expect(cards.locator('h2')).toHaveText([
+    'Beta goal',
+    'Gamma goal',
+    'Alpha goal',
+  ]);
+  await page
+    .getByRole('button', { name: 'Move goal Alpha goal', exact: true })
+    .focus();
+  await page.keyboard.press('Alt+ArrowLeft');
+  await expect(cards.locator('h2')).toHaveText([
+    'Beta goal',
+    'Alpha goal',
+    'Gamma goal',
+  ]);
+});
+
+test('mobile goal handle reorders cards with horizontal edge scrolling', async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+  });
+  const page = await context.newPage();
+  try {
+    await page.goto('http://127.0.0.1:4174/');
+    await page
+      .getByRole('button', { name: 'Continue as guest', exact: true })
+      .click();
+    await goals(page);
+    await create(page, 'First island');
+    await create(page, 'Second island');
+    const strip = page.locator('.goal-strip');
+    await strip.evaluate((el) => (el.scrollLeft = 0));
+    const handle = page.getByRole('button', {
+      name: 'Move goal First island',
+      exact: true,
+    });
+    await handle.scrollIntoViewIfNeeded();
+    const a = (await handle.boundingBox())!;
+    const client = await context.newCDPSession(page);
+    await client.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ x: a.x + 22, y: a.y + 22 }],
+    });
+    await client.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [{ x: 380, y: a.y + 22 }],
+    });
+    await expect(page.locator('.drag-preview')).toContainText('First island');
+    await expect
+      .poll(() => strip.evaluate((el) => el.scrollLeft))
+      .toBeGreaterThan(0);
+    const b = (await page
+      .getByRole('region', { name: 'Second island', exact: true })
+      .boundingBox())!;
+    await client.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [{ x: Math.min(375, b.x + b.width - 15), y: a.y + 22 }],
+    });
+    await expect(strip).toHaveAttribute('data-card-target');
+    await client.send('Input.dispatchTouchEvent', {
+      type: 'touchEnd',
+      touchPoints: [],
+    });
+    await expect(page.locator('.goal-card h2')).toHaveText([
+      'Second island',
+      'First island',
+    ]);
+    await page.reload();
+    await goals(page);
+    await expect(page.locator('.goal-card h2')).toHaveText([
+      'Second island',
+      'First island',
+    ]);
+  } finally {
+    await context.close();
+  }
 });

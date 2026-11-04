@@ -60,7 +60,9 @@ async function drag(page: Page, title: string, target: string, after = true) {
   await page.mouse.move(b.x + 65, b.y + (after ? b.height - 4 : 4), {
     steps: 8,
   });
+  await expect(page.locator('.drag-preview')).toBeVisible();
   await page.mouse.up();
+  await expect(page.locator('.drag-preview')).toHaveCount(0);
   await expect(
     page.getByRole('button', { name: 'Add task', exact: true }),
   ).toBeEnabled();

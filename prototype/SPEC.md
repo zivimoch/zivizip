@@ -235,3 +235,9 @@ This document describes the target interaction model. The [verification scope](.
 - New Finance transactions suggest the most frequently used category for their direction across the workspace ledger. Ties use the latest transaction date, then category name. Changing direction updates the suggestion until the user explicitly changes the category; editing a transaction preserves its category.
 - Detail Notes provides individual checkboxes, select-all filtered results, clearing selection, and confirmed bulk deletion. Opening a card still opens Main. Failed deletions retain undeleted notes and selection for retry.
 - Mobile/coarse-pointer reorder handles use six dots with 44px touch targets for Goals contributions, Tasks, planning categories, and Notes tabs. Item bodies retain scrolling/tapping; Goals no longer starts drag after holding an item body. Desktop row dragging remains available. Canvas object manipulation and native text selection keep their editor-specific gestures.
+
+### Goal card ordering and task drag feedback
+
+- Goal cards can be reordered horizontally using their six-dot handle on desktop or touch devices. Desktop also allows dragging noninteractive card body areas. Card order is persisted in the existing Goals snapshot, included in backups, and synchronized for accounts. Alt+Left/Right on the handle provides keyboard reordering.
+- Goal-card dragging has a floating preview, insertion markers, horizontal edge scrolling and Escape/pointer-cancel support. Contribution assignment remains a separate gesture and does not reorder cards.
+- Task dragging shows a floating item preview, a count for multiple selected tasks, and an insertion marker. The source list stays stable until drop. Auto-scroll continues near the list edge without requiring repeated movement. Existing due-date ordering restrictions, selection and mobile six-dot handles remain in effect. Dropping outside the list or cancelling leaves the order unchanged.

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import DragPreview from './DragPreview.svelte';
   import { onMount } from 'svelte';
   import { capitalFirst } from './capitalization';
   import Icon from './Icon.svelte';
@@ -89,15 +90,155 @@
       const item = itemsByKey.get(key);
       return item ? [item] : [];
     });
+  let goalStrip: HTMLDivElement;
+  let cardDrag: {
+    id: string;
+    pointer: number;
+    startX: number;
+    startY: number;
+    x: number;
+    y: number;
+    moving: boolean;
+  } | null = null;
+  let cardTarget = '',
+    cardAfter = false,
+    cardFrame = 0;
+  function cancelCardDrag() {
+    if (cardDrag && goalStrip?.hasPointerCapture(cardDrag.pointer))
+      goalStrip.releasePointerCapture(cardDrag.pointer);
+    cardDrag = null;
+    cardTarget = '';
+    cancelAnimationFrame(cardFrame);
+  }
+  function cardDown(event: PointerEvent, goal: Goal) {
+    if (!writable || busy || dragging || event.button !== 0) return;
+    const handle = (event.target as Element).closest('[data-goal-grip]');
+    if (
+      !handle &&
+      (event.pointerType !== 'mouse' ||
+        (event.target as Element).closest(
+          'button,a,input,.cover,.linked-items',
+        ))
+    )
+      return;
+    event.preventDefault();
+    cardDrag = {
+      id: goal.id,
+      pointer: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      x: event.clientX,
+      y: event.clientY,
+      moving: false,
+    };
+    goalStrip.setPointerCapture(event.pointerId);
+  }
+  function cardPosition() {
+    if (!cardDrag?.moving) return;
+    const box = goalStrip.getBoundingClientRect();
+    const edge = 52;
+    if (cardDrag.y >= box.top - edge && cardDrag.y <= box.bottom + edge) {
+      if (cardDrag.x < box.left + edge)
+        goalStrip.scrollLeft -= Math.min(
+          28,
+          Math.max(10, (box.left + edge - cardDrag.x) * 0.45),
+        );
+      if (cardDrag.x > box.right - edge)
+        goalStrip.scrollLeft += Math.min(
+          28,
+          Math.max(10, (cardDrag.x - (box.right - edge)) * 0.45),
+        );
+    }
+    const cards = [
+      ...goalStrip.querySelectorAll<HTMLElement>('[data-card-id]'),
+    ].filter((candidate) => {
+      const bounds = candidate.getBoundingClientRect();
+      return (
+        candidate.dataset.cardId !== cardDrag?.id &&
+        cardDrag!.y >= bounds.top &&
+        cardDrag!.y <= bounds.bottom
+      );
+    });
+    let card: HTMLElement | undefined;
+    cardAfter = false;
+    if (cardDrag.x <= box.left + edge) {
+      card = cards[0];
+    } else if (cardDrag.x >= box.right - edge) {
+      card = cards.at(-1);
+      cardAfter = true;
+    } else {
+      card = cards.sort((a, b) => {
+        const ax = a.getBoundingClientRect().left + a.clientWidth / 2;
+        const bx = b.getBoundingClientRect().left + b.clientWidth / 2;
+        return Math.abs(cardDrag!.x - ax) - Math.abs(cardDrag!.x - bx);
+      })[0];
+    }
+    cardTarget = card?.dataset.cardId || '';
+    if (
+      cardTarget &&
+      card &&
+      cardDrag.x > box.left + edge &&
+      cardDrag.x < box.right - edge
+    ) {
+      const r = card.getBoundingClientRect();
+      cardAfter = cardDrag.x > r.left + r.width / 2;
+    }
+    cardFrame = requestAnimationFrame(cardPosition);
+  }
+  function cardMove(event: PointerEvent) {
+    if (!cardDrag || cardDrag.pointer !== event.pointerId) return;
+    cardDrag.x = event.clientX;
+    cardDrag.y = event.clientY;
+    if (
+      !cardDrag.moving &&
+      Math.hypot(
+        event.clientX - cardDrag.startX,
+        event.clientY - cardDrag.startY,
+      ) >= 7
+    ) {
+      cardDrag.moving = true;
+      cardPosition();
+    }
+  }
+  async function cardUp(event: PointerEvent) {
+    if (!cardDrag || cardDrag.pointer !== event.pointerId) return;
+    cancelAnimationFrame(cardFrame);
+    if (cardDrag.moving) cardPosition();
+    const source = cardDrag.id,
+      target = cardTarget,
+      after = cardAfter,
+      moving = cardDrag.moving;
+    cancelCardDrag();
+    if (moving && target) await reorderCard(source, target, after);
+  }
+  async function reorderCard(source: string, target: string, after: boolean) {
+    const item = state.items.find((goal) => goal.id === source);
+    if (!item || source === target) return;
+    const items = state.items.filter((goal) => goal.id !== source);
+    const index = items.findIndex((goal) => goal.id === target);
+    if (index < 0) return;
+    items.splice(index + Number(after), 0, item);
+    await commit(items);
+  }
+  function cardKey(event: KeyboardEvent, id: string) {
+    if (!event.altKey || !['ArrowLeft', 'ArrowRight'].includes(event.key))
+      return;
+    event.preventDefault();
+    event.stopPropagation();
+    const right = event.key === 'ArrowRight',
+      index = state.items.findIndex((goal) => goal.id === id);
+    const next = state.items[index + (right ? 1 : -1)];
+    if (next) void reorderCard(id, next.id, right);
+  }
   async function refresh() {
-    if (busy) return;
+    if (busy || cardDrag) return;
     try {
       const [g, ts, tx] = await Promise.all([
         repository.list(navigator.onLine),
         tasksRepository.list(navigator.onLine),
         financeRepository.list(navigator.onLine),
       ]);
-      if (!busy) {
+      if (!busy && !cardDrag) {
         if (g.revision >= state.revision) state = g;
         error = '';
         tasks = ts.items;
@@ -120,6 +261,7 @@
       window.removeEventListener('touchcancel', cancelDrag);
       window.removeEventListener('online', change);
       cancelDrag();
+      cancelCardDrag();
     };
   });
   $: if (ready && refreshToken >= 0) void refresh();
@@ -381,8 +523,14 @@
 
 <svelte:window
   onkeydown={(e) => {
-    if (e.key === 'Escape') cancelDrag();
+    if (e.key === 'Escape') {
+      cancelDrag();
+      cancelCardDrag();
+    }
   }}
+  onpointermove={cardMove}
+  onpointerup={cardUp}
+  onpointercancel={cancelCardDrag}
 />
 {#if touchActive}<div
     class="drag-ghost"
@@ -390,6 +538,12 @@
   >
     {allItems.find((i) => i.key === dragging)?.title}
   </div>{/if}
+{#if cardDrag?.moving}<DragPreview
+    x={cardDrag.x}
+    y={cardDrag.y}
+    title={state.items.find((goal) => goal.id === cardDrag?.id)?.title || ''}
+    detail={t('Move goal', 'Pindahkan target')}
+  />{/if}
 <section
   bind:this={pageElement}
   class="goals-page"
@@ -406,7 +560,12 @@
   {#if error}<p role="alert">
       {error} <button onclick={refresh}>{t('Reload', 'Muat ulang')}</button>
     </p>{/if}
-  <div class="goal-strip">
+  <div
+    class="goal-strip"
+    class:reordering={!!cardDrag}
+    data-card-target={cardTarget || undefined}
+    bind:this={goalStrip}
+  >
     {#each state.items as goal (goal.id)}
       {@const totals = goalTotals(goal, tasks, transactions)}
       <!-- Keyboard-focusable drop region supports Space/Tab/Enter drag without nested buttons. -->
@@ -415,6 +574,11 @@
         class:drop-hover={hover === goal.id}
         class:accepting={!!dragging}
         class="goal-card"
+        class:card-moving={cardDrag?.moving && cardDrag.id === goal.id}
+        class:card-before={cardTarget === goal.id && !cardAfter}
+        class:card-after={cardTarget === goal.id && cardAfter}
+        data-card-id={goal.id}
+        onpointerdown={(event) => cardDown(event, goal)}
         data-goal-drop={goal.id}
         tabindex="0"
         onkeydown={(e) => targetKey(e, goal.id)}
@@ -442,7 +606,21 @@
           >
         </div>
         <div class="goal-body">
-          <h2 title={goal.title}>{goal.title}</h2>
+          <div class="goal-heading">
+            <h2 title={goal.title}>{goal.title}</h2>
+            <button
+              class="goal-grip"
+              data-goal-grip
+              aria-label={`${t('Move goal', 'Pindahkan target')} ${goal.title}`}
+              title={t(
+                'Drag to reorder; Alt + arrow keys',
+                'Geser untuk mengurutkan; Alt + tombol panah',
+              )}
+              disabled={!writable || busy}
+              onkeydown={(event) => cardKey(event, goal.id)}
+              ><Icon name="grip" /></button
+            >
+          </div>
           <p class="description" title={goal.description}>{goal.description}</p>
           <div class="totals">
             <div>
@@ -643,6 +821,38 @@
 </dialog>
 
 <style>
+  .goal-strip.reordering {
+    scroll-snap-type: none;
+  }
+  .goal-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .goal-heading h2 {
+    min-width: 0;
+  }
+  .goal-grip {
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    padding: 10px;
+    border: 0;
+    background: transparent;
+    touch-action: none;
+    cursor: grab;
+  }
+  .goal-card.card-moving {
+    opacity: 0.45;
+  }
+  .goal-card.card-before {
+    box-shadow: inset 3px 0 var(--accent);
+  }
+  .goal-card.card-after {
+    box-shadow: inset -3px 0 var(--accent);
+  }
+
   .themes {
     display: flex;
     gap: 12px;

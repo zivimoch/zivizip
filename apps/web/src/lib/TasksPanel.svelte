@@ -1,4 +1,5 @@
 <script lang="ts">
+  import DragPreview from './DragPreview.svelte';
   import TouchGrip from './TouchGrip.svelte';
   import { capitalizeField } from './capitalization';
   import LinkedText from './LinkedText.svelte';
@@ -34,7 +35,59 @@
     date = '',
     deleting = false,
     formOpen = false;
-  let draftOrder: Task[] | null = null;
+  let dragX = 0,
+    dragY = 0,
+    dragFrame = 0;
+  let dropTarget = '',
+    dropAfter = false;
+  $: dragTitles = state.items.filter((task) => selected.has(task.id));
+  function trackDrag() {
+    if (!drag?.moving) return;
+    const bounds = list.getBoundingClientRect();
+    if (
+      dragX >= bounds.left &&
+      dragX <= bounds.right &&
+      dragY >= bounds.top - 30 &&
+      dragY <= bounds.bottom + 30
+    ) {
+      if (dragY > bounds.bottom - 35) list.scrollTop += 8;
+      if (dragY < bounds.top + 35) list.scrollTop -= 8;
+    }
+    updateTarget();
+    dragFrame = requestAnimationFrame(trackDrag);
+  }
+  function updateTarget() {
+    dropTarget = '';
+    dropAfter = false;
+    const source = state.items.find((task) => task.id === drag?.id);
+    if (!source) return;
+    const target = [...list.querySelectorAll<HTMLElement>('[data-task]')]
+      .filter((candidate) => {
+        const task = state.items.find(
+          (item) => item.id === candidate.dataset.task,
+        );
+        const box = candidate.getBoundingClientRect();
+        return (
+          !!task &&
+          !selected.has(task.id) &&
+          task.date === source.date &&
+          dragY >= box.top &&
+          dragY <= box.bottom
+        );
+      })
+      .sort((a, b) => {
+        const ay = a.getBoundingClientRect().top + a.clientHeight / 2;
+        const by = b.getBoundingClientRect().top + b.clientHeight / 2;
+        return Math.abs(dragY - ay) - Math.abs(dragY - by);
+      })[0];
+    if (!target || !list.contains(target) || !drag) return;
+    const item = state.items.find((task) => task.id === target.dataset.task);
+    if (!item || !source || selected.has(item.id) || item.date !== source.date)
+      return;
+    dropTarget = item.id;
+    const box = target.getBoundingClientRect();
+    dropAfter = dragY > box.top + box.height / 2;
+  }
   let drag: {
     id: string;
     pointer: number;
@@ -59,8 +112,8 @@
   $: percent = active.length ? Math.round((done / active.length) * 100) : 0;
   $: rows =
     mode === 'main'
-      ? visibleTasks(draftOrder || state.items, archived)
-      : (draftOrder || state.items)
+      ? visibleTasks(state.items, archived)
+      : state.items
           .filter((task) => task.done === (mode === 'completed'))
           .sort(
             (a, b) =>
@@ -284,34 +337,24 @@
       Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 7
     )
       return;
+    const started = !drag.moving;
     drag.moving = true;
+    dragX = event.clientX;
+    dragY = event.clientY;
     lastTap = { id: '', time: 0 };
-    const target = document
-      .elementFromPoint(event.clientX, event.clientY)
-      ?.closest<HTMLElement>('[data-task]');
-    if (target && list.contains(target)) {
-      const item = state.items.find((t) => t.id === target.dataset.task),
-        source = state.items.find((t) => t.id === drag!.id);
-      if (item && source && item.date === source.date) {
-        const box = target.getBoundingClientRect();
-        draftOrder = moveTasks(
-          draftOrder || state.items,
-          selected,
-          item.id,
-          event.clientY > box.top + box.height / 2,
-        );
-      }
-    }
-    const bounds = list.getBoundingClientRect();
-    if (event.clientY > bounds.bottom - 35) list.scrollTop += 14;
-    if (event.clientY < bounds.top + 35) list.scrollTop -= 14;
+    updateTarget();
+    if (started) dragFrame = requestAnimationFrame(trackDrag);
   }
+
   async function pointerUp(event: PointerEvent) {
     if (!drag || drag.pointer !== event.pointerId) return;
     const current = drag,
-      order = draftOrder;
+      order = dropTarget
+        ? moveTasks(state.items, selected, dropTarget, dropAfter)
+        : null;
+    cancelAnimationFrame(dragFrame);
+    dropTarget = '';
     drag = null;
-    draftOrder = null;
     if (list.hasPointerCapture(event.pointerId))
       list.releasePointerCapture(event.pointerId);
     if (current.moving) {
@@ -327,8 +370,9 @@
     } else lastTap = { id: current.id, time: now };
   }
   function cancelDrag() {
+    cancelAnimationFrame(dragFrame);
+    dropTarget = '';
     drag = null;
-    draftOrder = null;
   }
   function rowKey(event: KeyboardEvent, task: Task) {
     if (event.target !== event.currentTarget) return;
@@ -411,6 +455,7 @@
     changes.onmessage = () => void refresh();
     broadcast = () => changes.postMessage('changed');
     return () => {
+      cancelDrag();
       alive = false;
       changes.close();
       onbusy(false);
@@ -419,6 +464,22 @@
   let broadcast = () => {};
 </script>
 
+<svelte:window
+  onkeydown={(event) => {
+    if (event.key === 'Escape') cancelDrag();
+  }}
+  onpointermove={pointerMove}
+  onpointerup={pointerUp}
+  onpointercancel={cancelDrag}
+/>
+{#if drag?.moving}<DragPreview
+    x={dragX}
+    y={dragY}
+    title={dragTitles[0]?.title || ''}
+    detail={dragTitles.length > 1
+      ? `${dragTitles.length} ${t('tasks', 'tugas')}`
+      : t('To do', 'Tugas')}
+  />{/if}
 <svelte:document
   onkeydown={deleteKey}
   ondragstart={(event) => {
@@ -534,15 +595,14 @@
     tabindex="-1"
     aria-multiselectable="true"
     aria-label={t('Tasks', 'Tugas')}
-    onpointermove={pointerMove}
-    onpointerup={pointerUp}
-    onpointercancel={cancelDrag}
   >
     {#each rows as task (task.id)}
       <div
         class="task-row"
         class:selected={selected.has(task.id)}
         class:moving={drag?.moving && selected.has(task.id)}
+        class:drop-before={dropTarget === task.id && !dropAfter}
+        class:drop-after={dropTarget === task.id && dropAfter}
         data-task={task.id}
         role="row"
         aria-selected={selected.has(task.id)}
@@ -708,6 +768,12 @@
 </dialog>
 
 <style>
+  .task-row.drop-before {
+    box-shadow: inset 0 2px var(--accent);
+  }
+  .task-row.drop-after {
+    box-shadow: inset 0 -2px var(--accent);
+  }
   .tasks-panel {
     display: flex;
     flex-direction: column;
