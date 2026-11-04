@@ -61,20 +61,28 @@
     dropAfter = false;
     const source = state.items.find((task) => task.id === drag?.id);
     if (!source) return;
-    const target = [...list.querySelectorAll<HTMLElement>('[data-task]')]
+    const candidates = [...list.querySelectorAll<HTMLElement>('[data-task]')]
       .filter((candidate) => {
         const task = state.items.find(
           (item) => item.id === candidate.dataset.task,
         );
-        const box = candidate.getBoundingClientRect();
         return (
           !!task &&
           !selected.has(task.id) &&
-          task.date === source.date &&
-          dragY >= box.top &&
-          dragY <= box.bottom
+          task.date === source.date
         );
-      })
+      });
+    const hit = document
+      .elementsFromPoint(dragX, dragY)
+      .map((element) => element.closest<HTMLElement>('[data-task]'))
+      .find((candidate) => !!candidate && candidates.includes(candidate));
+    const target =
+      hit ||
+      candidates
+        .filter((candidate) => {
+          const box = candidate.getBoundingClientRect();
+          return dragY >= box.top && dragY <= box.bottom;
+        })
       .sort((a, b) => {
         const ay = a.getBoundingClientRect().top + a.clientHeight / 2;
         const by = b.getBoundingClientRect().top + b.clientHeight / 2;
