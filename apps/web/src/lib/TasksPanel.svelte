@@ -40,7 +40,9 @@
     dragFrame = 0;
   let dropTarget = '',
     dropAfter = false;
-  $: dragTitles = state.items.filter((task) => selected.has(task.id));
+  $: dragTitles = state.items.filter((task) =>
+    (drag?.moving ? drag.ids : selected).has(task.id),
+  );
   function trackDrag() {
     if (!drag?.moving) return;
     const bounds = list.getBoundingClientRect();
@@ -68,7 +70,7 @@
         );
         return (
           !!task &&
-          !selected.has(task.id) &&
+          !drag?.ids.has(task.id) &&
           task.date === source.date
         );
       });
@@ -76,21 +78,19 @@
       .elementsFromPoint(dragX, dragY)
       .map((element) => element.closest<HTMLElement>('[data-task]'))
       .find((candidate) => !!candidate && candidates.includes(candidate));
+    const listBounds = list.getBoundingClientRect();
     const target =
       hit ||
-      candidates
-        .filter((candidate) => {
-          const box = candidate.getBoundingClientRect();
-          return dragY >= box.top && dragY <= box.bottom;
-        })
-      .sort((a, b) => {
-        const ay = a.getBoundingClientRect().top + a.clientHeight / 2;
-        const by = b.getBoundingClientRect().top + b.clientHeight / 2;
-        return Math.abs(dragY - ay) - Math.abs(dragY - by);
-      })[0];
+      (dragY >= listBounds.top - 30 && dragY <= listBounds.bottom + 30
+        ? candidates.sort((a, b) => {
+            const ay = a.getBoundingClientRect().top + a.clientHeight / 2;
+            const by = b.getBoundingClientRect().top + b.clientHeight / 2;
+            return Math.abs(dragY - ay) - Math.abs(dragY - by);
+          })[0]
+        : undefined);
     if (!target || !list.contains(target) || !drag) return;
     const item = state.items.find((task) => task.id === target.dataset.task);
-    if (!item || !source || selected.has(item.id) || item.date !== source.date)
+    if (!item || !source || drag.ids.has(item.id) || item.date !== source.date)
       return;
     dropTarget = item.id;
     const box = target.getBoundingClientRect();
@@ -102,6 +102,7 @@
     x: number;
     y: number;
     moving: boolean;
+    ids: Set<string>;
   } | null = null;
   let lastTap = { id: '', time: 0 },
     suppressDouble = false;
@@ -320,7 +321,8 @@
       return;
     }
     const already = selected.has(task.id);
-    if (!already) selected = new Set([task.id]);
+    const selectedIds = already ? new Set(selected) : new Set([task.id]);
+    if (!already) selected = selectedIds;
     if (!writable) return;
     if (
       event.pointerType !== 'mouse' &&
@@ -334,6 +336,7 @@
       x: event.clientX,
       y: event.clientY,
       moving: false,
+      ids: selectedIds,
     };
     list.setPointerCapture(event.pointerId);
     (event.currentTarget as HTMLElement).focus({ preventScroll: true });
@@ -358,7 +361,7 @@
     if (!drag || drag.pointer !== event.pointerId) return;
     const current = drag,
       order = dropTarget
-        ? moveTasks(state.items, selected, dropTarget, dropAfter)
+        ? moveTasks(state.items, current.ids, dropTarget, dropAfter)
         : null;
     cancelAnimationFrame(dragFrame);
     dropTarget = '';
