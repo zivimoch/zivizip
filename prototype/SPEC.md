@@ -204,7 +204,7 @@ This document describes the target interaction model. The [verification scope](.
 ## Goal completion and brand refinement
 
 - Goal completion is controlled on the card only. The create/edit form has no Completed control; editing a goal preserves its existing completion state.
-- The slimmer Link monogram is shared by the sidebar, shared-note header, favicon, Apple touch icon and PWA launcher icons. Generated icons remain available offline.
+- The bold Link monogram is shared by the sidebar, shared-note header, favicon, Apple touch icon and PWA launcher icons. Generated icons remain available offline.
 
 ## Draw clipboard and images
 
@@ -241,3 +241,5 @@ This document describes the target interaction model. The [verification scope](.
 - Goal cards can be reordered horizontally using their six-dot handle on desktop or touch devices. Desktop also allows dragging noninteractive card body areas. Card order is persisted in the existing Goals snapshot, included in backups, and synchronized for accounts. Alt+Left/Right on the handle provides keyboard reordering.
 - Goal-card dragging has a floating preview, insertion markers, horizontal edge scrolling and Escape/pointer-cancel support. Contribution assignment remains a separate gesture and does not reorder cards.
 - Task dragging shows a floating item preview, a count for multiple selected tasks, and an insertion marker. The source list stays stable until drop. Auto-scroll continues near the list edge without requiring repeated movement. Existing due-date ordering restrictions, selection and mobile six-dot handles remain in effect. Dropping outside the list or cancelling leaves the order unchanged.
+
+- Searchable category and description selectors include a clear button when filled and enabled. Clearing keeps focus in the field, displays available suggestions, and preserves required-field validation. Fixed settings such as language, currency, and sort order always retain a valid option.

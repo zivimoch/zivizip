@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test('brand icons share the slim mark and remain available offline', async ({
+test('brand icons share the bold mark and remain available offline', async ({
   page,
   context,
 }) => {

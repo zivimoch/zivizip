@@ -1,6 +1,7 @@
 <script lang="ts">
   import { capitalFirst, capitalizeField } from './capitalization';
   export let capitalize = false;
+  export let clearLabel = 'Clear selection';
   export let onedit: () => void = () => {};
   import { onMount, tick } from 'svelte';
   export let id: string;
@@ -54,6 +55,13 @@
     close();
     input.focus();
   }
+  async function clear() {
+    value = '';
+    onedit();
+    await tick();
+    input.focus();
+    await show();
+  }
   function key(event: KeyboardEvent) {
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
@@ -87,32 +95,47 @@
   });
 </script>
 
-<input
-  use:capitalizeField={capitalize}
-  bind:this={input}
-  bind:value
-  {id}
-  {disabled}
-  {required}
-  {maxlength}
-  {placeholder}
-  aria-label={label}
-  role="combobox"
-  aria-autocomplete="list"
-  aria-expanded={open}
-  aria-controls={`${id}-options`}
-  aria-activedescendant={open && active >= 0
-    ? `${id}-option-${active}`
-    : undefined}
-  autocomplete="off"
-  onclick={show}
-  oninput={() => {
-    onedit();
-    void show();
-  }}
-  onkeydown={key}
-  onblur={close}
-/>
+<div class="suggestion-field">
+  <input
+    use:capitalizeField={capitalize}
+    bind:this={input}
+    bind:value
+    {id}
+    {disabled}
+    {required}
+    {maxlength}
+    {placeholder}
+    aria-label={label}
+    role="combobox"
+    aria-autocomplete="list"
+    aria-expanded={open}
+    aria-controls={`${id}-options`}
+    aria-activedescendant={open && active >= 0
+      ? `${id}-option-${active}`
+      : undefined}
+    autocomplete="off"
+    onclick={show}
+    oninput={() => {
+      onedit();
+      void show();
+    }}
+    onkeydown={key}
+    onblur={close}
+  />
+  {#if value && !disabled}
+    <button
+      class="clear-selection"
+      type="button"
+      aria-label={clearLabel}
+      title={clearLabel}
+      onpointerdown={(event) => event.preventDefault()}
+      onclick={clear}
+      ><svg viewBox="0 0 24 24" aria-hidden="true"
+        ><path d="m6 6 12 12M18 6 6 18" /></svg
+      ></button
+    >
+  {/if}
+</div>
 <div
   bind:this={menu}
   id={`${id}-options`}
@@ -133,7 +156,36 @@
 </div>
 
 <style>
+  .suggestion-field {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+  }
+  .clear-selection {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 38px;
+    height: 100%;
+    padding: 8px;
+    display: grid;
+    place-items: center;
+    border-radius: 6px;
+  }
+  .clear-selection svg {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    fill: none;
+    stroke-linecap: round;
+  }
+  .clear-selection:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -3px;
+  }
   input {
+    padding-right: 40px;
     width: 100%;
     min-width: 0;
   }

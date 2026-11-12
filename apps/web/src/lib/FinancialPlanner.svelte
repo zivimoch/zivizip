@@ -922,6 +922,7 @@
               >
                 <label
                   >{t('Category', 'Kategori')}<SuggestionField
+                    clearLabel={t('Clear selection', 'Kosongkan pilihan')}
                     id={`plan-category-${card.key}`}
                     label={t('Category', 'Kategori')}
                     options={categories}
@@ -1092,6 +1093,7 @@
     {:else}
       {#if mode === 'budget'}<label
           >{t('Category', 'Kategori')}<SuggestionField
+            clearLabel={t('Clear selection', 'Kosongkan pilihan')}
             id="edit-plan-category"
             label={t('Category', 'Kategori')}
             options={categories}

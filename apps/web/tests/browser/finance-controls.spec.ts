@@ -30,6 +30,21 @@ test('finance suggestions, optional description, formatted money and daily total
   await expect(
     page.getByRole('combobox', { name: 'Category', exact: true }),
   ).toHaveValue('Food');
+  const category = page.getByRole('combobox', {
+    name: 'Category',
+    exact: true,
+  });
+  await page
+    .getByRole('button', { name: 'Clear selection', exact: true })
+    .click();
+  await expect(category).toHaveValue('');
+  await expect(category).toBeFocused();
+  await expect(
+    page.getByRole('option', { name: 'Food', exact: true }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(category).toHaveValue('');
   await page.getByRole('combobox', { name: 'Category', exact: true }).fill('F');
   const option = page.getByRole('option', { name: 'Food', exact: true });
   await expect(option).toBeVisible();

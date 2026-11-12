@@ -405,6 +405,7 @@
       </fieldset>
       <label
         >{t('Category', 'Kategori')}<SuggestionField
+          clearLabel={t('Clear selection', 'Kosongkan pilihan')}
           onedit={() => (categoryEdited = true)}
           id="transaction-category"
           label={t('Category', 'Kategori')}
@@ -428,6 +429,7 @@
       >
       <label
         >{t('Description', 'Keterangan')}<SuggestionField
+          clearLabel={t('Clear selection', 'Kosongkan pilihan')}
           id="transaction-description"
           capitalize
           label={t('Description', 'Keterangan')}

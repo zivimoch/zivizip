@@ -13,6 +13,7 @@
     }
   }
   import { noteAssets } from '$lib/note-assets';
+  import SuggestionField from '$lib/SuggestionField.svelte';
   import { capitalFirst } from '$lib/capitalization';
   import {
     currencies,
@@ -1595,17 +1596,16 @@
         required
         maxlength="150"
       /></label
-    ><label
-      >{t('Category', 'Kategori')}<input
-        value={formCategory}
-        oninput={(e) => capitalise(e, 'category')}
-        oncompositionend={(e) => capitalise(e, 'category')}
-        list="categories"
+    ><label>
+      {t('Category', 'Kategori')}<SuggestionField
+        id="note-category"
+        label={t('Category', 'Kategori')}
+        clearLabel={t('Clear selection', 'Kosongkan pilihan')}
+        bind:value={formCategory}
+        options={categories}
         required
-        maxlength="60"
+        maxlength={60}
       /></label
-    ><datalist id="categories"
-      >{#each categories as c}<option value={c}></option>{/each}</datalist
     >
     {#if editing && account}{#key editing}<ShareSettings
           id={editing}
