@@ -1065,3 +1065,33 @@ a.content-link {
   white-space: nowrap;
   margin-left: auto;
 }
+
+.notes-tab-bar {
+  display: flex;
+  flex: 0 0 auto;
+  min-width: 0;
+  border-bottom: 1px solid var(--line);
+}
+.notes-tab-bar .tabs {
+  flex: 1;
+  min-width: 0;
+  border-bottom: 0;
+}
+.note-search-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin: 5px 8px;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+}
+.note-search-trigger svg {
+  width: 17px;
+  height: 17px;
+}
+.note-search-trigger kbd {
+  font: inherit;
+  font-size: 11px;
+}

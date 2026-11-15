@@ -243,3 +243,10 @@ This document describes the target interaction model. The [verification scope](.
 - Task dragging shows a floating item preview, a count for multiple selected tasks, and an insertion marker. The source list stays stable until drop. Auto-scroll continues near the list edge without requiring repeated movement. Existing due-date ordering restrictions, selection and mobile six-dot handles remain in effect. Dropping outside the list or cancelling leaves the order unchanged.
 
 - Searchable category and description selectors include a clear button when filled and enabled. Clearing keeps focus in the field, displays available suggestions, and preserves required-field validation. Fixed settings such as language, currency, and sort order always retain a valid option.
+
+## Quick Notes search
+
+- A compact magnifying-glass and Ctrl+K control stays at the right of the Notes tab bar while tabs scroll independently.
+- Ctrl+K (or Command+K) opens the same search dialog, with autofocus, keyboard navigation, Enter to open and Escape to close.
+- Search matches note names, categories and Text content. Selecting a result opens its tab on Main without creating a duplicate.
+- With an empty query, show up to 30 recently opened notes, newest first. History persists per browser workspace, remains separate for guest and account storage, and ignores deleted notes.

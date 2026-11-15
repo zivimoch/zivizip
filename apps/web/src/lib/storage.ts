@@ -48,6 +48,7 @@ export interface Note {
 export interface Preferences {
   key: 'workspace';
   open: string[];
+  recent?: string[];
   active: string | null;
   counter: number;
   language: 'en' | 'id';

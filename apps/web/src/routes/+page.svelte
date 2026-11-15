@@ -39,6 +39,8 @@
   import ShareSettings from '$lib/ShareSettings.svelte';
   import TouchGrip from '$lib/TouchGrip.svelte';
   import NoteLibrary from '$lib/NoteLibrary.svelte';
+  import NoteSearch from '$lib/NoteSearch.svelte';
+  let noteSearch: NoteSearch;
   import TasksPanel from '$lib/TasksPanel.svelte';
   import {
     GoalsRepository,
@@ -669,6 +671,10 @@
     if (id !== prefs.active) await collaborativeEditor?.flush();
     if (!prefs.open.includes(id)) prefs.open = [...prefs.open, id];
     prefs.active = id;
+    prefs.recent = [
+      id,
+      ...(prefs.recent || []).filter((item) => item !== id),
+    ].slice(0, 30);
     remember();
   }
   async function closeNote(id: string) {
@@ -1044,6 +1050,18 @@
 </script>
 
 <svelte:window onkeydown={saveShortcut} />
+{#if ready && !switching}
+  <NoteSearch
+    bind:this={noteSearch}
+    {notes}
+    recent={prefs.recent || []}
+    language={prefs.language}
+    onopen={async (id) => {
+      await openNote(id);
+      navigate('main');
+    }}
+  />
+{/if}
 
 <svelte:head
   ><title>Zivizip — Personal workspace</title><meta
@@ -1238,38 +1256,47 @@
     />
   {:else if view === 'main'}
     <section class="notes-pane">
-      <div class="tabs">
-        {#each openNotes as note (note.id)}<div
-            class="tab"
-            class:active={prefs.active === note.id}
-            data-note-id={note.id}
-          >
-            <TouchGrip
-              label={`${t('Drag tab', 'Geser tab')} ${note.name}`}
-              onpointerdown={(event) => moveTab(event, note.id)}
-            />
-            <button
-              class="tab-select"
-              onpointerdown={(e) => moveTab(e, note.id)}
-              onclick={() => {
-                if (!dragId) openNote(note.id);
-              }}
-              ondblclick={() => showNote(note)}
-              onkeydown={(e) => {
-                if (e.key === 'F2') showNote(note);
-              }}
-              title={`${note.name} · ${t('Double-click to edit', 'Klik dua kali untuk edit')}`}
-              ><Icon name={note.icon} /><span>{note.name}</span></button
-            ><button
-              class="close-tab"
-              aria-label={`${t('Close', 'Tutup')} ${note.name}`}
-              onclick={() => closeNote(note.id)}>×</button
+      <div class="notes-tab-bar">
+        <div class="tabs">
+          {#each openNotes as note (note.id)}<div
+              class="tab"
+              class:active={prefs.active === note.id}
+              data-note-id={note.id}
             >
-          </div>{/each}<button
-          class="add-tab"
-          disabled={!writable}
-          aria-label={t('New note', 'Catatan baru')}
-          onclick={() => showNote()}><Icon name="plus" /></button
+              <TouchGrip
+                label={`${t('Drag tab', 'Geser tab')} ${note.name}`}
+                onpointerdown={(event) => moveTab(event, note.id)}
+              />
+              <button
+                class="tab-select"
+                onpointerdown={(e) => moveTab(e, note.id)}
+                onclick={() => {
+                  if (!dragId) openNote(note.id);
+                }}
+                ondblclick={() => showNote(note)}
+                onkeydown={(e) => {
+                  if (e.key === 'F2') showNote(note);
+                }}
+                title={`${note.name} · ${t('Double-click to edit', 'Klik dua kali untuk edit')}`}
+                ><Icon name={note.icon} /><span>{note.name}</span></button
+              ><button
+                class="close-tab"
+                aria-label={`${t('Close', 'Tutup')} ${note.name}`}
+                onclick={() => closeNote(note.id)}>×</button
+              >
+            </div>{/each}<button
+            class="add-tab"
+            disabled={!writable}
+            aria-label={t('New note', 'Catatan baru')}
+            onclick={() => showNote()}><Icon name="plus" /></button
+          >
+        </div>
+        <button
+          class="note-search-trigger"
+          aria-label={t('Search notes', 'Cari catatan')}
+          title={t('Search notes (Ctrl+K)', 'Cari catatan (Ctrl+K)')}
+          onclick={() => noteSearch.show()}
+          ><Icon name="search" /><kbd>Ctrl+K</kbd></button
         >
       </div>
       {#if current}<div class="breadcrumb">
