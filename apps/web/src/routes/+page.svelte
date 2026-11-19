@@ -1086,9 +1086,13 @@
         navigate('main');
       }}
     >
-      <img class="brand-mark" src="/logo.svg" alt="" width="28" height="28" /><b
-        class="brand-wordmark">Zivizip<span aria-hidden="true">.</span></b
-      >
+      <img
+        class="brand-mark"
+        src="/logo.svg?v=20261119"
+        alt=""
+        width="28"
+        height="28"
+      /><b class="brand-wordmark">Zivizip<span aria-hidden="true">.</span></b>
     </a>
     <button
       class="hide-menu"

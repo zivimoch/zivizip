@@ -44,7 +44,7 @@ Use concise pull request descriptions covering the problem, behavior change, and
 
 ## Brand assets
 
-`apps/web/static/logo.svg` is the Link monogram source. After editing it, run
+`apps/web/static/logo.svg` is the ZV monogram source. After editing it, run
 `node scripts/generate-brand-icons.mjs` to rebuild the favicon, 192px/512px PWA
 icons and 180px Apple touch icon. The script uses the existing Playwright browser;
 set `CHROMIUM_PATH` if Chromium is installed outside Playwright. Keep the symbol

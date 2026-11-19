@@ -64,7 +64,7 @@
 <main class="shared-note">
   <header>
     <a href="/" aria-label="Zivizip Main"
-      ><img src="/logo.svg" alt="" width="28" height="28" /><b
+      ><img src="/logo.svg?v=20261119" alt="" width="28" height="28" /><b
         class="brand-wordmark">Zivizip<span aria-hidden="true">.</span></b
       ></a
     ><span

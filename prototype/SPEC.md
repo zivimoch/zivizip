@@ -4,7 +4,7 @@ This document describes the target interaction model. The [verification scope](.
 
 ## Brand identity
 
-- Use the cyan Link monogram: two angular interlocking strokes forming a Z. The sidebar, shared-note header, favicon and installed PWA icons use the same vector geometry.
+- Use the cyan (#00d8ec) ZV monogram with uniform rounded strokes, equal horizontal bars and a 1.5-degree counterclockwise rotation. The sidebar, shared-note header, favicon and installed PWA icons use the same vector geometry.
 - The Zivizip wordmark uses the section-heading typography with an accent-colored terminal dot, including the mobile header.
 - Launcher icons use a dark background and keep the mark inside the maskable safe area; provide an Apple touch icon.
 
@@ -204,7 +204,7 @@ This document describes the target interaction model. The [verification scope](.
 ## Goal completion and brand refinement
 
 - Goal completion is controlled on the card only. The create/edit form has no Completed control; editing a goal preserves its existing completion state.
-- The bold Link monogram is shared by the sidebar, shared-note header, favicon, Apple touch icon and PWA launcher icons. Generated icons remain available offline.
+- The rounded ZV monogram is shared by the sidebar, shared-note header, favicon, Apple touch icon and PWA launcher icons. Generated icons remain available offline.
 
 ## Draw clipboard and images
 

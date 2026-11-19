@@ -201,3 +201,14 @@ verification are separate from these local results.
 Local validation passed 54 frontend unit tests, 19 Rust tests, Svelte/TypeScript diagnostics, and 28 unique browser scenarios across targeted batches. Coverage includes unplanned Income budgets and category controls, frequency-based category suggestions without replacing manual choices, cancelled/confirmed bulk Notes deletion and reload persistence, desktop/task/planning regressions, and mobile six-dot handles for Goals, Tasks, planning categories and Notes tabs. Touch checks cover body scrolling, edge scrolling, cancellation and persisted order. Browser viewport/touch emulation is not physical-device verification.
 
 The CI suite includes dedicated Finance-default, Notes-library and mobile-reorder scenarios. Automatic Income changes validation only, without changing the stored snapshot shape; see the compatibility note in API.md before rolling back.
+
+## ZV brand assets — 2026-11-19
+
+The application and shared-note header use the cyan rounded ZV monogram with
+equal-length bars and a 1.5-degree counterclockwise rotation. Favicon, Apple
+touch icon and 192px/512px PWA icons derive from the same SVG. Asset URLs use a
+new version, and launcher artwork stays within the maskable safe circle.
+
+Docker validation passed Svelte diagnostics, all 54 frontend unit tests and the
+production build. The existing browser brand-assets scenario checks icon sizes
+and offline availability. Physical-device launcher refresh is not verified.

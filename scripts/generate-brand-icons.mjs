@@ -11,8 +11,9 @@ const logo = await readFile(new URL('logo.svg', assets), 'utf8');
 const shapes = logo
   .replace(/^[\s\S]*?<svg[^>]*>/, '')
   .replace(/<\/svg>\s*$/, '');
-// A 288px square fits inside the 512px maskable icon's central 80% circle.
-const icon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" fill="#101719"/><g transform="translate(112 112) scale(2.88)">${shapes}</g></svg>\n`;
+// Scale the 1024px source to 80% of the icon canvas. Its rotated strokes
+// remain inside the maskable icon's central 80% safe circle.
+const icon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" fill="#0d1721"/><g transform="translate(51.2 51.2) scale(0.4)">${shapes}</g></svg>\n`;
 await writeFile(new URL('icon.svg', assets), icon);
 const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM_PATH,
